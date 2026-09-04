@@ -1,23 +1,156 @@
 ﻿@inherits LayoutComponentBase
 
-<div class="page">
-    <div class="sidebar">
+@using System.Globalization
+@using CvPlatform.Web.Resources
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.Extensions.Localization
+
+@inject AuthenticationStateProvider AuthState
+@inject UserManager<ApplicationUser> Users
+@inject Blazored.LocalStorage.ILocalStorageService Storage
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+@inject IStringLocalizer<SharedResource> L
+
+<MudThemeProvider Theme="_theme" IsDarkMode="_darkMode" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudLayout>
+    <MudAppBar Elevation="1">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="ToggleDrawer" />
+        <MudText Typo="Typo.h6">@L["AppName"]</MudText>
+        <MudSpacer />
+        <AuthorizeView>
+            <Authorized>
+                <MudTextField T="string" Placeholder="@L["SearchPlaceholder"]" Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium"
+                              Class="mt-0" Margin="Margin.Dense" Variant="Variant.Outlined" Clearable="true" />
+            </Authorized>
+        </AuthorizeView>
+        <MudIconButton Icon="@(_darkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
+                       Color="Color.Inherit" OnClick="ToggleTheme" title="@L["Theme"]" />
+        <MudMenu Icon="@Icons.Material.Filled.Translate" Color="Color.Inherit" AriaLabel="@L["Language"]">
+            <MudMenuItem OnClick="@(() => SetLanguageAsync("en"))">English</MudMenuItem>
+            <MudMenuItem OnClick="@(() => SetLanguageAsync("pl"))">Polski</MudMenuItem>
+        </MudMenu>
+        <AuthorizeView>
+            <Authorized>
+                <MudMenu Icon="@Icons.Material.Filled.AccountCircle" Color="Color.Inherit">
+                    <MudMenuItem Href="/Account/Logout">@L["Logout"]</MudMenuItem>
+                </MudMenu>
+            </Authorized>
+            <NotAuthorized>
+                <MudButton Href="/Account/Login" Color="Color.Inherit">@L["Login"]</MudButton>
+                <MudButton Href="/Account/Register" Color="Color.Inherit">@L["Register"]</MudButton>
+            </NotAuthorized>
+        </AuthorizeView>
+    </MudAppBar>
+    <MudDrawer @bind-Open="_drawerOpen" Elevation="1" Variant="DrawerVariant.Responsive">
         <NavMenu />
-    </div>
-
-    <main>
-        <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
-        </div>
-
-        <article class="content px-4">
+    </MudDrawer>
+    <MudMainContent>
+        <MudContainer MaxWidth="MaxWidth.Large" Class="my-4">
             @Body
-        </article>
-    </main>
-</div>
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
 
 <div id="blazor-error-ui" data-nosnippet>
     An unhandled error has occurred.
     <a href="." class="reload">Reload</a>
     <span class="dismiss">🗙</span>
 </div>
+
+@code {
+    private bool _drawerOpen = true;
+    private bool _darkMode;
+    private MudTheme _theme = CreateTheme();
+
+    private void ToggleDrawer() => _drawerOpen = !_drawerOpen;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        var state = await AuthState.GetAuthenticationStateAsync();
+        if (state.User.Identity?.IsAuthenticated == true)
+        {
+            var user = await Users.GetUserAsync(state.User);
+            if (user is not null)
+                ApplyPrefs(user.PreferredTheme, user.PreferredLanguage);
+        }
+        else
+        {
+            var theme = await Storage.GetItemAsync<string>("cvplatform.theme");
+            var lang = await Storage.GetItemAsync<string>("cvplatform.lang");
+            ApplyPrefs(theme, lang);
+        }
+
+        StateHasChanged();
+    }
+
+    private void ApplyPrefs(string? theme, string? lang)
+    {
+        _darkMode = string.Equals(theme, "dark", StringComparison.OrdinalIgnoreCase);
+        _theme = CreateTheme();
+        if (!string.IsNullOrWhiteSpace(lang))
+        {
+            var culture = new CultureInfo(lang);
+            CultureInfo.CurrentCulture = culture;
+            CultureInfo.CurrentUICulture = culture;
+        }
+    }
+
+    private async Task ToggleTheme()
+    {
+        _darkMode = !_darkMode;
+        _theme = CreateTheme();
+        var value = _darkMode ? "dark" : "light";
+
+        var state = await AuthState.GetAuthenticationStateAsync();
+        var user = state.User.Identity?.IsAuthenticated == true
+            ? await Users.GetUserAsync(state.User)
+            : null;
+
+        if (user is not null)
+        {
+            user.PreferredTheme = value;
+            await Users.UpdateAsync(user);
+        }
+        else
+        {
+            await Storage.SetItemAsync("cvplatform.theme", value);
+        }
+    }
+
+    private async Task SetLanguageAsync(string lang)
+    {
+        var state = await AuthState.GetAuthenticationStateAsync();
+        var user = state.User.Identity?.IsAuthenticated == true
+            ? await Users.GetUserAsync(state.User)
+            : null;
+
+        if (user is not null)
+        {
+            user.PreferredLanguage = lang;
+            await Users.UpdateAsync(user);
+        }
+        else
+        {
+            await Storage.SetItemAsync("cvplatform.lang", lang);
+        }
+
+        await JS.InvokeVoidAsync("cvPlatform.setCultureCookie", lang);
+        Navigation.NavigateTo(Navigation.Uri, forceLoad: true);
+    }
+
+    private static MudTheme CreateTheme() => new()
+    {
+        PaletteLight = new PaletteLight(),
+        PaletteDark = new PaletteDark(),
+    };
+}

@@ -1,7 +1,18 @@
 ﻿@page "/"
 
-<PageTitle>Home</PageTitle>
+@using CvPlatform.Web.Resources
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.Extensions.Localization
 
-<h1>Hello, world!</h1>
+@attribute [Authorize]
+@inject IStringLocalizer<SharedResource> L
 
-Welcome to your new app.
+<PageTitle>@L["Home"]</PageTitle>
+
+<h1>@L["AppName"]</h1>
+
+<AuthorizeView>
+    <Authorized>
+        <MudText>Hello, @context.User.Identity?.Name</MudText>
+    </Authorized>
+</AuthorizeView>

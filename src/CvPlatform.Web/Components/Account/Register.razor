@@ -1,0 +1,79 @@
+@page "/Account/Register"
+@attribute [ExcludeFromInteractiveRouting]
+@attribute [AllowAnonymous]
+
+@using System.ComponentModel.DataAnnotations
+@using CvPlatform.Core.Data
+@using Microsoft.AspNetCore.Identity
+
+@inject UserManager<ApplicationUser> UserManager
+@inject SignInManager<ApplicationUser> SignInManager
+@inject IAppDbContextFactory DbFactory
+@inject NavigationManager Navigation
+
+<PageTitle>Register</PageTitle>
+
+<h1>Register</h1>
+
+@if (!string.IsNullOrEmpty(StatusMessage))
+{
+    <p role="alert">@StatusMessage</p>
+}
+
+<EditForm Model="Input" method="post" OnValidSubmit="RegisterUser" FormName="register">
+    <DataAnnotationsValidator />
+    <ValidationSummary role="alert" />
+    <div>
+        <label for="email">Email</label>
+        <InputText id="email" @bind-Value="Input.Email" autocomplete="username" />
+        <ValidationMessage For="() => Input.Email" />
+    </div>
+    <div>
+        <label for="password">Password</label>
+        <InputText id="password" type="password" @bind-Value="Input.Password" autocomplete="new-password" />
+        <ValidationMessage For="() => Input.Password" />
+    </div>
+    <button type="submit">Register</button>
+    <p><a href="/Account/Login">Already have an account? Log in</a></p>
+</EditForm>
+
+@code {
+    [SupplyParameterFromForm]
+    private InputModel Input { get => _input ??= new(); set => _input = value; }
+    private InputModel? _input;
+
+    [SupplyParameterFromQuery]
+    private string? ReturnUrl { get; set; }
+
+    private string? StatusMessage;
+
+    private async Task RegisterUser()
+    {
+        var user = new ApplicationUser { UserName = Input.Email, Email = Input.Email };
+        var result = await UserManager.CreateAsync(user, Input.Password);
+        if (!result.Succeeded)
+        {
+            StatusMessage = string.Join(" ", result.Errors.Select(e => e.Description));
+            return;
+        }
+
+        using var db = DbFactory.CreateDbContext();
+        db.Profiles.Add(new Profile { Id = Guid.NewGuid(), UserId = user.Id });
+        await db.SaveChangesAsync();
+
+        await SignInManager.SignInAsync(user, isPersistent: false);
+        Navigation.NavigateTo(ReturnUrl ?? "/");
+    }
+
+    private sealed class InputModel
+    {
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; } = "";
+
+        [Required]
+        [StringLength(100, MinimumLength = 8)]
+        [DataType(DataType.Password)]
+        public string Password { get; set; } = "";
+    }
+}
