@@ -3,7 +3,7 @@
 @code {
     protected override void OnInitialized()
     {
-        var returnUrl = Uri.EscapeDataString(Navigation.Uri);
-        Navigation.NavigateTo($"/Account/Login?returnUrl={returnUrl}");
+        var relative = Navigation.ToBaseRelativePath(Navigation.Uri);
+        Navigation.NavigateTo($"/Account/Login?returnUrl={Uri.EscapeDataString("/" + relative.TrimStart('/'))}");
     }
 }

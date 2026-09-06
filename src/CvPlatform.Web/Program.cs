@@ -92,4 +92,6 @@ app.MapAuthEndpoints();
 app.MapRazorComponents<CvPlatform.Web.Components.App>()
     .AddInteractiveServerRenderMode();
 
+await CvPlatform.Web.Seed.SeedData.SeedAsync(app.Services, builder.Configuration);
+
 app.Run();
