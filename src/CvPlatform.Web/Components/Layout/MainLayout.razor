@@ -1,6 +1,5 @@
 ﻿@inherits LayoutComponentBase
 
-@using System.Globalization
 @using CvPlatform.Web.Resources
 @using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.AspNetCore.Identity
@@ -81,28 +80,21 @@
         {
             var user = await Users.GetUserAsync(state.User);
             if (user is not null)
-                ApplyPrefs(user.PreferredTheme, user.PreferredLanguage);
+                ApplyTheme(user.PreferredTheme);
         }
         else
         {
             var theme = await Storage.GetItemAsync<string>("cvplatform.theme");
-            var lang = await Storage.GetItemAsync<string>("cvplatform.lang");
-            ApplyPrefs(theme, lang);
+            ApplyTheme(theme);
         }
 
         StateHasChanged();
     }
 
-    private void ApplyPrefs(string? theme, string? lang)
+    private void ApplyTheme(string? theme)
     {
         _darkMode = string.Equals(theme, "dark", StringComparison.OrdinalIgnoreCase);
         _theme = CreateTheme();
-        if (!string.IsNullOrWhiteSpace(lang))
-        {
-            var culture = new CultureInfo(lang);
-            CultureInfo.CurrentCulture = culture;
-            CultureInfo.CurrentUICulture = culture;
-        }
     }
 
     private async Task ToggleTheme()
@@ -138,10 +130,6 @@
         {
             user.PreferredLanguage = lang;
             await Users.UpdateAsync(user);
-        }
-        else
-        {
-            await Storage.SetItemAsync("cvplatform.lang", lang);
         }
 
         await JS.InvokeVoidAsync("cvPlatform.setCultureCookie", lang);

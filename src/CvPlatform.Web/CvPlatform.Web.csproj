@@ -22,6 +22,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Required for NavigationManager.NavigateTo during prerendering in interactive routing; do not remove. -->
     <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
     <UserSecretsId>30e7512c-a1f1-480c-b648-07932d0cf28e</UserSecretsId>
   </PropertyGroup>

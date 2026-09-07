@@ -1,11 +1,9 @@
 using System.Globalization;
 using Blazored.LocalStorage;
-using CvPlatform.Core.Data;
 using CvPlatform.Core.Entities;
 using CvPlatform.Infrastructure.Data;
 using CvPlatform.Web.Auth;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using MudBlazor.Services;
 using Serilog;
@@ -22,14 +20,9 @@ builder.Host.UseSerilog();
 
 var connectionString = builder.Configuration.GetConnectionString("Default")
     ?? throw new InvalidOperationException(
-        "Missing ConnectionStrings:Default. Set it with: dotnet user-secrets set \"ConnectionStrings:Default\" \"Host=localhost;Port=5434;Database=cvplatform;Username=cvplatform;Password=cvplatform\"");
+        $"Missing ConnectionStrings:Default. Set it with: dotnet user-secrets set \"ConnectionStrings:Default\" \"{AppDbContextDesignTimeFactory.DefaultConnectionString}\"");
 
-builder.Services.AddDbContextFactory<AppDbContext>(o => o
-    .UseNpgsql(connectionString)
-    .UseSnakeCaseNamingConvention()
-    .AddInterceptors(new VersionIncrementInterceptor()));
-builder.Services.AddSingleton<IAppDbContextFactory>(sp =>
-    new AppDbContextFactoryAdapter(sp.GetRequiredService<IDbContextFactory<AppDbContext>>()));
+builder.Services.AddCvPlatformDatabase(connectionString);
 
 builder.Services.AddIdentity<ApplicationUser, IdentityRole<Guid>>(options =>
     {
@@ -82,9 +75,9 @@ if (!app.Environment.IsDevelopment())
 
 app.UseRequestLocalization(app.Services.GetRequiredService<IOptions<RequestLocalizationOptions>>().Value);
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
-app.UseAntiforgery();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseAntiforgery();
 app.UseSerilogRequestLogging();
 
 app.MapStaticAssets();

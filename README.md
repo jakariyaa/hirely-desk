@@ -76,6 +76,9 @@ container still listens on 5432). The image reference is the fully-qualified
 registry here), and the data volume mounts at `/var/lib/postgresql` because the
 postgres:18 image refuses a mount directly on `/var/lib/postgresql/data`.
 
+Credentials in `compose.yml` and the seed/user-secrets examples are dev-only: the
+container is for local development (bound to localhost), never reuse them outside it.
+
 ## Deferred to later phases
 
 Attribute engine, profiles, positions + access rules, CV workflow, search/discussion/

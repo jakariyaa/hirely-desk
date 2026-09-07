@@ -115,5 +115,6 @@ public static class SeedData
                 IsPublic = true,
                 MaxProjects = 3,
             });
+        await db.SaveChangesAsync();
     }
 }
