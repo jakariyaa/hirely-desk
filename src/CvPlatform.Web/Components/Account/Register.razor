@@ -1,6 +1,7 @@
 @page "/Account/Register"
 @attribute [ExcludeFromInteractiveRouting]
 @attribute [AllowAnonymous]
+@attribute [EnableRateLimiting("auth")]
 
 @using System.ComponentModel.DataAnnotations
 @using CvPlatform.Core.Data
@@ -62,7 +63,7 @@
         await db.SaveChangesAsync();
 
         await SignInManager.SignInAsync(user, isPersistent: false);
-        Navigation.NavigateTo(ReturnUrl ?? "/");
+        Navigation.NavigateTo(RedirectUrlHelper.SafeReturnUrl(ReturnUrl));
     }
 
     private sealed class InputModel

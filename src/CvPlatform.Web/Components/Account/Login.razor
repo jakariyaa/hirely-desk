@@ -1,6 +1,7 @@
 @page "/Account/Login"
 @attribute [ExcludeFromInteractiveRouting]
 @attribute [AllowAnonymous]
+@attribute [EnableRateLimiting("auth")]
 
 @using System.ComponentModel.DataAnnotations
 @using Microsoft.AspNetCore.Authentication
@@ -91,7 +92,7 @@
         var result = await SignInManager.PasswordSignInAsync(Input.Email, Input.Password, Input.RememberMe, lockoutOnFailure: false);
         if (result.Succeeded)
         {
-            Navigation.NavigateTo(ReturnUrl ?? "/");
+            Navigation.NavigateTo(RedirectUrlHelper.SafeReturnUrl(ReturnUrl));
         }
         else
         {

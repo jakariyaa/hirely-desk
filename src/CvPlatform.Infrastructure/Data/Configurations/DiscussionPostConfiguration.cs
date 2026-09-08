@@ -9,6 +9,7 @@ public class DiscussionPostConfiguration : IEntityTypeConfiguration<DiscussionPo
     public void Configure(EntityTypeBuilder<DiscussionPost> builder)
     {
         builder.Property(p => p.TextMarkdown).IsRequired();
+        builder.Property(p => p.CreatedAt).HasDefaultValueSql("now()");
 
         builder.HasIndex(p => new { p.PositionId, p.CreatedAt });
 

@@ -1,6 +1,6 @@
 using CvPlatform.Core.Entities;
 using CvPlatform.Infrastructure.Data;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 

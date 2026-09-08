@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Threading.RateLimiting;
 using Blazored.LocalStorage;
 using CvPlatform.Core.Entities;
 using CvPlatform.Infrastructure.Data;
@@ -60,6 +61,19 @@ builder.Services.AddAuthorization();
 builder.Services.AddMudServices();
 builder.Services.AddBlazoredLocalStorage();
 builder.Services.AddLocalization();
+builder.Services.AddRateLimiter(o =>
+{
+    o.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    o.AddPolicy("auth", context => RateLimitPartition.GetFixedWindowLimiter(
+        context.Connection.RemoteIpAddress?.ToString() ?? "anonymous",
+        _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 10,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0,
+            AutoReplenishment = true
+        }));
+});
 builder.Services.Configure<RequestLocalizationOptions>(o =>
 {
     var cultures = new[] { new CultureInfo("en"), new CultureInfo("pl") };
@@ -75,6 +89,7 @@ if (!app.Environment.IsDevelopment())
 
 app.UseRequestLocalization(app.Services.GetRequiredService<IOptions<RequestLocalizationOptions>>().Value);
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseAntiforgery();
