@@ -1,0 +1,93 @@
+@using CvPlatform.Application.Attributes
+@using CvPlatform.Application.Authorization
+@using CvPlatform.Core.Enums
+@using System.Security.Claims
+@inject IAttributeDefinitionService Definitions
+@inject AuthenticationStateProvider AuthProvider
+
+<MudForm @ref="_form">
+    <MudDialog>
+        <DialogContent>
+            <MudSelect T="Guid" @bind-Value="_categoryId" Label="Category" Required="true">
+                @foreach (var category in Categories)
+                {
+                    <MudSelectItem Value="category.Id">@category.Name</MudSelectItem>
+                }
+            </MudSelect>
+            <MudTextField T="string" @bind-Value="_name" Label="Name" Required="true" />
+            <MudTextField T="string" @bind-Value="_description" Label="Description" />
+            <MudSelect T="AttributeDataType" @bind-Value="_dataType" Label="Data type" Required="true">
+                @foreach (var type in Enum.GetValues<AttributeDataType>())
+                {
+                    <MudSelectItem Value="type">@type</MudSelectItem>
+                }
+            </MudSelect>
+            @if (_dataType == AttributeDataType.Dropdown)
+            {
+                <MudTextField T="string" @bind-Value="_optionsJson" Label="Options JSON" Lines="3" />
+            }
+        </DialogContent>
+        <DialogActions>
+            <MudButton OnClick="MudDialog.Cancel">Cancel</MudButton>
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync" Disabled="_saving">Save</MudButton>
+        </DialogActions>
+    </MudDialog>
+</MudForm>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public AttributeDefinitionAdminDto? Editing { get; set; }
+    [Parameter, EditorRequired] public IReadOnlyList<AttributeCategoryDto> Categories { get; set; } = [];
+
+    private MudForm? _form;
+    private Guid _categoryId;
+    private string _name = "";
+    private string? _description;
+    private AttributeDataType _dataType;
+    private string? _optionsJson;
+    private bool _saving;
+
+    protected override void OnInitialized()
+    {
+        if (Editing is null)
+        {
+            _categoryId = Categories.FirstOrDefault()?.Id ?? Guid.Empty;
+            return;
+        }
+
+        _categoryId = Editing.CategoryId;
+        _name = Editing.Name;
+        _description = Editing.Description;
+        _dataType = Editing.DataType;
+        _optionsJson = Editing.OptionsJson;
+    }
+
+    private async Task SaveAsync()
+    {
+        await _form!.ValidateAsync();
+        if (!_form.IsValid || _categoryId == Guid.Empty || string.IsNullOrWhiteSpace(_name))
+            return;
+
+        _saving = true;
+        try
+        {
+            var auth = await AuthProvider.GetAuthenticationStateAsync();
+            var actor = new ActorContext(
+                Guid.Parse(auth.User.FindFirstValue(ClaimTypes.NameIdentifier)!),
+                auth.User.IsInRole("Admin"));
+            var input = new AttributeDefinitionInput(
+                _categoryId, _name, _description, _dataType,
+                _dataType == AttributeDataType.Dropdown ? _optionsJson : null,
+                Editing?.Version);
+            var result = Editing is null
+                ? await Definitions.CreateAsync(actor, input)
+                : await Definitions.UpdateAsync(actor, Editing.Id, input);
+            if (result.Succeeded)
+                MudDialog.Close(DialogResult.Ok(result.Value));
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

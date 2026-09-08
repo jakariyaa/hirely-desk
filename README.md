@@ -56,13 +56,14 @@ dotnet user-secrets set "Authentication:Google:ClientSecret" "<secret>"
 
 ```
 CvPlatform.slnx
-├─ src/CvPlatform.Core            // entities, enums, IAppDbContext / IAppDbContextFactory
-├─ src/CvPlatform.Infrastructure  // AppDbContext, interceptor, configurations, migrations
-├─ src/CvPlatform.Web            // composition root, Identity, MudBlazor shell, seed
+├─ src/CvPlatform.Core            // entities, enums, domain interfaces and logic
+├─ src/CvPlatform.Application     // use cases, DTOs, validators and application services
+├─ src/CvPlatform.Infrastructure   // AppDbContext, interceptor, configurations, migrations
+├─ src/CvPlatform.Web             // composition root, Identity, MudBlazor shell, seed
 └─ tests/CvPlatform.Tests        // xUnit + FluentAssertions
 ```
 
-Core never references Infrastructure. Services (later phases) inject
+Core never references Infrastructure. Application services inject the Core-owned
 `IAppDbContextFactory` only. The `VersionIncrementInterceptor` is registered on the
 `AddDbContextFactory` options — the only registration that fires with factory-created
 contexts. Theme/language are read from `Blazored.LocalStorage` only in

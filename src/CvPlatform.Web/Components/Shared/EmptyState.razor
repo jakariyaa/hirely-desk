@@ -1,0 +1,20 @@
+<div class="cv-empty-state">
+    <MudIcon Icon="@Icon" Color="Color.Primary" Size="Size.Large" Class="cv-empty-icon" />
+    <MudText Typo="Typo.h6">@Title</MudText>
+    @if (!string.IsNullOrWhiteSpace(Description))
+    {
+        <MudText Typo="Typo.body2" Class="cv-empty-description">@Description</MudText>
+    }
+    @if (ChildContent is not null)
+    {
+        <div class="cv-empty-actions">@ChildContent</div>
+    }
+</div>
+
+@code {
+    /// <summary>Material icon name, e.g. Icons.Material.Filled.FolderOpen.</summary>
+    [Parameter] public string Icon { get; set; } = Icons.Material.Filled.FolderOpen;
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+    [Parameter] public string? Description { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

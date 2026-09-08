@@ -2,41 +2,46 @@
 @attribute [ExcludeFromInteractiveRouting]
 @attribute [AllowAnonymous]
 @attribute [EnableRateLimiting("auth")]
+@layout AuthLayout
 
 @using System.ComponentModel.DataAnnotations
 @using CvPlatform.Core.Data
-@using Microsoft.AspNetCore.Identity
+@using CvPlatform.Web.Resources
 
 @inject UserManager<ApplicationUser> UserManager
 @inject SignInManager<ApplicationUser> SignInManager
 @inject IAppDbContextFactory DbFactory
 @inject NavigationManager Navigation
+@inject IStringLocalizer<SharedResource> L
 
-<PageTitle>Register</PageTitle>
+<PageTitle>@L["Register"]</PageTitle>
 
-<h1>Register</h1>
+<MudPaper Elevation="2" Class="cv-auth-card">
+    <MudText Typo="Typo.h5" Class="mb-1">@L["Register"]</MudText>
+    <MudText Typo="Typo.body2" Class="cv-text-secondary mb-4">@L["RegisterHelper"]</MudText>
 
-@if (!string.IsNullOrEmpty(StatusMessage))
-{
-    <p role="alert">@StatusMessage</p>
-}
+    @if (!string.IsNullOrEmpty(StatusMessage))
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-4">@StatusMessage</MudAlert>
+    }
 
-<EditForm Model="Input" method="post" OnValidSubmit="RegisterUser" FormName="register">
-    <DataAnnotationsValidator />
-    <ValidationSummary role="alert" />
-    <div>
-        <label for="email">Email</label>
-        <InputText id="email" @bind-Value="Input.Email" autocomplete="username" />
-        <ValidationMessage For="() => Input.Email" />
-    </div>
-    <div>
-        <label for="password">Password</label>
-        <InputText id="password" type="password" @bind-Value="Input.Password" autocomplete="new-password" />
-        <ValidationMessage For="() => Input.Password" />
-    </div>
-    <button type="submit">Register</button>
-    <p><a href="/Account/Login">Already have an account? Log in</a></p>
-</EditForm>
+    <EditForm Model="Input" method="post" OnValidSubmit="RegisterUser" FormName="register" novalidate>
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+        <MudTextField T="string" Label="@L["Email"]" @bind-Value="Input.Email" For="() => Input.Email"
+                      UserAttributes="@EmailAttributes"
+                      Variant="Variant.Outlined" Class="mb-3" />
+        <MudTextField T="string" Label="@L["PasswordMinLength"]" @bind-Value="Input.Password" For="() => Input.Password"
+                      UserAttributes="@NewPasswordAttributes"
+                      Variant="Variant.Outlined" InputType="InputType.Password" Class="mb-3" />
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Class="mt-4"
+                   ButtonType="ButtonType.Submit">@L["Register"]</MudButton>
+    </EditForm>
+
+    <MudText Typo="Typo.body2" Class="mt-4">
+        <a href="/Account/Login">@L["AlreadyHaveAccount"]</a>
+    </MudText>
+</MudPaper>
 
 @code {
     [SupplyParameterFromForm]
@@ -47,6 +52,10 @@
     private string? ReturnUrl { get; set; }
 
     private string? StatusMessage;
+    private static readonly Dictionary<string, object> EmailAttributes =
+        new Dictionary<string, object> { ["autocomplete"] = "email" };
+    private static readonly Dictionary<string, object> NewPasswordAttributes =
+        new Dictionary<string, object> { ["autocomplete"] = "new-password" };
 
     private async Task RegisterUser()
     {

@@ -1,0 +1,172 @@
+@inject IProjectService ProjectService
+@inject ISnackbar Snackbar
+@inject AuthenticationStateProvider AuthProvider
+@inject IStringLocalizer<SharedResource> L
+@using CvPlatform.Application.Common
+@using CvPlatform.Application.Authorization
+@using CvPlatform.Application.Projects
+@using CvPlatform.Web.Resources
+@using Microsoft.Extensions.Localization
+@using System.Security.Claims
+
+<MudForm @ref="@_form" Class="pa-2">
+    <MudDialog>
+        <DialogContent>
+            <MudPaper Class="cv-panel pa-3 mb-3" Outlined="true">
+                <MudTextField T="string" @bind-Value="@_name" Label="@L["ProjectName"]"
+                              Variant="Variant.Outlined" Immediate="false"
+                              Validation="@(new Func<string, IEnumerable<string>>(ValidateName))" />
+                <MudStack Row Spacing="2" Class="mt-3">
+                    <MudDatePicker Date="@ToDateTime(_periodStart)"
+                                   DateChanged="@(d => _periodStart = ToDateOnly(d))"
+                                   Label="@L["PeriodStart"]" Variant="Variant.Outlined" />
+                    <MudDatePicker Date="@ToDateTime(_periodEnd)"
+                                   DateChanged="@(d => _periodEnd = ToDateOnly(d))"
+                                   Label="@L["PeriodEnd"]" Variant="Variant.Outlined" />
+                </MudStack>
+                <MudTextField T="string" @bind-Value="@_description" Label="@L["ProjectDescription"]"
+                              Variant="Variant.Outlined" Lines="6" Class="mt-3"
+                              HelperText="@L["MarkdownHelper"]" />
+                <div class="mt-3">
+                    <MudText Typo="Typo.caption" Class="mb-1">@L["ProjectTags"]</MudText>
+                    @if (_selectedTags.Count > 0)
+                    {
+                        <MudStack Row Spacing="1" Wrap="Wrap.Wrap" Class="mb-2">
+                            @foreach (var tag in _selectedTags.ToList())
+                            {
+                                <MudChip T="string" Size="Size.Small" Text="@tag" OnClose="@(() => RemoveTag(tag))" />
+                            }
+                        </MudStack>
+                    }
+                    <MudStack Row Spacing="1" AlignItems="AlignItems.Center">
+                        <MudAutocomplete T="string" Value="@_newTag" ValueChanged="@(value => _newTag = value ?? "")"
+                                         SearchFunc="SearchTagsAsync" Placeholder="@L["AddTagHint"]"
+                                         Variant="Variant.Outlined" Immediate="true" Class="flex-grow-1"
+                                         CoerceText="true" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Add" Variant="Variant.Outlined"
+                                       title="@L["AddTag"]" OnClick="@(() => AddTag(_newTag))" />
+                    </MudStack>
+                </div>
+            </MudPaper>
+        </DialogContent>
+        <DialogActions>
+            <MudButton Variant="Variant.Text" OnClick="@(() => MudDialog.Cancel())">@L["Cancel"]</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitAsync"
+                       Disabled="@_saving">@L["Save"]</MudButton>
+        </DialogActions>
+    </MudDialog>
+</MudForm>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public ProjectDto? Editing { get; set; }
+
+    private string _name = "";
+    private DateOnly? _periodStart;
+    private DateOnly? _periodEnd;
+    private string _description = "";
+    private HashSet<string> _selectedTags = [];
+    private string _newTag = "";
+    private MudForm? _form;
+    private bool _saving;
+
+    protected override void OnInitialized()
+    {
+        if (Editing is not null)
+        {
+            _name = Editing.Name;
+            _periodStart = Editing.PeriodStart;
+            _periodEnd = Editing.PeriodEnd;
+            _description = Editing.DescriptionMarkdown;
+            _selectedTags = [.. Editing.Tags];
+        }
+    }
+
+    private IEnumerable<string> ValidateName(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            yield return L["ProjectNameRequired"];
+        else if (name.Trim().Length > 200)
+            yield return L["ProjectNameTooLong"];
+    }
+
+    private void OnTagKeyDown(KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter")
+            AddTag(_newTag);
+    }
+
+    private void AddTag(string tag)
+    {
+        var trimmed = tag?.Trim() ?? "";
+        if (trimmed.Length > 0)
+        {
+            _selectedTags.Add(trimmed);
+            _newTag = "";
+        }
+    }
+
+    private void RemoveTag(string tag) => _selectedTags.Remove(tag);
+
+    private async Task<IEnumerable<string>> SearchTagsAsync(string value, CancellationToken ct)
+    {
+        var result = await ProjectService.SearchTagsAsync(value, ct);
+        return result.Succeeded && result.Value is not null ? result.Value : [];
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (_form is null)
+            return;
+
+        await _form.ValidateAsync();
+        if (!_form.IsValid)
+            return;
+
+        _saving = true;
+        try
+        {
+            var actor = await GetActorAsync();
+            var input = new ProjectInput(
+                _name,
+                _periodStart,
+                _periodEnd,
+                _description,
+                _selectedTags.ToList(),
+                Editing?.Version);
+
+            Result<ProjectDto> result = Editing is null
+                ? await ProjectService.CreateAsync(actor, input)
+                : await ProjectService.UpdateAsync(actor, Editing.Id, input);
+
+            if (result.Succeeded)
+            {
+                Snackbar.Add(L["ProjectSaved"], Severity.Success);
+                MudDialog.Close(DialogResult.Ok(result.Value));
+            }
+            else
+            {
+                Snackbar.Add(result.Error.Message, Severity.Error);
+            }
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private static DateTime? ToDateTime(DateOnly? date) =>
+        date.HasValue ? date.Value.ToDateTime(TimeOnly.MinValue) : null;
+
+    private static DateOnly? ToDateOnly(DateTime? dateTime) =>
+        dateTime.HasValue ? DateOnly.FromDateTime(dateTime.Value) : null;
+
+    private async Task<ActorContext> GetActorAsync()
+    {
+        var authState = await AuthProvider.GetAuthenticationStateAsync();
+        return new ActorContext(
+            Guid.Parse(authState.User.FindFirstValue(ClaimTypes.NameIdentifier)!),
+            authState.User.IsInRole("Admin"));
+    }
+}

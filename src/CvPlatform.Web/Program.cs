@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Threading.RateLimiting;
 using Blazored.LocalStorage;
+using CvPlatform.Application;
 using CvPlatform.Core.Entities;
 using CvPlatform.Infrastructure.Data;
 using CvPlatform.Web.Auth;
@@ -24,6 +25,7 @@ var connectionString = builder.Configuration.GetConnectionString("Default")
         $"Missing ConnectionStrings:Default. Set it with: dotnet user-secrets set \"ConnectionStrings:Default\" \"{AppDbContextDesignTimeFactory.DefaultConnectionString}\"");
 
 builder.Services.AddCvPlatformDatabase(connectionString);
+builder.Services.AddCvPlatformApplication();
 
 builder.Services.AddIdentity<ApplicationUser, IdentityRole<Guid>>(options =>
     {

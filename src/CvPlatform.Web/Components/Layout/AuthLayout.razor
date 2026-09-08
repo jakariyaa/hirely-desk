@@ -1,0 +1,38 @@
+@inherits LayoutComponentBase
+
+<MudThemeProvider Theme="@CvPlatformTheme.Instance" IsDarkMode="_darkMode" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudLayout>
+    <MudMainContent Class="cv-main cv-auth-main">
+        <MudContainer MaxWidth="MaxWidth.Small" Class="cv-auth-container">
+            <div class="cv-auth-brand">
+                <span class="cv-brand-mark cv-brand-mark-lg" aria-hidden="true">CV</span>
+                <MudText Typo="Typo.h5" Class="cv-auth-brand-title">@L["AppName"]</MudText>
+            </div>
+            @Body
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
+
+@using CvPlatform.Web.Resources
+@using CvPlatform.Web.Theme
+@using Microsoft.Extensions.Localization
+@inject Blazored.LocalStorage.ILocalStorageService Storage
+@inject IStringLocalizer<SharedResource> L
+
+@code {
+    private bool _darkMode;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        var theme = await Storage.GetItemAsync<string>("cvplatform.theme");
+        _darkMode = string.Equals(theme, "dark", StringComparison.OrdinalIgnoreCase);
+        StateHasChanged();
+    }
+}

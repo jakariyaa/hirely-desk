@@ -1,0 +1,24 @@
+@using Microsoft.AspNetCore.Components.Web
+
+<div class="cv-page-header">
+    <div>
+        <MudText Typo="Typo.h5" Class="cv-page-title">@Title</MudText>
+        @if (!string.IsNullOrWhiteSpace(Subtitle))
+        {
+            <MudText Typo="Typo.body2" Class="cv-page-subtitle">@Subtitle</MudText>
+        }
+    </div>
+    @if (ChildContent is not null)
+    {
+        <div class="cv-page-actions">@ChildContent</div>
+    }
+</div>
+
+@code {
+    /// <summary>Page title shown as the h5 heading.</summary>
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+    /// <summary>Optional secondary line under the title.</summary>
+    [Parameter] public string? Subtitle { get; set; }
+    /// <summary>Right-aligned action buttons.</summary>
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

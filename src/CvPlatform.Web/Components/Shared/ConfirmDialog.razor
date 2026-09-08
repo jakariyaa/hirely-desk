@@ -1,0 +1,21 @@
+@using Microsoft.Extensions.Localization
+
+<MudDialog ContentClass="cv-confirm-dialog">
+    <DialogContent>
+        <MudText>@ContentText</MudText>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Text" OnClick="@(() => MudDialog.Cancel())">@NoText</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Error" OnClick="ConfirmAsync">@YesText</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public string ContentText { get; set; } = "";
+    [Parameter] public string YesText { get; set; } = "Yes";
+    [Parameter] public string NoText { get; set; } = "No";
+
+    private void ConfirmAsync() => MudDialog.Close(DialogResult.Ok(true));
+}

@@ -36,4 +36,132 @@
   <data name="Theme" xml:space="preserve">
     <value>Motyw</value>
   </data>
+
+  <data name="HomeWelcome" xml:space="preserve">
+    <value>Witamy ponownie</value>
+  </data>
+  <data name="Navigation" xml:space="preserve">
+    <value>Nawigacja</value>
+  </data>
+  <data name="AccountMenu" xml:space="preserve">
+    <value>Menu konta</value>
+  </data>
+  <data name="VersionLabel" xml:space="preserve">
+    <value>Wersja</value>
+  </data>
+  <data name="CardCandidatesTitle" xml:space="preserve">
+    <value>Profile kandydatów</value>
+  </data>
+  <data name="CardCandidatesDesc" xml:space="preserve">
+    <value>Przeglądaj profile kandydatów i ich atrybuty.</value>
+  </data>
+  <data name="CardPositionsTitle" xml:space="preserve">
+    <value>Stanowiska</value>
+  </data>
+  <data name="CardPositionsDesc" xml:space="preserve">
+    <value>Twórz stanowiska i określaj, kto ma do nich dostęp.</value>
+  </data>
+  <data name="CardCvsTitle" xml:space="preserve">
+    <value>CV</value>
+  </data>
+  <data name="CardCvsDesc" xml:space="preserve">
+    <value>Przesyłaj CV, przeglądaj dokumenty i omawiaj je z zespołem.</value>
+  </data>
+  <data name="CardComingSoon" xml:space="preserve">
+    <value>Wkrótce</value>
+  </data>
+
+  <data name="Profile" xml:space="preserve">
+    <value>Profil</value>
+  </data>
+  <data name="Projects" xml:space="preserve">
+    <value>Projekty</value>
+  </data>
+  <data name="ProfileSubtitle" xml:space="preserve">
+    <value>Zarządzaj swoimi danymi osobowymi i atrybutami umiejętności.</value>
+  </data>
+  <data name="ProjectsSubtitle" xml:space="preserve">
+    <value>Projekty portfolio widoczne na Twoim profilu.</value>
+  </data>
+  <data name="LoadFailed" xml:space="preserve">
+    <value>Coś poszło nie tak podczas ładowania danych.</value>
+  </data>
+  <data name="Retry" xml:space="preserve">
+    <value>Ponów próbę</value>
+  </data>
+  <data name="Save" xml:space="preserve">
+    <value>Zapisz</value>
+  </data>
+  <data name="Saved" xml:space="preserve">
+    <value>Zapisano</value>
+  </data>
+  <data name="PeriodStart" xml:space="preserve">
+    <value>Od</value>
+  </data>
+  <data name="PeriodEnd" xml:space="preserve">
+    <value>Do</value>
+  </data>
+  <data name="NewProject" xml:space="preserve">
+    <value>Nowy projekt</value>
+  </data>
+  <data name="EditProject" xml:space="preserve">
+    <value>Edytuj projekt</value>
+  </data>
+  <data name="DeleteProject" xml:space="preserve">
+    <value>Usuń projekt</value>
+  </data>
+  <data name="Delete" xml:space="preserve">
+    <value>Usuń</value>
+  </data>
+  <data name="Cancel" xml:space="preserve">
+    <value>Anuluj</value>
+  </data>
+  <data name="DeleteProjectConfirm" xml:space="preserve">
+    <value>Usunąć ten projekt? Tej operacji nie można cofnąć.</value>
+  </data>
+  <data name="ProjectDeleted" xml:space="preserve">
+    <value>Projekt usunięty</value>
+  </data>
+  <data name="ProjectSaved" xml:space="preserve">
+    <value>Projekt zapisany</value>
+  </data>
+  <data name="ProjectName" xml:space="preserve">
+    <value>Nazwa projektu</value>
+  </data>
+  <data name="ProjectNameRequired" xml:space="preserve">
+    <value>Nazwa projektu jest wymagana.</value>
+  </data>
+  <data name="ProjectNameTooLong" xml:space="preserve">
+    <value>Nazwa projektu nie może przekraczać 200 znaków.</value>
+  </data>
+  <data name="ProjectDescription" xml:space="preserve">
+    <value>Opis</value>
+  </data>
+  <data name="MarkdownHelper" xml:space="preserve">
+    <value>Obsługiwany jest Markdown.</value>
+  </data>
+  <data name="ProjectTags" xml:space="preserve">
+    <value>Tagi</value>
+  </data>
+  <data name="AddTag" xml:space="preserve">
+    <value>Dodaj tag</value>
+  </data>
+  <data name="AddTagHint" xml:space="preserve">
+    <value>Wpisz tag i naciśnij Enter…</value>
+  </data>
+  <data name="Name" xml:space="preserve">
+    <value>Nazwa</value>
+  </data>
+  <data name="Period" xml:space="preserve">
+    <value>Okres</value>
+  </data>
+  <data name="Tags" xml:space="preserve">
+    <value>Tagi</value>
+  </data>
+  <data name="NoProjects" xml:space="preserve">
+    <value>Brak projektów</value>
+  </data>
+  <data name="NoProjectsHint" xml:space="preserve">
+    <value>Zaprezentuj swoją pracę, dodając pierwszy projekt portfolio.</value>
+  </data>
 </root>

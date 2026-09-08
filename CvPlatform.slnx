@@ -2,6 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/CvPlatform.Core/CvPlatform.Core.csproj" />
     <Project Path="src/CvPlatform.Infrastructure/CvPlatform.Infrastructure.csproj" />
+    <Project Path="src/CvPlatform.Application/CvPlatform.Application.csproj" />
     <Project Path="src/CvPlatform.Web/CvPlatform.Web.csproj" />
   </Folder>
   <Folder Name="/tests/">

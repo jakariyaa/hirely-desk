@@ -1,5 +1,6 @@
 @page "/Account/Logout"
 @attribute [ExcludeFromInteractiveRouting]
+@layout AuthLayout
 
 @using Microsoft.AspNetCore.Identity
 
@@ -8,27 +9,23 @@
 
 <PageTitle>Log out</PageTitle>
 
-<h1>Log out</h1>
-
-@if (HttpMethods.IsGet(HttpContext.Request.Method))
-{
-    <p>Are you sure you want to log out?</p>
-    <form method="post" action="/Account/Logout">
-        <AntiforgeryToken />
-        <button type="submit">Log out</button>
-    </form>
-}
+<div class="cv-state-page cv-state-page-auth">
+    <MudPaper Elevation="2" Class="cv-state-card">
+        <MudIcon Icon="@Icons.Material.Filled.Logout" Color="Color.Primary" Size="Size.Large" />
+        <MudText Typo="Typo.h6">Log out</MudText>
+        <MudText Typo="Typo.body2" Class="cv-text-secondary">Are you sure you want to log out?</MudText>
+        <form method="post" action="/Account/Logout" @formname="logout" @onsubmit="LogoutAsync">
+            <AntiforgeryToken />
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" ButtonType="ButtonType.Submit"
+                       Class="mt-2">Log out</MudButton>
+        </form>
+    </MudPaper>
+</div>
 
 @code {
-    [CascadingParameter]
-    private HttpContext HttpContext { get; set; } = default!;
-
-    protected override async Task OnInitializedAsync()
+    private async Task LogoutAsync()
     {
-        if (HttpMethods.IsPost(HttpContext.Request.Method))
-        {
-            await SignInManager.SignOutAsync();
-            Navigation.NavigateTo("/");
-        }
+        await SignInManager.SignOutAsync();
+        Navigation.NavigateTo("/");
     }
 }

@@ -1,5 +1,6 @@
 ﻿@page "/"
 
+@using CvPlatform.Web.Components.Shared
 @using CvPlatform.Web.Resources
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.Extensions.Localization
@@ -9,10 +10,32 @@
 
 <PageTitle>@L["Home"]</PageTitle>
 
-<h1>@L["AppName"]</h1>
+<PageHeader Title="@L["HomeWelcome"]" />
 
-<AuthorizeView>
-    <Authorized>
-        <MudText>Hello, @context.User.Identity?.Name</MudText>
-    </Authorized>
-</AuthorizeView>
+<MudGrid Spacing="4">
+    <MudItem xs="12" md="6" lg="4">
+        <MudPaper Class="cv-card" Elevation="1">
+            <div class="cv-card-icon cv-card-icon-primary"><MudIcon Icon="@Icons.Material.Filled.PeopleAlt" /></div>
+            <MudText Typo="Typo.subtitle1" Class="font-weight-bold">@L["CardCandidatesTitle"]</MudText>
+            <MudText Typo="Typo.body2" Class="cv-text-secondary">@L["CardCandidatesDesc"]</MudText>
+            <MudButton Variant="Variant.Text" Color="Color.Primary" Disabled="true" Class="cv-card-cta">@L["CardComingSoon"]</MudButton>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" md="6" lg="4">
+        <MudPaper Class="cv-card" Elevation="1">
+            <div class="cv-card-icon cv-card-icon-secondary"><MudIcon Icon="@Icons.Material.Filled.Work" /></div>
+            <MudText Typo="Typo.subtitle1" Class="font-weight-bold">@L["CardPositionsTitle"]</MudText>
+            <MudText Typo="Typo.body2" Class="cv-text-secondary">@L["CardPositionsDesc"]</MudText>
+            <MudButton Variant="Variant.Text" Color="Color.Primary" Disabled="true" Class="cv-card-cta">@L["CardComingSoon"]</MudButton>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" md="6" lg="4">
+        <MudPaper Class="cv-card" Elevation="1">
+            <div class="cv-card-icon cv-card-icon-accent"><MudIcon Icon="@Icons.Material.Filled.Description" /></div>
+            <MudText Typo="Typo.subtitle1" Class="font-weight-bold">@L["CardCvsTitle"]</MudText>
+            <MudText Typo="Typo.body2" Class="cv-text-secondary">@L["CardCvsDesc"]</MudText>
+            <MudButton Variant="Variant.Text" Color="Color.Primary" Disabled="true" Class="cv-card-cta">@L["CardComingSoon"]</MudButton>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+

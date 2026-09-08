@@ -1,0 +1,28 @@
+@using CvPlatform.Application.Attributes
+@using CvPlatform.Application.Common
+@inject IAttributeCatalog Catalog
+
+<MudAutocomplete T="AttributeDefinitionDto"
+                 Label="@Label"
+                 Value="Value"
+                 ValueChanged="ValueChanged"
+                 SearchFunc="SearchAsync"
+                 ToStringFunc="@(definition => definition?.Name ?? string.Empty)"
+                 Clearable="true"
+                 Dense="true"
+                 Variant="Variant.Outlined" />
+
+@code {
+    [Parameter] public string Label { get; set; } = "Attribute";
+    [Parameter] public Guid? CategoryId { get; set; }
+    [Parameter] public string? Prefix { get; set; }
+    [Parameter] public AttributeDefinitionDto? Value { get; set; }
+    [Parameter] public EventCallback<AttributeDefinitionDto?> ValueChanged { get; set; }
+
+    private async Task<IEnumerable<AttributeDefinitionDto>> SearchAsync(string text, CancellationToken ct)
+    {
+        var result = await Catalog.SearchAsync(
+            new AttributeCatalogQuery(CategoryId, text, Prefix, new PageRequest(1, 25)), ct);
+        return result.Succeeded && result.Value is not null ? result.Value.Items : [];
+    }
+}

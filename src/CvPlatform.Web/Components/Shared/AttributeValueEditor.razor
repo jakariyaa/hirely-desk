@@ -1,0 +1,67 @@
+@using CvPlatform.Application.Attributes
+@using CvPlatform.Core.Enums
+
+<div class="cv-attribute-editor" @onfocusout="NotifyChangedAsync">
+    @switch (Definition.DataType)
+    {
+        case AttributeDataType.String:
+            <MudTextField T="string" @bind-Value="Value.String"
+                          Variant="Variant.Outlined" Immediate="false" Disabled="Disabled" />
+            break;
+        case AttributeDataType.Text:
+            <MudTextField T="string" @bind-Value="Value.Text"
+                          Variant="Variant.Outlined" Lines="4" Disabled="Disabled" />
+            break;
+        case AttributeDataType.Numeric:
+            <MudNumericField T="decimal?" @bind-Value="Value.Numeric"
+                             Variant="Variant.Outlined" Disabled="Disabled" />
+            break;
+        case AttributeDataType.Date:
+            <MudDatePicker Date="@ToDateTime(Value.Date)"
+                           DateChanged="@(date => Value.Date = ToDateOnly(date))"
+                           Variant="Variant.Outlined" Disabled="Disabled" />
+            break;
+        case AttributeDataType.Period:
+            <MudStack Row Spacing="2">
+                <MudDatePicker Date="@ToDateTime(Value.PeriodStart)"
+                               DateChanged="@(date => Value.PeriodStart = ToDateOnly(date))"
+                               Label="Start" Variant="Variant.Outlined" Disabled="Disabled" />
+                <MudDatePicker Date="@ToDateTime(Value.PeriodEnd)"
+                               DateChanged="@(date => Value.PeriodEnd = ToDateOnly(date))"
+                               Label="End" Variant="Variant.Outlined" Disabled="Disabled" />
+            </MudStack>
+            break;
+        case AttributeDataType.Boolean:
+            <MudSwitch T="bool?" @bind-Value="Value.Boolean"
+                       Color="Color.Primary" Disabled="Disabled" />
+            break;
+        case AttributeDataType.Dropdown:
+            <MudSelect T="string" @bind-Value="Value.Dropdown"
+                       Variant="Variant.Outlined" Clearable Disabled="Disabled">
+                @foreach (var choice in Definition.Choices)
+                {
+                    <MudSelectItem Value="@choice.Value">@choice.Value</MudSelectItem>
+                }
+            </MudSelect>
+            break;
+        case AttributeDataType.Image:
+            <MudTextField T="string" @bind-Value="Value.ImageUrl"
+                          Variant="Variant.Outlined" Placeholder="https://..." Disabled="Disabled" />
+            break;
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public AttributeDefinitionDto Definition { get; set; } = default!;
+    [Parameter, EditorRequired] public AttributeValueDraft Value { get; set; } = default!;
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private Task NotifyChangedAsync(FocusEventArgs _) => OnChanged.InvokeAsync();
+
+    private static DateTime? ToDateTime(DateOnly? date) =>
+        date.HasValue ? date.Value.ToDateTime(TimeOnly.MinValue) : null;
+
+    private static DateOnly? ToDateOnly(DateTime? dateTime) =>
+        dateTime.HasValue ? DateOnly.FromDateTime(dateTime.Value) : null;
+}

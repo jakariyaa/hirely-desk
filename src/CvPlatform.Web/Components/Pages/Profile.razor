@@ -1,0 +1,214 @@
+@page "/Profile"
+@attribute [Authorize]
+@implements IAsyncDisposable
+@using CvPlatform.Application.Attributes
+@using CvPlatform.Application.Authorization
+@using CvPlatform.Application.Common
+@using CvPlatform.Application.Profiles
+@using CvPlatform.Core.Enums
+@using CvPlatform.Web.Components.Shared
+@using CvPlatform.Web.Resources
+@using Microsoft.Extensions.Localization
+@using System.Security.Claims
+@inject IProfileService ProfileService
+@inject AuthenticationStateProvider AuthProvider
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject IStringLocalizer<SharedResource> L
+
+<PageTitle>@L["Profile"]</PageTitle>
+
+<PageHeader Title="@L["Profile"]" Subtitle="@L["ProfileSubtitle"]" Icon="@Icons.Material.Filled.Person" />
+
+@if (_loading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate Class="cv-page-loading" />
+}
+
+@if (_error is not null)
+{
+    <EmptyState Icon="@Icons.Material.Filled.ErrorOutline" Title="@L["LoadFailed"]" Description="@_error">
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="LoadAsync">@L["Retry"]</MudButton>
+    </EmptyState>
+}
+else if (_catalog is not null)
+{
+    @foreach (var category in _catalog)
+    {
+        <MudPaper Class="cv-panel pa-4 mb-4">
+            <MudText Typo="Typo.h6" Class="mb-3">@category.Name</MudText>
+            @foreach (var definition in category.Definitions)
+            {
+                <div class="cv-attribute-row">
+                    <MudText Typo="Typo.body2" Class="cv-attribute-label">@definition.Name</MudText>
+                    <AttributeValueEditor Definition="definition" Value="@Draft(definition.Id)"
+                                           Disabled="@IsSaving(definition.Id)"
+                                           OnChanged="@(() => DraftChangedAsync(definition.Id))" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Save" Color="Color.Primary"
+                                   Variant="Variant.Text" Disabled="@IsSaving(definition.Id)"
+                                   title="@L["Save"]"
+                                   OnClick="@(() => SaveAsync(definition))" />
+                </div>
+            }
+        </MudPaper>
+    }
+
+@code {
+    private IReadOnlyList<AttributeCategoryDto>? _catalog;
+    private Dictionary<Guid, AttributeValueDraft> _drafts = [];
+    private HashSet<Guid> _saving = [];
+    private readonly Dictionary<Guid, CancellationTokenSource> _autosave = [];
+    private bool _loading;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            var actor = await GetActorAsync();
+            var catalogResult = await ProfileService.GetCatalogAsync();
+            if (!catalogResult.Succeeded)
+            {
+                _error = catalogResult.Error.Message;
+                return;
+            }
+
+            _catalog = catalogResult.Value;
+            var profileResult = await ProfileService.GetForUserAsync(actor, actor.UserId);
+            if (!profileResult.Succeeded)
+            {
+                _error = profileResult.Error.Message;
+                return;
+            }
+
+            if (profileResult.Value is null)
+                return;
+
+            _drafts = profileResult.Value.Values.ToDictionary(
+                v => v.AttributeDefinitionId, v => ToDraft(v));
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private AttributeValueDraft Draft(Guid definitionId) =>
+        _drafts.TryGetValue(definitionId, out var draft)
+            ? draft
+            : _drafts[definitionId] = new AttributeValueDraft();
+
+    private static AttributeValueDraft ToDraft(AttributeValueDto value) => new()
+    {
+        String = value.StringValue,
+        Text = value.TextValue,
+        Numeric = value.NumericValue,
+        Date = value.DateValue,
+        PeriodStart = value.PeriodStart,
+        PeriodEnd = value.PeriodEnd,
+        Boolean = value.BooleanValue,
+        Dropdown = value.DropdownOption,
+        ImageUrl = value.ImageUrl,
+        Version = value.Version,
+    };
+
+    private async Task SaveAsync(AttributeDefinitionDto definition)
+    {
+        if (!_saving.Add(definition.Id))
+            return;
+
+        try
+        {
+            var draft = _drafts[definition.Id];
+            var input = new AttributeValueInput(
+                definition.Id,
+                draft.String,
+                draft.Text,
+                draft.Numeric,
+                draft.Date,
+                draft.PeriodStart,
+                draft.PeriodEnd,
+                draft.Boolean,
+                draft.Dropdown,
+                draft.ImageUrl,
+                draft.Version);
+
+            var actor = await GetActorAsync();
+            var result = await ProfileService.SaveAttributeValueAsync(actor, actor.UserId, input);
+            if (result.Succeeded && result.Value is not null)
+            {
+                Snackbar.Add(L["Saved"], Severity.Success);
+                var updated = result.Value.Values.FirstOrDefault(v => v.AttributeDefinitionId == definition.Id);
+                if (updated is not null)
+                    _drafts[definition.Id] = ToDraft(updated);
+            }
+            else if (!result.Succeeded)
+            {
+                if (result.Error.Code == ErrorCodes.ConcurrencyConflict)
+                {
+                    var dialog = await DialogService.ShowAsync<ConcurrencyDialog>("Concurrency conflict");
+                    if ((await dialog.Result) is { Canceled: false, Data: true })
+                        await LoadAsync();
+                }
+                else
+                    Snackbar.Add(result.Error.Message, Severity.Error);
+            }
+        }
+        finally
+        {
+            _saving.Remove(definition.Id);
+        }
+    }
+
+    private bool IsSaving(Guid definitionId) => _saving.Contains(definitionId);
+
+    private async Task DraftChangedAsync(Guid definitionId)
+    {
+        if (_autosave.Remove(definitionId, out var previous))
+            await previous.CancelAsync();
+
+        var current = new CancellationTokenSource();
+        _autosave[definitionId] = current;
+        try
+        {
+            await Task.Delay(700, current.Token);
+            if (!IsSaving(definitionId) && _catalog is not null)
+            {
+                var definition = _catalog.SelectMany(c => c.Definitions)
+                    .Single(d => d.Id == definitionId);
+                await SaveAsync(definition);
+            }
+        }
+        catch (OperationCanceledException) when (current.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            if (_autosave.Remove(definitionId, out var completed))
+                completed.Dispose();
+        }
+    }
+
+    private async Task<ActorContext> GetActorAsync()
+    {
+        var authState = await AuthProvider.GetAuthenticationStateAsync();
+        return new ActorContext(
+            Guid.Parse(authState.User.FindFirstValue(ClaimTypes.NameIdentifier)!),
+            authState.User.IsInRole("Admin"));
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        foreach (var source in _autosave.Values)
+            await source.CancelAsync();
+        foreach (var source in _autosave.Values)
+            source.Dispose();
+        _autosave.Clear();
+    }
+}
+
+}

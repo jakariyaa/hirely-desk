@@ -3,6 +3,7 @@
   <ItemGroup>
     <ProjectReference Include="..\CvPlatform.Core\CvPlatform.Core.csproj" />
     <ProjectReference Include="..\CvPlatform.Infrastructure\CvPlatform.Infrastructure.csproj" />
+    <ProjectReference Include="..\CvPlatform.Application\CvPlatform.Application.csproj" />
   </ItemGroup>
 
   <ItemGroup>

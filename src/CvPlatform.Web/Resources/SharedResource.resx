@@ -36,4 +36,171 @@
   <data name="Theme" xml:space="preserve">
     <value>Theme</value>
   </data>
+
+  <data name="HomeWelcome" xml:space="preserve">
+    <value>Welcome back</value>
+  </data>
+  <data name="Navigation" xml:space="preserve">
+    <value>Navigation</value>
+  </data>
+  <data name="AccountMenu" xml:space="preserve">
+    <value>Account menu</value>
+  </data>
+  <data name="VersionLabel" xml:space="preserve">
+    <value>Version</value>
+  </data>
+  <data name="CardCandidatesTitle" xml:space="preserve">
+    <value>Candidate profiles</value>
+  </data>
+  <data name="CardCandidatesDesc" xml:space="preserve">
+    <value>Browse and manage candidate profiles and their attributes.</value>
+  </data>
+  <data name="CardPositionsTitle" xml:space="preserve">
+    <value>Positions</value>
+  </data>
+  <data name="CardPositionsDesc" xml:space="preserve">
+    <value>Create positions and define who can access them.</value>
+  </data>
+  <data name="CardCvsTitle" xml:space="preserve">
+    <value>CVs</value>
+  </data>
+  <data name="CardCvsDesc" xml:space="preserve">
+    <value>Upload CVs, review documents and discuss them with your team.</value>
+  </data>
+  <data name="CardComingSoon" xml:space="preserve">
+    <value>Coming soon</value>
+  </data>
+
+  <data name="Profile" xml:space="preserve">
+    <value>Profile</value>
+  </data>
+  <data name="Projects" xml:space="preserve">
+    <value>Projects</value>
+  </data>
+  <data name="ProfileSubtitle" xml:space="preserve">
+    <value>Manage your personal information and skill attributes.</value>
+  </data>
+  <data name="ProjectsSubtitle" xml:space="preserve">
+    <value>Portfolio projects shown on your profile.</value>
+  </data>
+  <data name="LoadFailed" xml:space="preserve">
+    <value>Something went wrong while loading data.</value>
+  </data>
+  <data name="Retry" xml:space="preserve">
+    <value>Retry</value>
+  </data>
+  <data name="Save" xml:space="preserve">
+    <value>Save</value>
+  </data>
+  <data name="Saved" xml:space="preserve">
+    <value>Saved</value>
+  </data>
+  <data name="PeriodStart" xml:space="preserve">
+    <value>From</value>
+  </data>
+  <data name="PeriodEnd" xml:space="preserve">
+    <value>To</value>
+  </data>
+  <data name="NewProject" xml:space="preserve">
+    <value>New project</value>
+  </data>
+  <data name="EditProject" xml:space="preserve">
+    <value>Edit project</value>
+  </data>
+  <data name="DeleteProject" xml:space="preserve">
+    <value>Delete project</value>
+  </data>
+  <data name="Delete" xml:space="preserve">
+    <value>Delete</value>
+  </data>
+  <data name="Cancel" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="DeleteProjectConfirm" xml:space="preserve">
+    <value>Delete this project? This cannot be undone.</value>
+  </data>
+  <data name="ProjectDeleted" xml:space="preserve">
+    <value>Project deleted</value>
+  </data>
+  <data name="ProjectSaved" xml:space="preserve">
+    <value>Project saved</value>
+  </data>
+  <data name="ProjectName" xml:space="preserve">
+    <value>Project name</value>
+  </data>
+  <data name="ProjectNameRequired" xml:space="preserve">
+    <value>Project name is required.</value>
+  </data>
+  <data name="ProjectNameTooLong" xml:space="preserve">
+    <value>Project name cannot exceed 200 characters.</value>
+  </data>
+  <data name="ProjectDescription" xml:space="preserve">
+    <value>Description</value>
+  </data>
+  <data name="MarkdownHelper" xml:space="preserve">
+    <value>Markdown is supported.</value>
+  </data>
+  <data name="ProjectTags" xml:space="preserve">
+    <value>Tags</value>
+  </data>
+  <data name="AddTag" xml:space="preserve">
+    <value>Add tag</value>
+  </data>
+  <data name="AddTagHint" xml:space="preserve">
+    <value>Type a tag and press Enter…</value>
+  </data>
+  <data name="Name" xml:space="preserve">
+    <value>Name</value>
+  </data>
+  <data name="Period" xml:space="preserve">
+    <value>Period</value>
+  </data>
+  <data name="Tags" xml:space="preserve">
+    <value>Tags</value>
+  </data>
+  <data name="NoProjects" xml:space="preserve">
+    <value>No projects yet</value>
+  </data>
+  <data name="NoProjectsHint" xml:space="preserve">
+    <value>Showcase your work by adding your first portfolio project.</value>
+  </data>
+  <data name="LoginHelper" xml:space="preserve">
+    <value>Enter your details to continue.</value>
+  </data>
+  <data name="RegisterHelper" xml:space="preserve">
+    <value>Create your account to get started.</value>
+  </data>
+  <data name="Email" xml:space="preserve">
+    <value>Email</value>
+  </data>
+  <data name="Password" xml:space="preserve">
+    <value>Password</value>
+  </data>
+  <data name="PasswordMinLength" xml:space="preserve">
+    <value>Password (min 8 characters)</value>
+  </data>
+  <data name="RememberMe" xml:space="preserve">
+    <value>Remember me</value>
+  </data>
+  <data name="ExternalLoginPrompt" xml:space="preserve">
+    <value>Or continue with</value>
+  </data>
+  <data name="RegisterNewAccount" xml:space="preserve">
+    <value>Register a new account</value>
+  </data>
+  <data name="AlreadyHaveAccount" xml:space="preserve">
+    <value>Already have an account? Log in</value>
+  </data>
+  <data name="ExternalNoEmail" xml:space="preserve">
+    <value>The external provider did not return an email address.</value>
+  </data>
+  <data name="ExternalCreateFailed" xml:space="preserve">
+    <value>Could not create a local account for the external login.</value>
+  </data>
+  <data name="ExternalLoginFailed" xml:space="preserve">
+    <value>External login failed: {0}</value>
+  </data>
+  <data name="InvalidCredentials" xml:space="preserve">
+    <value>Invalid email or password.</value>
+  </data>
 </root>

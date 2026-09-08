@@ -2,56 +2,63 @@
 @attribute [ExcludeFromInteractiveRouting]
 @attribute [AllowAnonymous]
 @attribute [EnableRateLimiting("auth")]
+@layout AuthLayout
 
 @using System.ComponentModel.DataAnnotations
+@using CvPlatform.Web.Resources
 @using Microsoft.AspNetCore.Authentication
-@using Microsoft.AspNetCore.Identity
 
 @inject SignInManager<ApplicationUser> SignInManager
 @inject NavigationManager Navigation
+@inject IStringLocalizer<SharedResource> L
 
-<PageTitle>Log in</PageTitle>
+<PageTitle>@L["Login"]</PageTitle>
 
-<h1>Log in</h1>
+<MudPaper Elevation="2" Class="cv-auth-card">
+    <MudText Typo="Typo.h5" Class="mb-1">@L["Login"]</MudText>
+    <MudText Typo="Typo.body2" Class="cv-text-secondary mb-4">@L["LoginHelper"]</MudText>
 
-@if (!string.IsNullOrEmpty(StatusMessage))
-{
-    <p role="alert">@StatusMessage</p>
-}
-
-<EditForm Model="Input" method="post" OnValidSubmit="LoginUser" FormName="login">
-    <DataAnnotationsValidator />
-    <ValidationSummary role="alert" />
-    <div>
-        <label for="email">Email</label>
-        <InputText id="email" @bind-Value="Input.Email" autocomplete="username" />
-        <ValidationMessage For="() => Input.Email" />
-    </div>
-    <div>
-        <label for="password">Password</label>
-        <InputText id="password" type="password" @bind-Value="Input.Password" autocomplete="current-password" />
-        <ValidationMessage For="() => Input.Password" />
-    </div>
-    <div>
-        <label>
-            <InputCheckbox @bind-Value="Input.RememberMe" /> Remember me
-        </label>
-    </div>
-    <button type="submit">Log in</button>
-    <p><a href="/Account/Register?returnUrl=@Uri.EscapeDataString(ReturnUrl ?? "/")">Register a new account</a></p>
-</EditForm>
-
-@if (_externalLogins.Count > 0)
-{
-    <hr />
-    <p>Or log in with:</p>
-    @foreach (var provider in _externalLogins)
+    @if (!string.IsNullOrEmpty(StatusMessage))
     {
-        <a href="/Account/ExternalLogin?provider=@Uri.EscapeDataString(provider.Name)&returnUrl=@Uri.EscapeDataString(ReturnUrl ?? "/")">
-            Log in with @provider.DisplayName
-        </a>
+        <MudAlert Severity="Severity.Error" Class="mb-4">@StatusMessage</MudAlert>
     }
-}
+
+    <EditForm Model="Input" method="post" OnValidSubmit="LoginUser" FormName="login" novalidate>
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+        <MudTextField T="string" Label="@L["Email"]" @bind-Value="Input.Email" For="() => Input.Email"
+                      UserAttributes="@EmailAttributes"
+                      Variant="Variant.Outlined" Class="mb-3" />
+        <MudTextField T="string" Label="@L["Password"]" @bind-Value="Input.Password" For="() => Input.Password"
+                      UserAttributes="@CurrentPasswordAttributes"
+                      Variant="Variant.Outlined" InputType="InputType.Password" Class="mb-3" />
+        <label class="cv-remember">
+            <InputCheckbox @bind-Value="Input.RememberMe" />
+            <span>@L["RememberMe"]</span>
+        </label>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Class="mt-4"
+                   ButtonType="ButtonType.Submit">@L["Login"]</MudButton>
+    </EditForm>
+
+    @if (_externalLogins.Count > 0)
+    {
+        <MudDivider Class="my-4" DividerType="DividerType.FullWidth" />
+        <MudText Typo="Typo.body2" Class="cv-text-secondary mb-2">@L["ExternalLoginPrompt"]</MudText>
+        <div class="cv-oauth-row">
+            @foreach (var provider in _externalLogins)
+            {
+                var loginUrl = $"/Account/ExternalLogin?provider={Uri.EscapeDataString(provider.Name)}&returnUrl={Uri.EscapeDataString(ReturnUrl ?? "/")}";
+                <MudButton Href="@loginUrl" Variant="Variant.Outlined" Class="cv-oauth-btn">
+                    @provider.DisplayName
+                </MudButton>
+            }
+        </div>
+    }
+
+    <MudText Typo="Typo.body2" Class="mt-4">
+        <a href="/Account/Register?returnUrl=@Uri.EscapeDataString(ReturnUrl ?? "/")">@L["RegisterNewAccount"]</a>
+    </MudText>
+</MudPaper>
 
 @code {
     [CascadingParameter]
@@ -69,15 +76,19 @@
 
     private string? StatusMessage;
     private IList<AuthenticationScheme> _externalLogins = [];
+    private static readonly Dictionary<string, object> EmailAttributes =
+        new Dictionary<string, object> { ["autocomplete"] = "username" };
+    private static readonly Dictionary<string, object> CurrentPasswordAttributes =
+        new Dictionary<string, object> { ["autocomplete"] = "current-password" };
 
     protected override async Task OnInitializedAsync()
     {
         if (!string.IsNullOrEmpty(Error))
             StatusMessage = Error switch
             {
-                "noemail" => "The external provider did not return an email address.",
-                "createfailed" => "Could not create a local account for the external login.",
-                _ => $"External login failed: {Error}",
+                "noemail" => L["ExternalNoEmail"],
+                "createfailed" => L["ExternalCreateFailed"],
+                _ => L["ExternalLoginFailed", Error],
             };
 
         if (HttpMethods.IsGet(HttpContext.Request.Method))
@@ -97,7 +108,7 @@
         else
         {
             Input.Password = string.Empty;
-            StatusMessage = "Invalid email or password.";
+            StatusMessage = L["InvalidCredentials"];
         }
     }
 

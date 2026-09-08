@@ -1,6 +1,7 @@
 ﻿@inherits LayoutComponentBase
 
 @using CvPlatform.Web.Resources
+@using CvPlatform.Web.Theme
 @using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.AspNetCore.Identity
 @using Microsoft.Extensions.Localization
@@ -12,50 +13,74 @@
 @inject NavigationManager Navigation
 @inject IStringLocalizer<SharedResource> L
 
-<MudThemeProvider Theme="_theme" IsDarkMode="_darkMode" />
+<MudThemeProvider Theme="@CvPlatformTheme.Instance" IsDarkMode="_darkMode" />
 <MudPopoverProvider />
 <MudDialogProvider />
 <MudSnackbarProvider />
 
-<MudLayout>
-    <MudAppBar Elevation="1">
-        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="ToggleDrawer" />
-        <MudText Typo="Typo.h6">@L["AppName"]</MudText>
-        <MudSpacer />
-        <AuthorizeView>
-            <Authorized>
-                <MudTextField T="string" Placeholder="@L["SearchPlaceholder"]" Adornment="Adornment.Start"
-                              AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium"
-                              Class="mt-0" Margin="Margin.Dense" Variant="Variant.Outlined" Clearable="true" />
-            </Authorized>
-        </AuthorizeView>
-        <MudIconButton Icon="@(_darkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
-                       Color="Color.Inherit" OnClick="ToggleTheme" title="@L["Theme"]" />
-        <MudMenu Icon="@Icons.Material.Filled.Translate" Color="Color.Inherit" AriaLabel="@L["Language"]">
-            <MudMenuItem OnClick="@(() => SetLanguageAsync("en"))">English</MudMenuItem>
-            <MudMenuItem OnClick="@(() => SetLanguageAsync("pl"))">Polski</MudMenuItem>
-        </MudMenu>
-        <AuthorizeView>
-            <Authorized>
-                <MudMenu Icon="@Icons.Material.Filled.AccountCircle" Color="Color.Inherit">
-                    <MudMenuItem Href="/Account/Logout">@L["Logout"]</MudMenuItem>
-                </MudMenu>
-            </Authorized>
-            <NotAuthorized>
-                <MudButton Href="/Account/Login" Color="Color.Inherit">@L["Login"]</MudButton>
-                <MudButton Href="/Account/Register" Color="Color.Inherit">@L["Register"]</MudButton>
-            </NotAuthorized>
-        </AuthorizeView>
-    </MudAppBar>
-    <MudDrawer @bind-Open="_drawerOpen" Elevation="1" Variant="DrawerVariant.Responsive">
+<div class="cv-shell">
+    <MudDrawer @bind-Open="_drawerOpen" Elevation="0" Variant="DrawerVariant.Responsive"
+                Class="cv-drawer">
+        <div class="cv-drawer-header">
+            <span class="cv-brand-mark" aria-hidden="true">CV</span>
+            <MudText Typo="Typo.h6" Class="cv-brand-title">@L["AppName"]</MudText>
+        </div>
+        <MudDivider DividerType="DividerType.FullWidth" />
         <NavMenu />
+        <div class="cv-drawer-footer">
+            <MudText Typo="Typo.caption" Class="cv-text-caption">@L["VersionLabel"] @VersionValue</MudText>
+        </div>
     </MudDrawer>
-    <MudMainContent>
-        <MudContainer MaxWidth="MaxWidth.Large" Class="my-4">
-            @Body
-        </MudContainer>
-    </MudMainContent>
-</MudLayout>
+
+    <MudLayout Class="cv-content-wrap">
+        <MudAppBar Elevation="0" Color="Color.Surface" Class="cv-appbar">
+            <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start"
+                           OnClick="ToggleDrawer" aria-label="@L["Navigation"]" />
+            <span class="cv-brand-mark cv-brand-mark-appbar" aria-hidden="true">CV</span>
+            <MudText Typo="Typo.h6" Class="cv-appbar-title d-none d-sm-inline">@L["AppName"]</MudText>
+            <MudSpacer />
+            <MudIconButton Icon="@(_darkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
+                           Color="Color.Inherit" OnClick="ToggleTheme" title="@L["Theme"]" />
+            <MudMenu Icon="@Icons.Material.Filled.Translate" Color="Color.Inherit" AriaLabel="@L["Language"]"
+                     Class="cv-menu-actions">
+                <MudMenuItem OnClick="@(() => SetLanguageAsync("en"))">English</MudMenuItem>
+                <MudMenuItem OnClick="@(() => SetLanguageAsync("pl"))">Polski</MudMenuItem>
+            </MudMenu>
+            <AuthorizeView>
+                <Authorized>
+                    <MudMenu Class="cv-menu-actions" Color="Color.Inherit" AriaLabel="@L["AccountMenu"]">
+                        <ActivatorContent Context="menuCtx">
+                            <div class="cv-user-chip">
+                                <span class="cv-avatar" aria-hidden="true">@_initials</span>
+                                <span class="cv-user-chip-name d-none d-lg-inline">@_displayName</span>
+                                <MudIcon Icon="@Icons.Material.Filled.ArrowDropDown" Class="d-none d-lg-inline" />
+                            </div>
+                        </ActivatorContent>
+                        <ChildContent>
+                            <MudText Typo="Typo.subtitle1" Class="px-4 pt-2 pb-1">@_displayName</MudText>
+                            <MudText Typo="Typo.caption" Class="px-4 pb-2 cv-text-caption">@_email</MudText>
+                            <MudDivider DividerType="DividerType.FullWidth" />
+                            <MudMenuItem Href="/Account/Logout" Icon="@Icons.Material.Filled.Logout">@L["Logout"]</MudMenuItem>
+                        </ChildContent>
+                    </MudMenu>
+                </Authorized>
+                <NotAuthorized>
+                    <MudButton Href="/Account/Login" Variant="Variant.Text" Color="Color.Primary">@L["Login"]</MudButton>
+                    <MudButton Href="/Account/Register" Variant="Variant.Filled" Color="Color.Primary"
+                               Class="ml-2 cv-hidden-xs">@L["Register"]</MudButton>
+                </NotAuthorized>
+            </AuthorizeView>
+        </MudAppBar>
+        <MudMainContent Class="cv-main">
+            <MudContainer MaxWidth="MaxWidth.Large" Class="cv-page-container">
+                @Body
+            </MudContainer>
+        </MudMainContent>
+        <div class="cv-footer">
+            <MudText Typo="Typo.caption">@L["AppName"] · @L["VersionLabel"] @VersionValue</MudText>
+        </div>
+    </MudLayout>
+</div>
 
 <div id="blazor-error-ui" data-nosnippet>
     An unhandled error has occurred.
@@ -64,9 +89,11 @@
 </div>
 
 @code {
+    private string? _displayName;
+    private string? _email;
     private bool _drawerOpen = true;
     private bool _darkMode;
-    private MudTheme _theme = CreateTheme();
+    private string? _initials;
 
     private void ToggleDrawer() => _drawerOpen = !_drawerOpen;
 
@@ -80,7 +107,12 @@
         {
             var user = await Users.GetUserAsync(state.User);
             if (user is not null)
-                ApplyTheme(user.PreferredTheme);
+            {
+                _displayName = user.UserName;
+                _email = user.Email;
+                _initials = BuildInitials(user.UserName, user.Email);
+            }
+            ApplyTheme(user?.PreferredTheme);
         }
         else
         {
@@ -91,16 +123,26 @@
         StateHasChanged();
     }
 
+    private static string BuildInitials(string? name, string? email)
+    {
+        var source = string.IsNullOrWhiteSpace(name) ? email : name;
+        if (string.IsNullOrWhiteSpace(source))
+            return "?";
+
+        var parts = source.Split(new[] { ' ', '.', '_', '-', '@' }, StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length >= 2)
+            return string.Concat(parts[0][0].ToString().ToUpperInvariant(), parts[1][0].ToString().ToUpperInvariant());
+        return source.Substring(0, 1).ToUpperInvariant();
+    }
+
     private void ApplyTheme(string? theme)
     {
         _darkMode = string.Equals(theme, "dark", StringComparison.OrdinalIgnoreCase);
-        _theme = CreateTheme();
     }
 
     private async Task ToggleTheme()
     {
         _darkMode = !_darkMode;
-        _theme = CreateTheme();
         var value = _darkMode ? "dark" : "light";
 
         var state = await AuthState.GetAuthenticationStateAsync();
@@ -136,9 +178,5 @@
         Navigation.NavigateTo(Navigation.Uri, forceLoad: true);
     }
 
-    private static MudTheme CreateTheme() => new()
-    {
-        PaletteLight = new PaletteLight(),
-        PaletteDark = new PaletteDark(),
-    };
+    private static string VersionValue => "0.1.0";
 }

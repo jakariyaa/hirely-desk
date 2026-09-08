@@ -23,6 +23,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\CvPlatform.Core\CvPlatform.Core.csproj" />
     <ProjectReference Include="..\..\src\CvPlatform.Infrastructure\CvPlatform.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\CvPlatform.Application\CvPlatform.Application.csproj" />
   </ItemGroup>
 
 </Project>

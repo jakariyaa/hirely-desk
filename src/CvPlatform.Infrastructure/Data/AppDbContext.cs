@@ -28,5 +28,11 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     {
         base.OnModelCreating(modelBuilder);
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
+
+        if (Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory")
+        {
+            modelBuilder.Entity<Cv>().Ignore(c => c.SearchVector);
+            modelBuilder.Entity<Position>().Ignore(p => p.SearchVector);
+        }
     }
 }

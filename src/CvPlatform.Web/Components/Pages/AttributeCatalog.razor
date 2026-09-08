@@ -1,0 +1,112 @@
+@page "/Admin/Attributes"
+@attribute [Authorize(Roles = "Admin")]
+@using CvPlatform.Application.Attributes
+@using CvPlatform.Application.Authorization
+@using CvPlatform.Application.Common
+@using CvPlatform.Web.Components.Shared
+@using System.Security.Claims
+@inject IAttributeCatalog Catalog
+@inject IAttributeDefinitionService Definitions
+@inject AuthenticationStateProvider AuthProvider
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Attribute catalog</PageTitle>
+<PageHeader Title="Attribute catalog" Subtitle="Manage shared profile attributes">
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CreateAsync">New attribute</MudButton>
+</PageHeader>
+
+<MudTextField T="string" Value="_search" ValueChanged="SearchChangedAsync" Label="Search" Immediate="true" Class="mb-3" />
+@if (_page is null)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else
+{
+    <MudTable Items="_page.Items" Hover="true" Dense="true" TableAttributes="@TableAttributes">
+        <HeaderContent><MudTh>Name</MudTh><MudTh>Category</MudTh><MudTh>Type</MudTh><MudTh></MudTh></HeaderContent>
+        <RowTemplate>
+            <MudTd>@context.Name</MudTd>
+            <MudTd>@context.CategoryName</MudTd>
+            <MudTd>@context.DataType</MudTd>
+            <MudTd>
+                <MudIconButton Icon="@Icons.Material.Filled.Edit" OnClick="@(() => EditAsync(context))" />
+                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" OnClick="@(() => DeleteAsync(context))" />
+            </MudTd>
+        </RowTemplate>
+    </MudTable>
+    <MudPagination Count="@Math.Max(1, _page.TotalPages)" Selected="@_page.Page"
+                   SelectedChanged="@(async page => await LoadAsync(page))" Class="mt-3" />
+}
+
+@code {
+    private readonly Dictionary<string, object> TableAttributes = new() { ["aria-label"] = "Attribute catalog" };
+    private PagedResult<AttributeDefinitionAdminDto>? _page;
+    private IReadOnlyList<AttributeCategoryDto> _categories = [];
+    private string? _search;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var catalog = await Catalog.GetCatalogAsync();
+        if (catalog.Succeeded)
+            _categories = catalog.Value!;
+        await LoadAsync(1);
+    }
+
+    private async Task LoadAsync(int page)
+    {
+        var actor = await GetActorAsync();
+        var result = await Definitions.ListAsync(
+            actor, new AttributeCatalogQuery(Search: _search, Page: new PageRequest(page, 25)));
+        if (result.Succeeded)
+            _page = result.Value;
+    }
+
+    private async Task SearchChangedAsync(string? value)
+    {
+        _search = value;
+        await LoadAsync(1);
+    }
+
+    private async Task CreateAsync() => await OpenDialogAsync(null);
+
+    private async Task EditAsync(AttributeDefinitionAdminDto definition) => await OpenDialogAsync(definition);
+
+    private async Task OpenDialogAsync(AttributeDefinitionAdminDto? editing)
+    {
+        var parameters = new DialogParameters { [nameof(AttributeDefinitionDialog.Editing)] = editing, [nameof(AttributeDefinitionDialog.Categories)] = _categories };
+        var dialog = await DialogService.ShowAsync<AttributeDefinitionDialog>(editing is null ? "New attribute" : "Edit attribute", parameters);
+        if ((await dialog.Result) is { Canceled: false })
+            await LoadAsync(_page?.Page ?? 1);
+    }
+
+    private async Task DeleteAsync(AttributeDefinitionAdminDto definition)
+    {
+        var actor = await GetActorAsync();
+        var impact = await Definitions.GetDeleteImpactAsync(actor, definition.Id);
+        if (!impact.Succeeded || impact.Value is null)
+            return;
+        var i = impact.Value;
+        var parameters = new DialogParameters
+        {
+            [nameof(ConfirmDialog.ContentText)] = $"Delete {definition.Name}? Profiles: {i.ProfileValues}; positions: {i.Positions}; rules: {i.AccessRules}; CVs: {i.Cvs}.",
+            [nameof(ConfirmDialog.YesText)] = "Delete",
+            [nameof(ConfirmDialog.NoText)] = "Cancel"
+        };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Delete attribute", parameters);
+        if ((await dialog.Result) is not { Canceled: false, Data: true })
+            return;
+        var result = await Definitions.DeleteAsync(actor, definition.Id);
+        Snackbar.Add(result.Succeeded ? "Attribute deleted." : result.Error.Message,
+            result.Succeeded ? Severity.Success : Severity.Error);
+        await LoadAsync(_page?.Page ?? 1);
+    }
+
+    private async Task<ActorContext> GetActorAsync()
+    {
+        var state = await AuthProvider.GetAuthenticationStateAsync();
+        return new ActorContext(
+            Guid.Parse(state.User.FindFirstValue(ClaimTypes.NameIdentifier)!),
+            state.User.IsInRole("Admin"));
+    }
+}

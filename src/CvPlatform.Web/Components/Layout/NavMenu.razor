@@ -3,6 +3,21 @@
 
 @inject IStringLocalizer<SharedResource> L
 
-<MudNavMenu>
-    <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home">@L["Home"]</MudNavLink>
+<MudNavMenu Class="cv-nav">
+    <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home" Class="cv-nav-link">
+        @L["Home"]
+    </MudNavLink>
+    <AuthorizeView>
+        <Authorized>
+            <MudNavLink Href="/Profile" Icon="@Icons.Material.Filled.Person" Class="cv-nav-link">
+                @L["Profile"]
+            </MudNavLink>
+            <MudNavLink Href="/Profile/Projects" Icon="@Icons.Material.Filled.Work" Class="cv-nav-link">
+                @L["Projects"]
+            </MudNavLink>
+            <MudNavLink Href="/Account/Logout" Icon="@Icons.Material.Filled.Logout" Class="cv-nav-link">
+                @L["Logout"]
+            </MudNavLink>
+        </Authorized>
+    </AuthorizeView>
 </MudNavMenu>
