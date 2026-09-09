@@ -104,10 +104,12 @@ public static class SeedData
     private static async Task EnsureDemoPositionAsync(IAppDbContext db)
     {
         const string title = "Senior .NET Developer";
+        var ownerId = await db.Users.Where(u => u.Email == AdminEmail).Select(u => u.Id).SingleAsync();
         if (!await db.Positions.AnyAsync(p => p.Title == title))
             db.Positions.Add(new Position
             {
                 Id = Guid.NewGuid(),
+                OwnerId = ownerId,
                 Title = title,
                 ShortDescription = "Demo position for local development.",
                 Company = "Demo Corp",

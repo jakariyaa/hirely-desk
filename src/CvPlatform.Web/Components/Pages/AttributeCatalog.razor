@@ -89,7 +89,7 @@ else
         var i = impact.Value;
         var parameters = new DialogParameters
         {
-            [nameof(ConfirmDialog.ContentText)] = $"Delete {definition.Name}? Profiles: {i.ProfileValues}; positions: {i.Positions}; rules: {i.AccessRules}; CVs: {i.Cvs}.",
+            [nameof(ConfirmDialog.ContentText)] = $"Delete {definition.Name}? Profiles: {i.ProfileValues}; positions: {i.Positions}; rules: {i.AccessRules}; CVs: {i.Cvs}; restricted positions losing all gating: {i.RestrictedPositionsLosingGating}.",
             [nameof(ConfirmDialog.YesText)] = "Delete",
             [nameof(ConfirmDialog.NoText)] = "Cancel"
         };

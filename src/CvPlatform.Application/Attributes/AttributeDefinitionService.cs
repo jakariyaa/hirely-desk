@@ -1,6 +1,6 @@
-using System.Text.Json;
 using CvPlatform.Application.Authorization;
 using CvPlatform.Application.Common;
+using CvPlatform.Application.Cvs;
 using CvPlatform.Core.Data;
 using CvPlatform.Core.Entities;
 using CvPlatform.Core.Enums;
@@ -109,8 +109,13 @@ public sealed class AttributeDefinitionService(IAppDbContextFactory factory) : I
 
         var positions = await db.PositionAttributes.Where(a => a.AttributeDefinitionId == id)
             .Select(a => a.PositionId).Distinct().ToListAsync(ct);
-        var restricted = await db.AccessRules.Where(r => r.AttributeDefinitionId == id)
-            .Select(r => r.PositionId).Distinct().ToListAsync(ct);
+        var restricted = await db.AccessRules
+            .Where(r => !r.Position.IsPublic && r.AttributeDefinitionId == id)
+            .Select(r => r.PositionId)
+            .Distinct()
+            .Where(positionId => !db.AccessRules.Any(r =>
+                r.PositionId == positionId && r.AttributeDefinitionId != id))
+            .CountAsync(ct);
         var cvCount = await db.Cvs.CountAsync(c =>
             positions.Contains(c.PositionId) || db.ProfileAttributeValues.Any(v =>
                 v.ProfileId == c.ProfileId && v.AttributeDefinitionId == id), ct);
@@ -119,7 +124,7 @@ public sealed class AttributeDefinitionService(IAppDbContextFactory factory) : I
             positions.Count,
             await db.AccessRules.CountAsync(r => r.AttributeDefinitionId == id, ct),
             cvCount,
-            restricted.Count));
+            restricted));
     }
 
     public async Task<Result> DeleteAsync(ActorContext actor, Guid id, CancellationToken ct = default)
@@ -130,9 +135,29 @@ public sealed class AttributeDefinitionService(IAppDbContextFactory factory) : I
         var definition = await db.AttributeDefinitions.SingleOrDefaultAsync(d => d.Id == id, ct);
         if (definition is null)
             return Result.Failure(ErrorCodes.NotFound, "Attribute definition was not found.");
+        if (definition.IsBuiltIn)
+            return Result.Failure(ErrorCodes.Forbidden, "Built-in attributes cannot be deleted.");
+
+        await using var transaction = db.Database.ProviderName != "Microsoft.EntityFrameworkCore.InMemory"
+            ? await db.Database.BeginTransactionAsync(ct)
+            : null;
+        var publishedCvs = await db.Cvs
+            .Include(c => c.Position).ThenInclude(p => p.Attributes).ThenInclude(a => a.AttributeDefinition)
+            .Include(c => c.Profile).ThenInclude(p => p.User)
+            .Include(c => c.Profile).ThenInclude(p => p.AttributeValues).ThenInclude(v => v.AttributeDefinition)
+            .AsSplitQuery()
+            .Where(c => c.Status == CvStatus.Published &&
+                (c.Position.Attributes.Any(a => a.AttributeDefinitionId == id) ||
+                 c.Profile.AttributeValues.Any(v => v.AttributeDefinitionId == id)))
+            .ToListAsync(ct);
+        foreach (var cv in publishedCvs)
+            cv.SearchText = CvSearchTextBuilder.Build(cv, id);
+
         db.AttributeDefinitions.Remove(definition);
         try { await db.SaveChangesAsync(ct); }
         catch (DbUpdateConcurrencyException) { return Result.Failure(ErrorCodes.ConcurrencyConflict, "The attribute was modified by someone else."); }
+        if (transaction is not null)
+            await transaction.CommitAsync(ct);
         return Result.Success();
     }
 
@@ -150,18 +175,6 @@ public sealed class AttributeDefinitionService(IAppDbContextFactory factory) : I
     {
         if (string.IsNullOrWhiteSpace(input.Name) || input.Name.Trim().Length > 200)
             return "Attribute name is required and cannot exceed 200 characters.";
-        if (input.DataType != AttributeDataType.Dropdown && !string.IsNullOrWhiteSpace(input.OptionsJson))
-            return "Options are supported only for dropdown attributes.";
-        if (!string.IsNullOrWhiteSpace(input.OptionsJson))
-        {
-            try
-            {
-                using var document = JsonDocument.Parse(input.OptionsJson);
-                if (document.RootElement.ValueKind != JsonValueKind.Object)
-                    return "Options must be a JSON object.";
-            }
-            catch (JsonException) { return "Options are invalid JSON."; }
-        }
-        return null;
+        return AttributeValueRules.ValidateOptions(input.DataType, input.OptionsJson);
     }
 }

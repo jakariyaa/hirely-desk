@@ -1,10 +1,14 @@
 using CvPlatform.Core.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 
 namespace CvPlatform.Core.Data;
 
 public interface IAppDbContext : IDisposable, IAsyncDisposable
 {
+    DatabaseFacade Database { get; }
+    EntityEntry<T> Entry<T>(T entity) where T : class;
     DbSet<ApplicationUser> Users { get; }
     DbSet<Profile> Profiles { get; }
     DbSet<AttributeCategory> AttributeCategories { get; }

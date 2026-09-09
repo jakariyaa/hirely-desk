@@ -11,6 +11,11 @@ public class PositionConfiguration : IEntityTypeConfiguration<Position>
         builder.Property(p => p.Title).IsRequired();
         builder.Property(p => p.Version).IsConcurrencyToken();
 
+        builder.HasOne(p => p.Owner)
+            .WithMany()
+            .HasForeignKey(p => p.OwnerId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         builder.Property(p => p.SearchVector)
             .IsGeneratedTsVectorColumn("english", nameof(Position.Title), nameof(Position.ShortDescription));
         builder.HasIndex(p => p.SearchVector).HasMethod("gin");

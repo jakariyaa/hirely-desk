@@ -199,4 +199,29 @@ public class ProfileServiceTests
         result.Succeeded.Should().BeFalse();
         result.Error.Code.Should().Be(ErrorCodes.ValidationFailed);
     }
+
+    [Fact]
+    public async Task DeleteAsync_rejects_built_in_attribute()
+    {
+        var factory = CreateFactory(out var db);
+        var category = new AttributeCategory { Id = Guid.NewGuid(), Name = "Me" };
+        var definition = new AttributeDefinition
+        {
+            Id = Guid.NewGuid(),
+            CategoryId = category.Id,
+            Name = "Me.Name",
+            DataType = AttributeDataType.String,
+            IsBuiltIn = true,
+        };
+        db.AttributeCategories.Add(category);
+        db.AttributeDefinitions.Add(definition);
+        await db.SaveChangesAsync();
+        var service = new AttributeDefinitionService(factory);
+
+        var result = await service.DeleteAsync(new ActorContext(Guid.NewGuid(), true), definition.Id);
+
+        result.Succeeded.Should().BeFalse();
+        result.Error.Code.Should().Be(ErrorCodes.Forbidden);
+        db.AttributeDefinitions.Should().ContainSingle();
+    }
 }
