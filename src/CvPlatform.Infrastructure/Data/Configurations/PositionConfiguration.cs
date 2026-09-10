@@ -1,6 +1,7 @@
 using CvPlatform.Core.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using NpgsqlTypes;
 
 namespace CvPlatform.Infrastructure.Data.Configurations;
 
@@ -16,9 +17,10 @@ public class PositionConfiguration : IEntityTypeConfiguration<Position>
             .HasForeignKey(p => p.OwnerId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        builder.Property(p => p.SearchVector)
-            .IsGeneratedTsVectorColumn("english", nameof(Position.Title), nameof(Position.ShortDescription));
-        builder.HasIndex(p => p.SearchVector).HasMethod("gin");
+        builder.Property<NpgsqlTsVector>("SearchVector")
+            .IsGeneratedTsVectorColumn("english", nameof(Position.Title), nameof(Position.ShortDescription), nameof(Position.Company))
+            .IsRequired();
+        builder.HasIndex("SearchVector").HasMethod("gin");
 
         builder.HasMany(p => p.Attributes)
             .WithOne(a => a.Position)

@@ -1,5 +1,3 @@
-using NpgsqlTypes;
-
 namespace CvPlatform.Core.Entities;
 
 public class Position : IVersioned
@@ -12,7 +10,6 @@ public class Position : IVersioned
     public string? Level { get; set; }
     public bool IsPublic { get; set; }
     public int MaxProjects { get; set; } = 3;
-    public NpgsqlTsVector SearchVector { get; set; } = null!;
     public long Version { get; set; }
 
     public ApplicationUser Owner { get; set; } = default!;

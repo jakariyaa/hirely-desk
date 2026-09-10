@@ -3,6 +3,7 @@ using System;
 using CvPlatform.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using NpgsqlTypes;
@@ -12,9 +13,11 @@ using NpgsqlTypes;
 namespace CvPlatform.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260922190747_AccessRuleTypedComparisons")]
+    partial class AccessRuleTypedComparisons
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -240,12 +243,6 @@ namespace CvPlatform.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
                     b.Property<Guid>("PositionId")
                         .HasColumnType("uuid")
                         .HasColumnName("position_id");
@@ -282,9 +279,6 @@ namespace CvPlatform.Infrastructure.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_cvs");
-
-                    b.HasIndex("CreatedAt")
-                        .HasDatabaseName("ix_cvs_created_at");
 
                     b.HasIndex("PositionId")
                         .HasDatabaseName("ix_cvs_position_id");
@@ -470,154 +464,6 @@ namespace CvPlatform.Infrastructure.Migrations
                         .HasDatabaseName("ix_position_attributes_attribute_definition_id");
 
                     b.ToTable("position_attributes", (string)null);
-                });
-
-            modelBuilder.Entity("CvPlatform.Core.Entities.PositionTemplate", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("Company")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("company");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-                    b.Property<Guid>("CreatedById")
-                        .HasColumnType("uuid")
-                        .HasColumnName("created_by_id");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)")
-                        .HasColumnName("description");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_active");
-
-                    b.Property<string>("Level")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("level");
-
-                    b.Property<int>("MaxProjects")
-                        .HasColumnType("integer")
-                        .HasColumnName("max_projects");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("name");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-                    b.Property<long>("Version")
-                        .IsConcurrencyToken()
-                        .HasColumnType("bigint")
-                        .HasColumnName("version");
-
-                    b.HasKey("Id")
-                        .HasName("pk_position_templates");
-
-                    b.HasIndex("CreatedById")
-                        .HasDatabaseName("ix_position_templates_created_by_id");
-
-                    b.HasIndex("IsActive", "Name")
-                        .HasDatabaseName("ix_position_templates_is_active_name");
-
-                    b.ToTable("position_templates", (string)null);
-                });
-
-            modelBuilder.Entity("CvPlatform.Core.Entities.PositionTemplateAccessRule", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<Guid>("AttributeDefinitionId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("attribute_definition_id");
-
-                    b.Property<string>("ComparisonValue")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("comparison_value");
-
-                    b.Property<string>("DataType")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("data_type");
-
-                    b.Property<DateOnly?>("DateComparison")
-                        .HasColumnType("date")
-                        .HasColumnName("date_comparison");
-
-                    b.Property<decimal?>("NumericComparison")
-                        .HasColumnType("numeric")
-                        .HasColumnName("numeric_comparison");
-
-                    b.Property<string>("Operator")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("operator");
-
-                    b.Property<Guid>("PositionTemplateId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("position_template_id");
-
-                    b.HasKey("Id")
-                        .HasName("pk_position_template_access_rules");
-
-                    b.HasIndex("AttributeDefinitionId")
-                        .HasDatabaseName("ix_position_template_access_rules_attribute_definition_id");
-
-                    b.HasIndex("PositionTemplateId", "AttributeDefinitionId")
-                        .HasDatabaseName("ix_position_template_access_rules_position_template_id_attribu");
-
-                    b.ToTable("position_template_access_rules", (string)null);
-                });
-
-            modelBuilder.Entity("CvPlatform.Core.Entities.PositionTemplateAttribute", b =>
-                {
-                    b.Property<Guid>("PositionTemplateId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("position_template_id");
-
-                    b.Property<Guid>("AttributeDefinitionId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("attribute_definition_id");
-
-                    b.Property<bool>("IsRequired")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_required");
-
-                    b.Property<int>("SortOrder")
-                        .HasColumnType("integer")
-                        .HasColumnName("sort_order");
-
-                    b.HasKey("PositionTemplateId", "AttributeDefinitionId")
-                        .HasName("pk_position_template_attributes");
-
-                    b.HasIndex("AttributeDefinitionId")
-                        .HasDatabaseName("ix_position_template_attributes_attribute_definition_id");
-
-                    b.ToTable("position_template_attributes", (string)null);
                 });
 
             modelBuilder.Entity("CvPlatform.Core.Entities.Profile", b =>
@@ -1105,60 +951,6 @@ namespace CvPlatform.Infrastructure.Migrations
                     b.Navigation("Position");
                 });
 
-            modelBuilder.Entity("CvPlatform.Core.Entities.PositionTemplate", b =>
-                {
-                    b.HasOne("CvPlatform.Core.Entities.ApplicationUser", "CreatedBy")
-                        .WithMany()
-                        .HasForeignKey("CreatedById")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_position_templates_users_created_by_id");
-
-                    b.Navigation("CreatedBy");
-                });
-
-            modelBuilder.Entity("CvPlatform.Core.Entities.PositionTemplateAccessRule", b =>
-                {
-                    b.HasOne("CvPlatform.Core.Entities.AttributeDefinition", "AttributeDefinition")
-                        .WithMany()
-                        .HasForeignKey("AttributeDefinitionId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_position_template_access_rules_attribute_definitions_attrib");
-
-                    b.HasOne("CvPlatform.Core.Entities.PositionTemplate", "PositionTemplate")
-                        .WithMany("AccessRules")
-                        .HasForeignKey("PositionTemplateId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_position_template_access_rules_position_templates_position_");
-
-                    b.Navigation("AttributeDefinition");
-
-                    b.Navigation("PositionTemplate");
-                });
-
-            modelBuilder.Entity("CvPlatform.Core.Entities.PositionTemplateAttribute", b =>
-                {
-                    b.HasOne("CvPlatform.Core.Entities.AttributeDefinition", "AttributeDefinition")
-                        .WithMany()
-                        .HasForeignKey("AttributeDefinitionId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_position_template_attributes_attribute_definitions_attribut");
-
-                    b.HasOne("CvPlatform.Core.Entities.PositionTemplate", "PositionTemplate")
-                        .WithMany("Attributes")
-                        .HasForeignKey("PositionTemplateId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_position_template_attributes_position_templates_position_te");
-
-                    b.Navigation("AttributeDefinition");
-
-                    b.Navigation("PositionTemplate");
-                });
-
             modelBuilder.Entity("CvPlatform.Core.Entities.Profile", b =>
                 {
                     b.HasOne("CvPlatform.Core.Entities.ApplicationUser", "User")
@@ -1295,13 +1087,6 @@ namespace CvPlatform.Infrastructure.Migrations
                 });
 
             modelBuilder.Entity("CvPlatform.Core.Entities.Position", b =>
-                {
-                    b.Navigation("AccessRules");
-
-                    b.Navigation("Attributes");
-                });
-
-            modelBuilder.Entity("CvPlatform.Core.Entities.PositionTemplate", b =>
                 {
                     b.Navigation("AccessRules");
 

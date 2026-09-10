@@ -32,8 +32,29 @@ public sealed class VersionIncrementInterceptor : SaveChangesInterceptor
         {
             if (entry.State == EntityState.Added)
                 entry.Entity.Version = 1;
-            else if (entry.State == EntityState.Modified)
+            else if (entry.State == EntityState.Modified && !IsSearchTextOnlyRefresh(entry))
                 entry.Entity.Version = entry.OriginalValues.GetValue<long>(nameof(IVersioned.Version)) + 1;
         }
+    }
+
+    private static bool IsSearchTextOnlyRefresh(Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry<IVersioned> entry)
+    {
+        if (entry.Entity is not Cv)
+            return false;
+        var searchTextModified = false;
+        foreach (var property in entry.Properties)
+        {
+            if (!property.IsModified)
+                continue;
+            if (property.Metadata.Name is nameof(IVersioned.Version))
+                continue;
+            if (property.Metadata.Name is nameof(Cv.SearchText))
+            {
+                searchTextModified = true;
+                continue;
+            }
+            return false;
+        }
+        return searchTextModified;
     }
 }

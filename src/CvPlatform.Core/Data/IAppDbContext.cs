@@ -18,6 +18,9 @@ public interface IAppDbContext : IDisposable, IAsyncDisposable
     DbSet<ProjectTag> ProjectTags { get; }
     DbSet<ProjectTagLink> ProjectTagLinks { get; }
     DbSet<Position> Positions { get; }
+    DbSet<PositionTemplate> PositionTemplates { get; }
+    DbSet<PositionTemplateAttribute> PositionTemplateAttributes { get; }
+    DbSet<PositionTemplateAccessRule> PositionTemplateAccessRules { get; }
     DbSet<PositionAttribute> PositionAttributes { get; }
     DbSet<AccessRule> AccessRules { get; }
     DbSet<Cv> Cvs { get; }

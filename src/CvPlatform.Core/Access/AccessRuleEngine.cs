@@ -25,12 +25,13 @@ public sealed class AccessRuleEngine : IAccessRuleEngine
 
     private static bool Evaluate(RuleOperator op, TypedValue value, string comparison)
     {
+        var text = value.DataType == AttributeDataType.Text ? value.TextValue : value.StringValue;
         return op switch
         {
             RuleOperator.Equals => value.DataType switch
             {
-                AttributeDataType.String or AttributeDataType.Text =>
-                    string.Equals(value.StringValue, comparison, StringComparison.Ordinal),
+                AttributeDataType.String => string.Equals(value.StringValue, comparison, StringComparison.Ordinal),
+                AttributeDataType.Text => string.Equals(value.TextValue, comparison, StringComparison.Ordinal),
                 AttributeDataType.Numeric =>
                     decimal.TryParse(comparison, NumberStyles.Number, CultureInfo.InvariantCulture, out var number) &&
                     value.NumericValue == number,
@@ -42,9 +43,9 @@ public sealed class AccessRuleEngine : IAccessRuleEngine
                 _ => false,
             },
             RuleOperator.NotEquals => value.DataType is AttributeDataType.String or AttributeDataType.Text &&
-                !string.Equals(value.StringValue, comparison, StringComparison.Ordinal),
+                !string.Equals(text, comparison, StringComparison.Ordinal),
             RuleOperator.Contains => value.DataType is AttributeDataType.String or AttributeDataType.Text &&
-                value.StringValue?.Contains(comparison, StringComparison.OrdinalIgnoreCase) == true,
+                text?.Contains(comparison, StringComparison.OrdinalIgnoreCase) == true,
             RuleOperator.GreaterThan => CompareNumeric(value, comparison, comparisonValue => value.NumericValue > comparisonValue),
             RuleOperator.LessThan => CompareNumeric(value, comparison, comparisonValue => value.NumericValue < comparisonValue),
             RuleOperator.On => CompareDate(AttributeDataType.Date, value, comparison, comparisonValue => value.DateValue == comparisonValue),

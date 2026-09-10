@@ -17,6 +17,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<ProjectTag> ProjectTags => Set<ProjectTag>();
     public DbSet<ProjectTagLink> ProjectTagLinks => Set<ProjectTagLink>();
     public DbSet<Position> Positions => Set<Position>();
+    public DbSet<PositionTemplate> PositionTemplates => Set<PositionTemplate>();
+    public DbSet<PositionTemplateAttribute> PositionTemplateAttributes => Set<PositionTemplateAttribute>();
+    public DbSet<PositionTemplateAccessRule> PositionTemplateAccessRules => Set<PositionTemplateAccessRule>();
     public DbSet<PositionAttribute> PositionAttributes => Set<PositionAttribute>();
     public DbSet<AccessRule> AccessRules => Set<AccessRule>();
     public DbSet<Cv> Cvs => Set<Cv>();
@@ -29,10 +32,11 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
         base.OnModelCreating(modelBuilder);
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
 
-        if (Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory")
+        var providerName = Database.ProviderName;
+        if (providerName is "Microsoft.EntityFrameworkCore.InMemory" or "Microsoft.EntityFrameworkCore.Sqlite")
         {
-            modelBuilder.Entity<Cv>().Ignore(c => c.SearchVector);
-            modelBuilder.Entity<Position>().Ignore(p => p.SearchVector);
+            modelBuilder.Entity<Cv>().Ignore("SearchVector");
+            modelBuilder.Entity<Position>().Ignore("SearchVector");
         }
     }
 }
