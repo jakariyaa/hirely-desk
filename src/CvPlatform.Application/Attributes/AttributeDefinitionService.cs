@@ -1,20 +1,24 @@
 using CvPlatform.Application.Authorization;
 using CvPlatform.Application.Common;
 using CvPlatform.Application.Cvs;
+using CvPlatform.Application.Validation;
 using CvPlatform.Core.Data;
 using CvPlatform.Core.Entities;
 using CvPlatform.Core.Enums;
+using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 
 namespace CvPlatform.Application.Attributes;
 
-public sealed class AttributeDefinitionService(IAppDbContextFactory factory) : IAttributeDefinitionService
+public sealed class AttributeDefinitionService(
+    IAppDbContextFactory factory,
+    IValidator<AttributeDefinitionInput>? validator = null) : IAttributeDefinitionService
 {
     public async Task<Result<PagedResult<AttributeDefinitionAdminDto>>> ListAsync(
         ActorContext actor, AttributeCatalogQuery request, CancellationToken ct = default)
     {
-        if (!actor.IsAdmin)
-            return Result<PagedResult<AttributeDefinitionAdminDto>>.Failure(ErrorCodes.Forbidden, "Admin access required.");
+        if (!actor.IsPrivileged)
+            return Result<PagedResult<AttributeDefinitionAdminDto>>.Failure(ErrorCodes.Forbidden, "Recruiter access required.");
 
         var page = request.Page ?? new PageRequest();
         await using var db = factory.CreateDbContext();
@@ -41,8 +45,8 @@ public sealed class AttributeDefinitionService(IAppDbContextFactory factory) : I
     public async Task<Result<AttributeDefinitionAdminDto>> CreateAsync(
         ActorContext actor, AttributeDefinitionInput input, CancellationToken ct = default)
     {
-        if (!actor.IsAdmin)
-            return Result<AttributeDefinitionAdminDto>.Failure(ErrorCodes.Forbidden, "Admin access required.");
+        if (!actor.IsPrivileged)
+            return Result<AttributeDefinitionAdminDto>.Failure(ErrorCodes.Forbidden, "Recruiter access required.");
         var validation = Validate(input);
         if (validation is not null)
             return Result<AttributeDefinitionAdminDto>.Failure(ErrorCodes.ValidationFailed, validation);
@@ -50,7 +54,8 @@ public sealed class AttributeDefinitionService(IAppDbContextFactory factory) : I
         await using var db = factory.CreateDbContext();
         if (!await db.AttributeCategories.AnyAsync(c => c.Id == input.CategoryId, ct))
             return Result<AttributeDefinitionAdminDto>.Failure(ErrorCodes.NotFound, "Attribute category was not found.");
-        if (await db.AttributeDefinitions.AnyAsync(d => d.Name == input.Name.Trim(), ct))
+        var normalizedName = input.Name.Trim().ToLowerInvariant();
+        if (await db.AttributeDefinitions.AnyAsync(d => d.Name.ToLower() == normalizedName, ct))
             return Result<AttributeDefinitionAdminDto>.Failure(ErrorCodes.Conflict, "Attribute name already exists.");
 
         var definition = new AttributeDefinition
@@ -71,8 +76,8 @@ public sealed class AttributeDefinitionService(IAppDbContextFactory factory) : I
     public async Task<Result<AttributeDefinitionAdminDto>> UpdateAsync(
         ActorContext actor, Guid id, AttributeDefinitionInput input, CancellationToken ct = default)
     {
-        if (!actor.IsAdmin)
-            return Result<AttributeDefinitionAdminDto>.Failure(ErrorCodes.Forbidden, "Admin access required.");
+        if (!actor.IsPrivileged)
+            return Result<AttributeDefinitionAdminDto>.Failure(ErrorCodes.Forbidden, "Recruiter access required.");
         var validation = Validate(input);
         if (validation is not null)
             return Result<AttributeDefinitionAdminDto>.Failure(ErrorCodes.ValidationFailed, validation);
@@ -85,16 +90,73 @@ public sealed class AttributeDefinitionService(IAppDbContextFactory factory) : I
             return Result<AttributeDefinitionAdminDto>.Failure(ErrorCodes.NotFound, "Attribute category was not found.");
         if (input.ExpectedVersion is null || input.ExpectedVersion != definition.Version)
             return Result<AttributeDefinitionAdminDto>.Failure(ErrorCodes.ConcurrencyConflict, "The attribute was modified by someone else.");
-        if (await db.AttributeDefinitions.AnyAsync(d => d.Id != id && d.Name == input.Name.Trim(), ct))
+        var normalizedUpdateName = input.Name.Trim().ToLowerInvariant();
+        if (await db.AttributeDefinitions.AnyAsync(d => d.Id != id && d.Name.ToLower() == normalizedUpdateName, ct))
             return Result<AttributeDefinitionAdminDto>.Failure(ErrorCodes.Conflict, "Attribute name already exists.");
+
+        if (input.DataType != definition.DataType)
+        {
+            var hasValues = await db.ProfileAttributeValues.AnyAsync(
+                v => v.AttributeDefinitionId == id, ct);
+            var hasRules = await db.AccessRules.AnyAsync(
+                r => r.AttributeDefinitionId == id, ct);
+            if (hasValues || hasRules)
+                return Result<AttributeDefinitionAdminDto>.Failure(
+                    ErrorCodes.Conflict,
+                    "Attribute type cannot change while profile values or access rules reference it.");
+        }
+
+        var removed = RemovedChoices(definition.DataType, definition.OptionsJson, input.DataType, input.OptionsJson);
+        if (removed.Count > 0 && !actor.IsAdmin)
+            return Result<AttributeDefinitionAdminDto>.Failure(
+                ErrorCodes.Forbidden, "Admin access required to remove shared dropdown options.");
+        if (removed.Count > 0 && !input.ForceOptionRemoval)
+        {
+            var values = await db.ProfileAttributeValues.CountAsync(
+                v => v.AttributeDefinitionId == id && v.DropdownOption != null && removed.Contains(v.DropdownOption), ct);
+            var rules = await db.AccessRules.CountAsync(
+                r => r.AttributeDefinitionId == id && removed.Contains(r.ComparisonValue), ct);
+            if (values > 0 || rules > 0)
+                return Result<AttributeDefinitionAdminDto>.Failure(ErrorCodes.Conflict,
+                    $"{removed.Count} option(s) are referenced by {values} profile value(s) and {rules} access rule(s): {string.Join(", ", removed)}. Confirm removal to proceed.");
+        }
 
         definition.CategoryId = input.CategoryId;
         definition.Name = input.Name.Trim();
         definition.Description = input.Description?.Trim();
         definition.DataType = input.DataType;
         definition.OptionsJson = input.OptionsJson?.Trim();
-        try { await db.SaveChangesAsync(ct); }
-        catch (DbUpdateConcurrencyException) { return Result<AttributeDefinitionAdminDto>.Failure(ErrorCodes.ConcurrencyConflict, "The attribute was modified by someone else."); }
+        await using var transaction = db.Database.ProviderName != "Microsoft.EntityFrameworkCore.InMemory"
+            ? await db.Database.BeginTransactionAsync(ct)
+            : null;
+        var publishedCvs = await db.Cvs
+            .Include(c => c.Position).ThenInclude(p => p.Attributes).ThenInclude(a => a.AttributeDefinition)
+            .Include(c => c.Profile).ThenInclude(p => p.User)
+            .Include(c => c.Profile).ThenInclude(p => p.AttributeValues).ThenInclude(v => v.AttributeDefinition)
+            .AsSplitQuery()
+            .Where(c => c.Status == CvStatus.Published &&
+                (c.Position.Attributes.Any(a => a.AttributeDefinitionId == id) ||
+                 c.Profile.AttributeValues.Any(v => v.AttributeDefinitionId == id)))
+            .ToListAsync(ct);
+        foreach (var cv in publishedCvs)
+            cv.SearchText = CvSearchTextBuilder.Build(cv);
+
+        try
+        {
+            await db.SaveChangesAsync(ct);
+            if (transaction is not null)
+                await transaction.CommitAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Result<AttributeDefinitionAdminDto>.Failure(
+                ErrorCodes.ConcurrencyConflict, "The attribute was modified by someone else.");
+        }
+        catch (DbUpdateException)
+        {
+            return Result<AttributeDefinitionAdminDto>.Failure(
+                ErrorCodes.Conflict, "Attribute name already exists.");
+        }
         return await GetAsync(db, id, ct);
     }
 
@@ -127,7 +189,26 @@ public sealed class AttributeDefinitionService(IAppDbContextFactory factory) : I
             restricted));
     }
 
-    public async Task<Result> DeleteAsync(ActorContext actor, Guid id, CancellationToken ct = default)
+    public async Task<Result<AttributeOptionImpactDto>> GetOptionChangeImpactAsync(
+        ActorContext actor, Guid id, AttributeDefinitionInput input, CancellationToken ct = default)
+    {
+        if (!actor.IsAdmin)
+            return Result<AttributeOptionImpactDto>.Failure(ErrorCodes.Forbidden, "Admin access required.");
+        await using var db = factory.CreateDbContext();
+        var definition = await db.AttributeDefinitions.AsNoTracking().SingleOrDefaultAsync(d => d.Id == id, ct);
+        if (definition is null)
+            return Result<AttributeOptionImpactDto>.Failure(ErrorCodes.NotFound, "Attribute definition was not found.");
+        var removed = RemovedChoices(definition.DataType, definition.OptionsJson, input.DataType, input.OptionsJson);
+        if (removed.Count == 0)
+            return Result<AttributeOptionImpactDto>.Success(new AttributeOptionImpactDto([], 0, 0));
+        var values = await db.ProfileAttributeValues.CountAsync(
+            v => v.AttributeDefinitionId == id && v.DropdownOption != null && removed.Contains(v.DropdownOption), ct);
+        var rules = await db.AccessRules.CountAsync(
+            r => r.AttributeDefinitionId == id && removed.Contains(r.ComparisonValue), ct);
+        return Result<AttributeOptionImpactDto>.Success(new AttributeOptionImpactDto(removed, values, rules));
+    }
+
+    public async Task<Result> DeleteAsync(ActorContext actor, Guid id, long expectedVersion, CancellationToken ct = default)
     {
         if (!actor.IsAdmin)
             return Result.Failure(ErrorCodes.Forbidden, "Admin access required.");
@@ -137,6 +218,8 @@ public sealed class AttributeDefinitionService(IAppDbContextFactory factory) : I
             return Result.Failure(ErrorCodes.NotFound, "Attribute definition was not found.");
         if (definition.IsBuiltIn)
             return Result.Failure(ErrorCodes.Forbidden, "Built-in attributes cannot be deleted.");
+        if (definition.Version != expectedVersion)
+            return Result.Failure(ErrorCodes.ConcurrencyConflict, "The attribute was modified by someone else.");
 
         await using var transaction = db.Database.ProviderName != "Microsoft.EntityFrameworkCore.InMemory"
             ? await db.Database.BeginTransactionAsync(ct)
@@ -171,10 +254,38 @@ public sealed class AttributeDefinitionService(IAppDbContextFactory factory) : I
         return Result<AttributeDefinitionAdminDto>.Success(dto);
     }
 
-    private static string? Validate(AttributeDefinitionInput input)
+    private string? Validate(AttributeDefinitionInput input)
     {
-        if (string.IsNullOrWhiteSpace(input.Name) || input.Name.Trim().Length > 200)
-            return "Attribute name is required and cannot exceed 200 characters.";
-        return AttributeValueRules.ValidateOptions(input.DataType, input.OptionsJson);
+        var result = (validator ?? new AttributeDefinitionInputValidator()).Validate(input);
+        return result.IsValid ? null : result.Errors[0].ErrorMessage;
     }
+
+    private static IReadOnlyList<string> RemovedChoices(
+        Core.Enums.AttributeDataType oldType, string? oldJson,
+        Core.Enums.AttributeDataType newType, string? newJson)
+    {
+        var oldChoices = ParseChoices(oldType, oldJson);
+        if (oldChoices.Count == 0)
+            return [];
+        var newChoices = ParseChoices(newType, newJson);
+        return oldChoices.Where(c => !newChoices.Contains(c, StringComparer.Ordinal)).ToList();
+    }
+
+    private static IReadOnlyList<string> ParseChoices(Core.Enums.AttributeDataType dataType, string? optionsJson)
+    {
+        if (dataType != Core.Enums.AttributeDataType.Dropdown || string.IsNullOrWhiteSpace(optionsJson))
+            return [];
+        try
+        {
+            var shape = System.Text.Json.JsonSerializer.Deserialize<DropdownShape>(
+                optionsJson, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            return shape?.Choices?.Select(c => c.Trim()).Where(c => c.Length > 0).Distinct(StringComparer.Ordinal).ToList() ?? [];
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return [];
+        }
+    }
+
+    private sealed record DropdownShape(string[]? Choices);
 }

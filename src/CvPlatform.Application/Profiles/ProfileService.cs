@@ -1,6 +1,7 @@
 using CvPlatform.Application.Attributes;
 using CvPlatform.Application.Authorization;
 using CvPlatform.Application.Common;
+using CvPlatform.Application.Cvs;
 using CvPlatform.Core.Data;
 using CvPlatform.Core.Entities;
 using CvPlatform.Core.Enums;
@@ -10,6 +11,32 @@ namespace CvPlatform.Application.Profiles;
 
 public sealed class ProfileService(IAppDbContextFactory factory) : IProfileService
 {
+    public async Task<Result<ProfileSummaryDto>> GetSummaryForUserAsync(
+        ActorContext actor, Guid userId, CancellationToken ct = default)
+    {
+        if (!actor.IsAdmin && actor.UserId != userId)
+            return Result<ProfileSummaryDto>.Failure(
+                ErrorCodes.Forbidden, "You are not allowed to access this profile.");
+
+        await using var db = factory.CreateDbContext();
+        var values = await db.ProfileAttributeValues
+            .AsNoTracking()
+            .Where(v => v.Profile.UserId == userId
+                && (v.AttributeDefinition.Name == ProfileAttributeNames.Name
+                    || v.AttributeDefinition.Name == ProfileAttributeNames.Photo))
+            .Select(v => new
+            {
+                v.AttributeDefinition.Name,
+                v.StringValue,
+                v.ImageUrl,
+            })
+            .ToListAsync(ct);
+
+        return Result<ProfileSummaryDto>.Success(new ProfileSummaryDto(
+            values.FirstOrDefault(v => v.Name == ProfileAttributeNames.Name)?.StringValue,
+            values.FirstOrDefault(v => v.Name == ProfileAttributeNames.Photo)?.ImageUrl));
+    }
+
     public async Task<Result<ProfileDto>> GetForUserAsync(ActorContext actor, Guid userId, CancellationToken ct = default)
     {
         if (!actor.IsAdmin && actor.UserId != userId)
@@ -18,6 +45,7 @@ public sealed class ProfileService(IAppDbContextFactory factory) : IProfileServi
         await using var db = factory.CreateDbContext();
         var profile = await db.Profiles
             .AsNoTracking()
+            .AsSplitQuery()
             .Include(p => p.AttributeValues).ThenInclude(v => v.AttributeDefinition)
             .Include(p => p.Projects)
             .SingleOrDefaultAsync(p => p.UserId == userId, ct);
@@ -37,11 +65,17 @@ public sealed class ProfileService(IAppDbContextFactory factory) : IProfileServi
             profile.AttributeValues.Select(AttributeValueDto.FromEntity).ToList()));
     }
 
-    public async Task<Result<ProfileDto>> SaveAttributeValueAsync(
-        ActorContext actor, Guid userId, AttributeValueInput input, CancellationToken ct = default)
+    public Task<Result<ProfileDto>> SaveAttributeValueAsync(
+        ActorContext actor, Guid userId, AttributeValueInput input, CancellationToken ct = default) =>
+        SaveAttributeValuesAsync(actor, userId, [input], ct);
+
+    public async Task<Result<ProfileDto>> SaveAttributeValuesAsync(
+        ActorContext actor, Guid userId, IReadOnlyList<AttributeValueInput> inputs, CancellationToken ct = default)
     {
         if (!actor.IsAdmin && actor.UserId != userId)
             return Result<ProfileDto>.Failure(ErrorCodes.Forbidden, "You are not allowed to modify this profile.");
+        if (inputs.Count == 0)
+            return await GetForUserAsync(actor, userId, ct);
 
         await using var db = factory.CreateDbContext();
         var profile = await db.Profiles.SingleOrDefaultAsync(p => p.UserId == userId, ct);
@@ -53,61 +87,95 @@ public sealed class ProfileService(IAppDbContextFactory factory) : IProfileServi
             profile = created.Value!;
         }
 
-        var definition = await db.AttributeDefinitions.FindAsync([input.AttributeDefinitionId], ct);
-        if (definition is null)
+        var ids = inputs.Select(i => i.AttributeDefinitionId).Distinct().ToList();
+        var definitions = await db.AttributeDefinitions
+            .Where(d => ids.Contains(d.Id))
+            .ToDictionaryAsync(d => d.Id, ct);
+        var missing = ids.FirstOrDefault(id => !definitions.ContainsKey(id));
+        if (missing != Guid.Empty)
             return Result<ProfileDto>.Failure(
                 ErrorCodes.NotFound,
-                $"Attribute definition {input.AttributeDefinitionId} was not found.");
+                $"Attribute definition {missing} was not found.");
 
-        var attributeDefinition = definition;
-
-        var normalized = AttributeValueRules.Normalize(attributeDefinition.DataType, input);
-        var validationError = AttributeValueRules.Validate(attributeDefinition, normalized);
-        if (validationError is not null)
-            return Result<ProfileDto>.Failure(ErrorCodes.ValidationFailed, validationError!);
-
-        var value = await db.ProfileAttributeValues.SingleOrDefaultAsync(
-            v => v.ProfileId == profile.Id && v.AttributeDefinitionId == attributeDefinition.Id, ct);
-
-        if (value is null)
+        var normalizedById = new Dictionary<Guid, AttributeValueInput>(ids.Count);
+        foreach (var input in inputs)
         {
-            value = new ProfileAttributeValue
-            {
-                ProfileId = profile.Id,
-                AttributeDefinitionId = attributeDefinition.Id,
-                StringValue = normalized.StringValue,
-                TextValue = normalized.TextValue,
-                NumericValue = normalized.NumericValue,
-                DateValue = normalized.DateValue,
-                PeriodStart = normalized.PeriodStart,
-                PeriodEnd = normalized.PeriodEnd,
-                BooleanValue = normalized.BooleanValue,
-                DropdownOption = normalized.DropdownOption,
-                ImageUrl = normalized.ImageUrl,
-            };
-            db.ProfileAttributeValues.Add(value);
-        }
-        else
-        {
-            if (input.ExpectedVersion is null || input.ExpectedVersion.Value != value.Version)
+            var definition = definitions[input.AttributeDefinitionId];
+            var normalized = AttributeValueRules.Normalize(definition.DataType, input);
+            var validationError = AttributeValueRules.Validate(definition, normalized);
+            if (validationError is not null)
+                return Result<ProfileDto>.Failure(ErrorCodes.ValidationFailed, validationError);
+            if (definition.DataType == AttributeDataType.Image &&
+                normalized.ImageUrl is not null &&
+                !IsOwnedCloudinaryImage(normalized.ImageUrl, userId))
                 return Result<ProfileDto>.Failure(
-                    ErrorCodes.ConcurrencyConflict,
-                    "The value was modified by someone else. Reload and try again.");
+                    ErrorCodes.ValidationFailed,
+                    "Image must be uploaded to the current user's Cloudinary folder.");
+            normalizedById[input.AttributeDefinitionId] = normalized;
+        }
 
-            value.StringValue = normalized.StringValue;
-            value.TextValue = normalized.TextValue;
-            value.NumericValue = normalized.NumericValue;
-            value.DateValue = normalized.DateValue;
-            value.PeriodStart = normalized.PeriodStart;
-            value.PeriodEnd = normalized.PeriodEnd;
-            value.BooleanValue = normalized.BooleanValue;
-            value.DropdownOption = normalized.DropdownOption;
-            value.ImageUrl = normalized.ImageUrl;
+        var existing = await db.ProfileAttributeValues
+            .Where(v => v.ProfileId == profile.Id && ids.Contains(v.AttributeDefinitionId))
+            .ToDictionaryAsync(v => v.AttributeDefinitionId, ct);
+
+        foreach (var input in inputs)
+        {
+            var normalized = normalizedById[input.AttributeDefinitionId];
+            if (!existing.TryGetValue(input.AttributeDefinitionId, out var value))
+            {
+                db.ProfileAttributeValues.Add(new ProfileAttributeValue
+                {
+                    ProfileId = profile.Id,
+                    AttributeDefinitionId = input.AttributeDefinitionId,
+                    StringValue = normalized.StringValue,
+                    TextValue = normalized.TextValue,
+                    NumericValue = normalized.NumericValue,
+                    DateValue = normalized.DateValue,
+                    PeriodStart = normalized.PeriodStart,
+                    PeriodEnd = normalized.PeriodEnd,
+                    BooleanValue = normalized.BooleanValue,
+                    DropdownOption = normalized.DropdownOption,
+                    ImageUrl = normalized.ImageUrl,
+                });
+            }
+            else
+            {
+                if (input.ExpectedVersion is null || input.ExpectedVersion.Value != value.Version)
+                    return Result<ProfileDto>.Failure(
+                        ErrorCodes.ConcurrencyConflict,
+                        "The value was modified by someone else. Reload and try again.");
+
+                value.StringValue = normalized.StringValue;
+                value.TextValue = normalized.TextValue;
+                value.NumericValue = normalized.NumericValue;
+                value.DateValue = normalized.DateValue;
+                value.PeriodStart = normalized.PeriodStart;
+                value.PeriodEnd = normalized.PeriodEnd;
+                value.BooleanValue = normalized.BooleanValue;
+                value.DropdownOption = normalized.DropdownOption;
+                value.ImageUrl = normalized.ImageUrl;
+            }
         }
 
         try
         {
-            await db.SaveChangesAsync(ct);
+            await using var transaction = db.Database.ProviderName != "Microsoft.EntityFrameworkCore.InMemory"
+                ? await db.Database.BeginTransactionAsync(ct)
+                : null;
+            try
+            {
+                await db.SaveChangesAsync(ct);
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                return Result<ProfileDto>.Failure(
+                    ErrorCodes.ConcurrencyConflict, "The value was modified by someone else. Reload and try again.");
+            }
+
+            await RefreshPublishedSearchTextsAsync(db, profile.Id, ct);
+
+            if (transaction is not null)
+                await transaction.CommitAsync(ct);
         }
         catch (DbUpdateConcurrencyException)
         {
@@ -116,6 +184,33 @@ public sealed class ProfileService(IAppDbContextFactory factory) : IProfileServi
         }
 
         return await GetForUserAsync(actor, userId, ct);
+    }
+
+    private async Task RefreshPublishedSearchTextsAsync(IAppDbContext db, Guid profileId, CancellationToken ct)
+    {
+        var published = await db.Cvs
+            .AsSplitQuery()
+            .Include(c => c.Position).ThenInclude(p => p.Attributes).ThenInclude(a => a.AttributeDefinition)
+            .Include(c => c.Profile).ThenInclude(p => p.User)
+            .Include(c => c.Profile).ThenInclude(p => p.AttributeValues).ThenInclude(v => v.AttributeDefinition)
+            .Where(c => c.ProfileId == profileId && c.Status == CvStatus.Published)
+            .ToListAsync(ct);
+        if (published.Count == 0)
+            return;
+
+        foreach (var cv in published)
+            cv.SearchText = CvSearchTextBuilder.Build(cv);
+
+        await db.SaveChangesAsync(ct);
+    }
+
+    private static bool IsOwnedCloudinaryImage(string imageUrl, Guid userId)
+    {
+        if (!Uri.TryCreate(imageUrl, UriKind.Absolute, out var uri))
+            return false;
+
+        return uri.AbsolutePath.Contains(
+            $"/{userId:D}/profile/", StringComparison.OrdinalIgnoreCase);
     }
 
     public Task<Result<IReadOnlyList<AttributeCategoryDto>>> GetCatalogAsync(CancellationToken ct = default) =>

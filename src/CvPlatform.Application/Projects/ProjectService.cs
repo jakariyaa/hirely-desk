@@ -1,12 +1,16 @@
 using CvPlatform.Application.Common;
 using CvPlatform.Application.Authorization;
+using CvPlatform.Application.Validation;
 using CvPlatform.Core.Data;
 using CvPlatform.Core.Entities;
+using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 
 namespace CvPlatform.Application.Projects;
 
-public sealed class ProjectService(IAppDbContextFactory factory) : IProjectService
+public sealed class ProjectService(
+    IAppDbContextFactory factory,
+    IValidator<ProjectInput>? validator = null) : IProjectService
 {
     public async Task<Result<IReadOnlyList<string>>> SearchTagsAsync(
         string? search, CancellationToken ct = default)
@@ -14,7 +18,10 @@ public sealed class ProjectService(IAppDbContextFactory factory) : IProjectServi
         await using var db = factory.CreateDbContext();
         var query = db.ProjectTags.AsNoTracking();
         if (!string.IsNullOrWhiteSpace(search))
-            query = query.Where(t => t.Name.Contains(search));
+        {
+            var normalizedSearch = search.Trim().ToLower();
+            query = query.Where(t => t.Name.ToLower().Contains(normalizedSearch));
+        }
         var tags = await query.OrderBy(t => t.Name).Select(t => t.Name)
             .Take(20).ToListAsync(ct);
         return Result<IReadOnlyList<string>>.Success(tags);
@@ -179,15 +186,10 @@ public sealed class ProjectService(IAppDbContextFactory factory) : IProjectServi
         return Result.Success();
     }
 
-    private static string? Validate(ProjectInput input)
+    private string? Validate(ProjectInput input)
     {
-        if (string.IsNullOrWhiteSpace(input.Name))
-            return "Project name is required.";
-        if (input.Name.Trim().Length > 200)
-            return "Project name cannot exceed 200 characters.";
-        if (input.PeriodStart is not null && input.PeriodEnd is not null && input.PeriodEnd < input.PeriodStart)
-            return "Period end cannot be earlier than period start.";
-        return null;
+        var result = (validator ?? new ProjectInputValidator()).Validate(input);
+        return result.IsValid ? null : result.Errors[0].ErrorMessage;
     }
 
     private static async Task<Guid?> GetProfileIdAsync(IAppDbContext db, Guid userId, CancellationToken ct) =>
@@ -234,8 +236,9 @@ public sealed class ProjectService(IAppDbContextFactory factory) : IProjectServi
         if (desired.Count == 0)
             return [];
 
+        var desiredKeys = desired.Select(t => t.ToLower()).ToList();
         var existing = await db.ProjectTags
-            .Where(t => desired.Contains(t.Name))
+            .Where(t => desiredKeys.Contains(t.Name.ToLower()))
             .ToDictionaryAsync(t => t.Name, StringComparer.OrdinalIgnoreCase);
 
         var resolved = new List<ProjectTag>();

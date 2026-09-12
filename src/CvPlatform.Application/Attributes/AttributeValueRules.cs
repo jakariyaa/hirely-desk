@@ -96,9 +96,14 @@ public static class AttributeValueRules
             }
         }
 
-        if (input.ImageUrl is not null &&
-            (!Uri.TryCreate(input.ImageUrl, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps))
-            return "Image URL must use HTTPS.";
+        if (input.ImageUrl is not null)
+        {
+            if (!Uri.TryCreate(input.ImageUrl, UriKind.Absolute, out var uri) ||
+                uri.Scheme != Uri.UriSchemeHttps)
+                return "Image URL must use HTTPS.";
+            if (!IsCloudinaryDeliveryUrl(uri))
+                return "Image must be uploaded through Cloudinary.";
+        }
 
         return null;
     }
@@ -113,9 +118,6 @@ public static class AttributeValueRules
         AttributeOptions? options;
         try
         {
-            using var document = JsonDocument.Parse(optionsJson);
-            if (document.RootElement.ValueKind != JsonValueKind.Object)
-                return "Options must be a JSON object.";
             options = JsonSerializer.Deserialize<AttributeOptions>(optionsJson, JsonOptions);
         }
         catch (JsonException)
@@ -211,6 +213,11 @@ public static class AttributeValueRules
     private static string? NullIfBlank(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
+    private static bool IsCloudinaryDeliveryUrl(Uri uri) =>
+        (uri.Host.Equals("res.cloudinary.com", StringComparison.OrdinalIgnoreCase) ||
+         uri.Host.EndsWith(".cloudinary.com", StringComparison.OrdinalIgnoreCase)) &&
+        uri.AbsolutePath.Contains("/image/upload/", StringComparison.OrdinalIgnoreCase);
+
     private static bool IsDropdownChoice(string? optionsJson, string value)
     {
         try
@@ -226,10 +233,4 @@ public static class AttributeValueRules
         }
     }
 
-    private sealed record AttributeOptions(
-        string[]? Choices,
-        decimal? Min,
-        decimal? Max,
-        int? MaxLength,
-        string? Regex);
 }

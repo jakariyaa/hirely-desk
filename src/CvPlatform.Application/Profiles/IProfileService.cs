@@ -10,9 +10,16 @@ public interface IProfileService
     /// <summary>Returns the profile for a user, creating an empty one on first access.</summary>
     Task<Result<ProfileDto>> GetForUserAsync(ActorContext actor, Guid userId, CancellationToken ct = default);
 
+    Task<Result<ProfileSummaryDto>> GetSummaryForUserAsync(
+        ActorContext actor, Guid userId, CancellationToken ct = default);
+
     /// <summary>Validates and saves one attribute value on the user's profile.</summary>
     Task<Result<ProfileDto>> SaveAttributeValueAsync(
         ActorContext actor, Guid userId, AttributeValueInput input, CancellationToken ct = default);
+
+    /// <summary>Validates and saves multiple attribute values in a single transaction.</summary>
+    Task<Result<ProfileDto>> SaveAttributeValuesAsync(
+        ActorContext actor, Guid userId, IReadOnlyList<AttributeValueInput> inputs, CancellationToken ct = default);
 
 
     /// <summary>The attribute catalog, for building the profile editor.</summary>

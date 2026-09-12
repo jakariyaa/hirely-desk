@@ -5,6 +5,14 @@ namespace CvPlatform.Application.Profiles;
 /// <summary>A candidate profile with its current attribute values.</summary>
 public sealed record ProfileDto(Guid ProfileId, Guid UserId, IReadOnlyList<AttributeValueDto> Values);
 
+public sealed record ProfileSummaryDto(string? Name, string? ImageUrl);
+
+public static class ProfileAttributeNames
+{
+    public const string Name = "Me.Name";
+    public const string Photo = "Me.Photo";
+}
+
 /// <summary>One attribute value on a profile.</summary>
 public sealed record AttributeValueDto(
     Guid AttributeDefinitionId,

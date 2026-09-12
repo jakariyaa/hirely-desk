@@ -32,7 +32,20 @@ public sealed record AttributeDefinitionInput(
     string? Description,
     AttributeDataType DataType,
     string? OptionsJson,
-    long? ExpectedVersion = null);
+    long? ExpectedVersion = null,
+    bool ForceOptionRemoval = false);
+
+public sealed record AttributeRequirementInput(
+    Guid AttributeDefinitionId,
+    bool IsRequired,
+    int SortOrder);
+
+public sealed record AttributeOptions(
+    string[]? Choices = null,
+    decimal? Min = null,
+    decimal? Max = null,
+    int? MaxLength = null,
+    string? Regex = null);
 
 public sealed record AttributeDefinitionAdminDto(
     Guid Id,
@@ -51,3 +64,8 @@ public sealed record AttributeDeleteImpactDto(
     int AccessRules,
     int Cvs,
     int RestrictedPositionsLosingGating);
+
+public sealed record AttributeOptionImpactDto(
+    IReadOnlyList<string> RemovedOptions,
+    int ProfileValues,
+    int AccessRules);
