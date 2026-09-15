@@ -1,4 +1,6 @@
+using CvPlatform.Application.Search;
 using CvPlatform.Core.Data;
+using CvPlatform.Infrastructure.Search;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -14,6 +16,7 @@ public static class ServiceCollectionExtensions
             .AddInterceptors(new VersionIncrementInterceptor()));
         services.AddSingleton<IAppDbContextFactory>(sp =>
             new AppDbContextFactoryAdapter(sp.GetRequiredService<IDbContextFactory<AppDbContext>>()));
+        services.AddTransient<IFullTextMatcher, PostgresFullTextMatcher>();
         return services;
     }
 }
