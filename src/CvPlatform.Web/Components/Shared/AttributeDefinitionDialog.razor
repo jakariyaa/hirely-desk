@@ -1,22 +1,22 @@
 @using CvPlatform.Application.Attributes
 @using CvPlatform.Application.Authorization
+@using CvPlatform.Application.Common
 @using CvPlatform.Core.Enums
+@using CvPlatform.Web.Resources
+@using Microsoft.Extensions.Localization
 @using System.Security.Claims
 @inject IAttributeDefinitionService Definitions
 @inject AuthenticationStateProvider AuthProvider
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject IStringLocalizer<SharedResource> L
 
 <MudForm @ref="_form">
     <MudDialog>
         <DialogContent>
-            <MudSelect T="Guid" @bind-Value="_categoryId" Label="Category" Required="true">
-                @foreach (var category in Categories)
-                {
-                    <MudSelectItem Value="category.Id">@category.Name</MudSelectItem>
-                }
-            </MudSelect>
-            <MudTextField T="string" @bind-Value="_name" Label="Name" Required="true" />
-            <MudTextField T="string" @bind-Value="_description" Label="Description" />
-            <MudSelect T="AttributeDataType" @bind-Value="_dataType" Label="Data type" Required="true">
+            <MudTextField T="string" @bind-Value="_name" Label="@L["Name"]" Required="true" />
+            <MudTextField T="string" @bind-Value="_description" Label="@L["Description"]" />
+            <MudSelect T="AttributeDataType" Value="_dataType" ValueChanged="OnDataTypeChanged" Label="@L["DataType"]" Required="true">
                 @foreach (var type in Enum.GetValues<AttributeDataType>())
                 {
                     <MudSelectItem Value="type">@type</MudSelectItem>
@@ -24,7 +24,11 @@
             </MudSelect>
             @if (_dataType == AttributeDataType.Dropdown)
             {
-                <MudTextField T="string" @bind-Value="_optionsJson" Label="Options JSON" Lines="3" />
+                <AttributeOptionsEditor DataType="_dataType" @bind-OptionsJson="_optionsJson" />
+            }
+            else if (_dataType is AttributeDataType.Numeric or AttributeDataType.String or AttributeDataType.Text)
+            {
+                <AttributeOptionsEditor DataType="_dataType" @bind-OptionsJson="_optionsJson" />
             }
         </DialogContent>
         <DialogActions>
@@ -46,6 +50,14 @@
     private AttributeDataType _dataType;
     private string? _optionsJson;
     private bool _saving;
+
+    private Task OnDataTypeChanged(AttributeDataType value)
+    {
+        if (_dataType != value)
+            _optionsJson = null;
+        _dataType = value;
+        return Task.CompletedTask;
+    }
 
     protected override void OnInitialized()
     {
@@ -72,18 +84,46 @@
         try
         {
             var auth = await AuthProvider.GetAuthenticationStateAsync();
-            var actor = new ActorContext(
-                Guid.Parse(auth.User.FindFirstValue(ClaimTypes.NameIdentifier)!),
-                auth.User.IsInRole("Admin"));
+            var actor = new ActorContext(Guid.Parse(auth.User.FindFirstValue(ClaimTypes.NameIdentifier)!), auth.User.IsInRole(Roles.Admin), auth.User.IsInRole(Roles.Recruiter) || auth.User.IsInRole(Roles.Admin));
             var input = new AttributeDefinitionInput(
                 _categoryId, _name, _description, _dataType,
-                _dataType == AttributeDataType.Dropdown ? _optionsJson : null,
+                _optionsJson,
                 Editing?.Version);
             var result = Editing is null
                 ? await Definitions.CreateAsync(actor, input)
                 : await Definitions.UpdateAsync(actor, Editing.Id, input);
             if (result.Succeeded)
+            {
                 MudDialog.Close(DialogResult.Ok(result.Value));
+                return;
+            }
+            if (Editing is not null && result.Error.Code == ErrorCodes.Conflict && result.Error.Message.Contains("referenced"))
+            {
+                var impact = await Definitions.GetOptionChangeImpactAsync(actor, Editing.Id, input);
+                if (impact.Succeeded && impact.Value is not null)
+                {
+                        var parameters = new DialogParameters<ConfirmDialog>
+                        {
+                            { dialog => dialog.ContentText, $"{result.Error.Message} Proceed?" },
+                            { dialog => dialog.YesText, "Remove" },
+                            { dialog => dialog.NoText, "Cancel" },
+                        };
+                    var confirm = await DialogService.ShowAsync<ConfirmDialog>("Remove options", parameters);
+                    if ((await confirm.Result) is { Canceled: false, Data: true })
+                    {
+                        var forced = await Definitions.UpdateAsync(actor, Editing.Id, input with { ForceOptionRemoval = true });
+                        if (forced.Succeeded)
+                        {
+                            MudDialog.Close(DialogResult.Ok(forced.Value));
+                            return;
+                        }
+                        Snackbar.Add(forced.Error.Message, Severity.Error);
+                        return;
+                    }
+                    return;
+                }
+            }
+            Snackbar.Add(result.Error.Message, Severity.Error);
         }
         finally
         {

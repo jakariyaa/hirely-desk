@@ -1,0 +1,143 @@
+@page "/positions/{Id:guid}/apply"
+@attribute [Authorize]
+@using CvPlatform.Application.Access
+@using CvPlatform.Application.Authorization
+@using CvPlatform.Application.Cvs
+@using CvPlatform.Application.Positions
+@using CvPlatform.Web.Components.Shared
+@using CvPlatform.Web.Resources
+@using Microsoft.Extensions.Localization
+@using System.Security.Claims
+@inject IPositionAccessService PositionAccess
+@inject ICvService CvService
+@inject AuthenticationStateProvider AuthProvider
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+@inject IStringLocalizer<SharedResource> L
+
+<PageTitle>@L["CreateCv"]</PageTitle>
+
+@if (_loading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate Class="cv-page-loading" />
+}
+else if (_error is not null)
+{
+    <EmptyState Icon="@Icons.Material.Filled.ErrorOutline" Title="@L["LoadFailed"]" Description="@_error">
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="LoadAsync">@L["Retry"]</MudButton>
+    </EmptyState>
+}
+else if (_position is not null)
+{
+    <PageHeader Title="@_position.Title" Subtitle="@_position.Company" Icon="@Icons.Material.Filled.Work" />
+
+    <MudPaper Class="cv-panel pa-4">
+        <MudText Typo="Typo.body1" Class="mb-2">@_position.ShortDescription</MudText>
+        <MudStack Row Spacing="2" Class="mb-4">
+            <MudChip T="string" Size="Size.Small" Color="@(_position.IsPublic ? Color.Success : Color.Warning)"
+                     Text="@(_position.IsPublic ? L["Public"] : L["Restricted"])" />
+            @if (_position.Company is not null)
+            {
+                <MudChip T="string" Size="Size.Small" Text="@_position.Company" />
+            }
+            @if (_position.Level is not null)
+            {
+                <MudChip T="string" Size="Size.Small" Text="@_position.Level" />
+            }
+        </MudStack>
+
+        @if (_existingCvId is not null)
+        {
+            <MudAlert Severity="Severity.Info" Class="mb-4">@L["NoCvsHint"]</MudAlert>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => Navigation.NavigateTo($"/cvs/{_existingCvId}"))">
+                @L["Open"]
+            </MudButton>
+        }
+        else
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                       Disabled="@(_busy || !_canAccess)" OnClick="CreateAsync">@L["CreateCv"]</MudButton>
+            @if (!_canAccess)
+            {
+                <MudAlert Severity="Severity.Warning" Class="mt-4">@L["NotFoundGeneric"]</MudAlert>
+            }
+        }
+    </MudPaper>
+}
+
+<DiscussionPanel PositionId="Id" />
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private bool _loading = true;
+    private bool _busy;
+    private string? _error;
+    private PositionDto? _position;
+    private bool _canAccess;
+    private Guid? _existingCvId;
+
+    protected override async Task OnParametersSetAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            var actor = await GetActorAsync();
+            var positionResult = await PositionAccess.GetAccessibleAsync(actor, Id);
+            if (!positionResult.Succeeded)
+            {
+                _error = positionResult.Error.Message;
+                return;
+            }
+
+            _position = positionResult.Value!;
+            var access = await PositionAccess.CanAccessAsync(actor, actor.UserId, Id);
+            _canAccess = access.Succeeded && access.Value;
+
+            var mine = await CvService.ListMineAsync(actor);
+            if (mine.Succeeded)
+                _existingCvId = mine.Value!.FirstOrDefault(c => c.PositionId == Id)?.Id;
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task CreateAsync()
+    {
+        _busy = true;
+        try
+        {
+            var actor = await GetActorAsync();
+            var result = await CvService.CreateAsync(actor, Id);
+            if (result.Succeeded)
+            {
+                Snackbar.Add(L["CvCreated"], Severity.Success);
+                Navigation.NavigateTo($"/cvs/{result.Value!.Id}");
+            }
+            else
+            {
+                Snackbar.Add(result.Error.Message, Severity.Error);
+                await LoadAsync();
+            }
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task<ActorContext> GetActorAsync()
+    {
+        var authState = await AuthProvider.GetAuthenticationStateAsync();
+        return new ActorContext(Guid.Parse(authState.User.FindFirstValue(ClaimTypes.NameIdentifier)!), authState.User.IsInRole(Roles.Admin), authState.User.IsInRole(Roles.Recruiter) || authState.User.IsInRole(Roles.Admin));
+    }
+}

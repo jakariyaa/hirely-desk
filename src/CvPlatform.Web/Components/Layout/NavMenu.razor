@@ -7,16 +7,32 @@
     <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home" Class="cv-nav-link">
         @L["Home"]
     </MudNavLink>
+    <MudNavLink Href="/positions" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.WorkOutline" Class="cv-nav-link">
+        @L["Positions"]
+    </MudNavLink>
     <AuthorizeView>
         <Authorized>
-            <MudNavLink Href="/Profile" Icon="@Icons.Material.Filled.Person" Class="cv-nav-link">
+            <MudNavLink Href="/profile" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Person" Class="cv-nav-link">
                 @L["Profile"]
             </MudNavLink>
-            <MudNavLink Href="/Profile/Projects" Icon="@Icons.Material.Filled.Work" Class="cv-nav-link">
+            <MudNavLink Href="/profile/projects" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Work" Class="cv-nav-link">
                 @L["Projects"]
             </MudNavLink>
-            <MudNavLink Href="/Account/Logout" Icon="@Icons.Material.Filled.Logout" Class="cv-nav-link">
-                @L["Logout"]
+            <MudNavLink Href="/mycvs" Icon="@Icons.Material.Filled.Description" Class="cv-nav-link">
+                @L["MyCvs"]
+            </MudNavLink>
+                <AuthorizeView Roles="Admin,Recruiter">
+                    <Authorized Context="recruiterCtx">
+                        <MudNavLink Href="/Admin/Attributes" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Tune" Class="cv-nav-link">
+                            @L["Attributes"]
+                        </MudNavLink>
+                        <MudNavLink Href="/positions/templates" Icon="@Icons.Material.Filled.ContentCopy" Class="cv-nav-link">
+                            @L["PositionTemplates"]
+                        </MudNavLink>
+                    </Authorized>
+                </AuthorizeView>
+            <MudNavLink Href="/search" Icon="@Icons.Material.Filled.Search" Class="cv-nav-link">
+                @L["Search"]
             </MudNavLink>
         </Authorized>
     </AuthorizeView>

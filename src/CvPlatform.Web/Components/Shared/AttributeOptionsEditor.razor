@@ -1,0 +1,171 @@
+@using System.Text.Json
+@using CvPlatform.Application.Attributes
+@using CvPlatform.Core.Enums
+@using CvPlatform.Web.Resources
+@using Microsoft.Extensions.Localization
+@inject IStringLocalizer<SharedResource> L
+
+<MudStack Spacing="2" Class="mt-2">
+    @if (_parseError is not null)
+    {
+        <MudAlert Severity="Severity.Error">@_parseError</MudAlert>
+    }
+
+    @if (DataType == AttributeDataType.Dropdown)
+    {
+        <MudText Typo="Typo.caption">@L["DropdownOptionsHint"]</MudText>
+        @foreach (var choice in _choices.Select((value, index) => (value, index)).ToList())
+        {
+            <MudStack Row Spacing="1" AlignItems="AlignItems.Center">
+                <MudTextField T="string" Value="@choice.value"
+                              ValueChanged="@(value => SetChoiceAsync(choice.index, value))"
+                              Label="@L["Choice"]" Immediate="true" Class="flex-grow-1" />
+                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error"
+                               title="@L["Remove"]" OnClick="@(() => RemoveChoiceAsync(choice.index))" />
+            </MudStack>
+        }
+        <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="AddChoiceAsync">@L["AddChoice"]</MudButton>
+    }
+    else if (DataType == AttributeDataType.Numeric)
+    {
+        <MudText Typo="Typo.caption">@L["NumericOptionsHint"]</MudText>
+        <MudStack Row Spacing="2">
+            <MudNumericField T="decimal?" Value="@_min" ValueChanged="SetMinAsync"
+                             Label="@L["Minimum"]" Variant="Variant.Outlined" />
+            <MudNumericField T="decimal?" Value="@_max" ValueChanged="SetMaxAsync"
+                             Label="@L["Maximum"]" Variant="Variant.Outlined" />
+        </MudStack>
+    }
+    else if (DataType is AttributeDataType.String or AttributeDataType.Text)
+    {
+        <MudText Typo="Typo.caption">@L["TextOptionsHint"]</MudText>
+        <MudNumericField T="int?" Value="@_maxLength" ValueChanged="SetMaxLengthAsync"
+                         Label="@L["MaximumLength"]" Variant="Variant.Outlined" />
+        <MudTextField T="string" Value="@_regex" ValueChanged="SetRegexAsync"
+                      Label="@L["RegularExpression"]" Variant="Variant.Outlined" />
+    }
+</MudStack>
+
+@code {
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        PropertyNameCaseInsensitive = true,
+    };
+
+    [Parameter] public AttributeDataType DataType { get; set; }
+    [Parameter] public string? OptionsJson { get; set; }
+    [Parameter] public EventCallback<string?> OptionsJsonChanged { get; set; }
+
+    private List<string> _choices = [];
+    private decimal? _min;
+    private decimal? _max;
+    private int? _maxLength;
+    private string? _regex;
+    private string? _parseError;
+    private string? _loadedOptionsJson;
+    private AttributeDataType? _loadedDataType;
+
+    protected override void OnParametersSet()
+    {
+        if (_loadedDataType == DataType && string.Equals(_loadedOptionsJson, OptionsJson, StringComparison.Ordinal))
+            return;
+
+        LoadOptions();
+    }
+
+    private void LoadOptions()
+    {
+        _choices = [];
+        _min = null;
+        _max = null;
+        _maxLength = null;
+        _regex = null;
+        _parseError = null;
+        _loadedDataType = DataType;
+        _loadedOptionsJson = OptionsJson;
+
+        if (string.IsNullOrWhiteSpace(OptionsJson))
+            return;
+
+        try
+        {
+            var options = JsonSerializer.Deserialize<AttributeOptions>(OptionsJson, JsonOptions);
+            if (options is null)
+            {
+                _parseError = L["OptionsObjectRequired"].Value;
+                return;
+            }
+
+            _choices = options.Choices?.ToList() ?? [];
+            _min = options.Min;
+            _max = options.Max;
+            _maxLength = options.MaxLength;
+            _regex = options.Regex;
+        }
+        catch (JsonException)
+        {
+            _parseError = L["OptionsJsonInvalid"].Value;
+        }
+    }
+
+    private Task AddChoiceAsync()
+    {
+        _choices.Add("");
+        return NotifyChangedAsync();
+    }
+
+    private Task RemoveChoiceAsync(int index)
+    {
+        if (index >= 0 && index < _choices.Count)
+            _choices.RemoveAt(index);
+        return NotifyChangedAsync();
+    }
+
+    private Task SetChoiceAsync(int index, string? value)
+    {
+        if (index >= 0 && index < _choices.Count)
+            _choices[index] = value ?? "";
+        return NotifyChangedAsync();
+    }
+
+    private async Task SetMinAsync(decimal? value)
+    {
+        _min = value;
+        await NotifyChangedAsync();
+    }
+
+    private async Task SetMaxAsync(decimal? value)
+    {
+        _max = value;
+        await NotifyChangedAsync();
+    }
+
+    private async Task SetMaxLengthAsync(int? value)
+    {
+        _maxLength = value;
+        await NotifyChangedAsync();
+    }
+
+    private async Task SetRegexAsync(string? value)
+    {
+        _regex = value;
+        await NotifyChangedAsync();
+    }
+
+    private async Task NotifyChangedAsync()
+    {
+        var options = new AttributeOptions(
+            DataType == AttributeDataType.Dropdown ? _choices.ToArray() : null,
+            DataType == AttributeDataType.Numeric ? _min : null,
+            DataType == AttributeDataType.Numeric ? _max : null,
+            DataType is AttributeDataType.String or AttributeDataType.Text ? _maxLength : null,
+            DataType is AttributeDataType.String or AttributeDataType.Text ? _regex : null);
+        var hasOptions = options.Choices is not null || options.Min is not null || options.Max is not null ||
+                         options.MaxLength is not null || !string.IsNullOrWhiteSpace(options.Regex);
+        var serialized = hasOptions ? JsonSerializer.Serialize(options, JsonOptions) : null;
+        _loadedOptionsJson = serialized;
+        await OptionsJsonChanged.InvokeAsync(serialized);
+    }
+}

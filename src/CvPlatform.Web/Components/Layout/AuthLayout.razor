@@ -1,6 +1,6 @@
 @inherits LayoutComponentBase
 
-<MudThemeProvider Theme="@CvPlatformTheme.Instance" IsDarkMode="_darkMode" />
+<MudThemeProvider Theme="@CvPlatformTheme.Instance" @bind-IsDarkMode="_darkMode" />
 <MudPopoverProvider />
 <MudDialogProvider />
 <MudSnackbarProvider />
@@ -9,7 +9,7 @@
     <MudMainContent Class="cv-main cv-auth-main">
         <MudContainer MaxWidth="MaxWidth.Small" Class="cv-auth-container">
             <div class="cv-auth-brand">
-                <span class="cv-brand-mark cv-brand-mark-lg" aria-hidden="true">CV</span>
+                <img class="cv-brand-logo cv-brand-logo-lg" src="/hirely-desk-logo.svg" alt="Hirely Desk" />
                 <MudText Typo="Typo.h5" Class="cv-auth-brand-title">@L["AppName"]</MudText>
             </div>
             @Body

@@ -1,0 +1,134 @@
+@page "/positions/{Id:guid}/cvs"
+@attribute [Authorize(Roles = "Admin,Recruiter")]
+@using CvPlatform.Application.Access
+@using CvPlatform.Application.Authorization
+@using CvPlatform.Application.Common
+@using CvPlatform.Application.Cvs
+@using CvPlatform.Application.Likes
+@using CvPlatform.Core.Enums
+@using CvPlatform.Web.Components.Shared
+@using CvPlatform.Web.Resources
+@using Microsoft.Extensions.Localization
+@using System.Security.Claims
+@inject ICvService CvService
+@inject ILikeService LikeService
+@inject IPositionAccessService PositionAccess
+@inject AuthenticationStateProvider AuthProvider
+@inject NavigationManager Navigation
+@inject IStringLocalizer<SharedResource> L
+
+<PageTitle>@L["PositionCvs"]</PageTitle>
+
+<PageHeader Title="@(_title ?? L["PositionCvs"])" Icon="@Icons.Material.Filled.Description">
+    <MudButton Href="@($"/api/exports/positions/{Id}/cvs.xlsx")" Variant="Variant.Outlined"
+               Color="Color.Primary" StartIcon="@Icons.Material.Filled.TableView">
+        @L["ExportExcel"]
+    </MudButton>
+    <MudButton Href="@($"/api/exports/positions/{Id}/cvs.csv")" Variant="Variant.Outlined"
+               Color="Color.Primary" StartIcon="@Icons.Material.Filled.Download">
+        @L["ExportCsv"]
+    </MudButton>
+</PageHeader>
+
+@if (_error is not null)
+{
+    <EmptyState Icon="@Icons.Material.Filled.ErrorOutline" Title="@L["LoadFailed"]" Description="@_error">
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="@(() => _grid?.ReloadServerData())">@L["Retry"]</MudButton>
+    </EmptyState>
+}
+else
+{
+    <MudPaper Class="cv-panel cv-list-card pa-2">
+        <MudStack Row Spacing="1" Class="pa-2" Justify="Justify.FlexEnd">
+            <MudText Typo="Typo.caption" Class="align-self-center">@L["SelectedCount", _selected.Count]</MudText>
+        </MudStack>
+        <MudDataGrid T="CvRow" @ref="_grid" ServerData="LoadServerDataAsync" Class="cv-list-table"
+                     MultiSelection="true" @bind-SelectedItems="_selected"
+                     Hover="true" Striped="true" Dense="true" RowsPerPage="10" Loading="@_loading"
+                     RowClick="@(async (DataGridRowClickEventArgs<CvRow> e) => await OnRowClickAsync(e.Item))">
+            <Columns>
+                <SelectColumn T="CvRow" />
+                <PropertyColumn Property="c => c.CandidateName" Title="@L["Candidates"]" />
+                <PropertyColumn Property="c => c.Status" Title="@L["Status"]">
+                    <CellTemplate>
+                        <MudChip T="string" Size="Size.Small" Color="@(context.Item.Status == CvStatus.Published ? Color.Success : Color.Default)"
+                                 Text="@(context.Item.Status == CvStatus.Published ? L["StatusPublished"] : L["StatusDraft"])" />
+                    </CellTemplate>
+                </PropertyColumn>
+                <PropertyColumn Property="c => c.PublishedAt" Title="@L["PublishedAt"]" Format="yyyy-MM-dd" />
+                <PropertyColumn Property="c => c.LikeCount" Title="@L["Likes"]" />
+            </Columns>
+            <NoRecordsContent>
+                <MudStack AlignItems="AlignItems.Center" Class="pa-6">
+                    <MudText Typo="Typo.h6">@L["NoCvs"]</MudText>
+                    <MudText Typo="Typo.body2">@L["NoCvsHint"]</MudText>
+                </MudStack>
+            </NoRecordsContent>
+            <PagerContent>
+                <MudDataGridPager T="CvRow" />
+            </PagerContent>
+        </MudDataGrid>
+    </MudPaper>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private MudDataGrid<CvRow>? _grid;
+    private HashSet<CvRow> _selected = [];
+    private string? _error;
+    private string? _title;
+    private bool _loading;
+
+    private sealed record CvRow(Guid CvId, string CandidateName, CvStatus Status, DateTime? PublishedAt, int LikeCount);
+
+    private async Task<GridData<CvRow>> LoadServerDataAsync(GridState<CvRow> state, CancellationToken ct)
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            var actor = await GetActorAsync();
+            var position = await PositionAccess.GetAccessibleAsync(actor, Id, ct);
+            if (position.Succeeded)
+                _title = position.Value!.Title;
+
+            var page = new PageRequest(state.Page + 1, state.PageSize);
+            var result = await CvService.ListByPositionPagedAsync(actor, Id, page, ct);
+            if (!result.Succeeded)
+            {
+                _error = result.Error.Message;
+                return new GridData<CvRow>();
+            }
+
+            var cvs = result.Value!.Items;
+            var counts = await LikeService.GetCountsAsync(actor, cvs.Select(c => c.Id).ToList(), ct);
+            var countMap = counts.Succeeded ? counts.Value! : new Dictionary<Guid, int>();
+            var rows = cvs.Select(c => new CvRow(
+                c.Id, c.CandidateName, c.Status, c.PublishedAt,
+                countMap.TryGetValue(c.Id, out var n) ? n : 0)).ToList();
+
+            return new GridData<CvRow>
+            {
+                TotalItems = result.Value.TotalCount,
+                Items = rows,
+            };
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private Task OnRowClickAsync(CvRow row)
+    {
+        Navigation.NavigateTo($"/cvs/{row.CvId}");
+        return Task.CompletedTask;
+    }
+
+    private async Task<ActorContext> GetActorAsync()
+    {
+        var authState = await AuthProvider.GetAuthenticationStateAsync();
+        return new ActorContext(Guid.Parse(authState.User.FindFirstValue(ClaimTypes.NameIdentifier)!), authState.User.IsInRole(Roles.Admin), authState.User.IsInRole(Roles.Recruiter) || authState.User.IsInRole(Roles.Admin));
+    }
+}

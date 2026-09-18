@@ -1,0 +1,127 @@
+@page "/positions/templates"
+@attribute [Authorize(Roles = "Admin,Recruiter")]
+@using CvPlatform.Application.Authorization
+@using CvPlatform.Application.Common
+@using CvPlatform.Application.PositionTemplates
+@using CvPlatform.Web.Auth
+@using CvPlatform.Web.Components.Shared
+@using CvPlatform.Web.Resources
+@using Microsoft.Extensions.Localization
+@inject IPositionTemplateService Templates
+@inject AuthenticationStateProvider AuthProvider
+@inject NavigationManager Navigation
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject IStringLocalizer<SharedResource> L
+
+<PageTitle>@L["PositionTemplates"]</PageTitle>
+<PageHeader Title="@L["PositionTemplates"]" Subtitle="@L["PositionTemplatesSubtitle"]">
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+               OnClick="@(() => Navigation.NavigateTo("/positions/templates/new"))">
+        @L["NewTemplate"]
+    </MudButton>
+</PageHeader>
+
+<MudPaper Class="cv-panel cv-list-card pa-2">
+    <MudDataGrid T="PositionTemplateDto" @ref="_grid" ServerData="LoadAsync" Class="cv-list-table"
+                 MultiSelection="true" @bind-SelectedItems="_selected"
+                 Hover="true" Striped="true" Dense="true" RowsPerPage="10" Loading="@_loading"
+                 RowClick="@(async (DataGridRowClickEventArgs<PositionTemplateDto> e) => await OpenAsync(e.Item))">
+        <ToolBarContent>
+            <MudText Typo="Typo.h6">@L["PositionTemplates"]</MudText>
+            <MudSpacer />
+            <MudText Typo="Typo.caption" Class="mr-2">@L["SelectedCount", _selected.Count]</MudText>
+            <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.Delete"
+                       Disabled="@(_loading || _deleting || _selected.Count == 0)" OnClick="DeleteSelectedAsync">
+                @L["Delete"]
+            </MudButton>
+        </ToolBarContent>
+        <Columns>
+            <SelectColumn T="PositionTemplateDto" />
+            <PropertyColumn Property="t => t.Name" Title="@L["Name"]" />
+            <PropertyColumn Property="t => t.Company" Title="@L["Company"]" />
+            <PropertyColumn Property="t => t.AttributeCount" Title="@L["Attributes"]" />
+            <PropertyColumn Property="t => t.AccessRuleCount" Title="@L["AccessRules"]" />
+            <PropertyColumn Property="t => t.IsActive" Title="@L["Status"]" />
+        </Columns>
+        <NoRecordsContent><MudText Class="pa-4">@L["NoTemplates"]</MudText></NoRecordsContent>
+        <PagerContent><MudDataGridPager T="PositionTemplateDto" /></PagerContent>
+    </MudDataGrid>
+</MudPaper>
+
+@code {
+    private MudDataGrid<PositionTemplateDto>? _grid;
+    private HashSet<PositionTemplateDto> _selected = [];
+    private bool _loading;
+    private bool _deleting;
+
+    private async Task<GridData<PositionTemplateDto>> LoadAsync(GridState<PositionTemplateDto> state, CancellationToken ct)
+    {
+        _loading = true;
+        try
+        {
+            var auth = await AuthProvider.GetAuthenticationStateAsync();
+            var result = await Templates.ListAsync(
+                ActorContexts.FromUser(auth.User), new PageRequest(state.Page + 1, state.PageSize), null, ct);
+            return result.Succeeded && result.Value is not null
+                ? new GridData<PositionTemplateDto>
+                {
+                    TotalItems = result.Value.TotalCount,
+                    Items = result.Value.Items,
+                }
+                : new GridData<PositionTemplateDto>();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private Task OpenAsync(PositionTemplateDto template)
+    {
+        Navigation.NavigateTo($"/positions/templates/{template.Id}");
+        return Task.CompletedTask;
+    }
+
+    private async Task DeleteSelectedAsync()
+    {
+        if (_selected.Count == 0)
+            return;
+
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { dialog => dialog.ContentText, L["DeleteTemplatesConfirm", _selected.Count].Value },
+            { dialog => dialog.YesText, L["Delete"].Value },
+            { dialog => dialog.NoText, L["Cancel"].Value },
+        };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>(
+            _selected.Count == 1 ? L["DeleteTemplate"].Value : L["DeleteTemplates"].Value, parameters);
+        var result = await dialog.Result;
+        if (result is { Canceled: true } || result?.Data is not true)
+            return;
+
+        _deleting = true;
+        try
+        {
+            var auth = await AuthProvider.GetAuthenticationStateAsync();
+            var deleteResult = await Templates.DeleteManyAsync(
+                ActorContexts.FromUser(auth.User),
+                _selected.Select(template => new PositionTemplateDeleteInput(template.Id, template.Version)).ToList());
+            if (deleteResult.Succeeded)
+            {
+                Snackbar.Add(L["TemplatesDeleted", _selected.Count], Severity.Success);
+                _selected.Clear();
+                if (_grid is not null)
+                    await _grid.ReloadServerData();
+            }
+            else
+            {
+                Snackbar.Add(deleteResult.Error.Message, Severity.Error);
+            }
+        }
+        finally
+        {
+            _deleting = false;
+        }
+    }
+}

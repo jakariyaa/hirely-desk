@@ -1,0 +1,145 @@
+@page "/search"
+@attribute [Authorize]
+@using CvPlatform.Application.Authorization
+@using CvPlatform.Application.Common
+@using CvPlatform.Application.Positions
+@using CvPlatform.Application.Search
+@using CvPlatform.Web.Components.Shared
+@using CvPlatform.Web.Resources
+@using Microsoft.Extensions.Localization
+@using System.Security.Claims
+@inject ISearchService SearchService
+@inject AuthenticationStateProvider AuthProvider
+@inject NavigationManager Navigation
+@inject IStringLocalizer<SharedResource> L
+
+<PageTitle>@L["SearchResults"]</PageTitle>
+
+<PageHeader Title="@L["SearchResults"]" Icon="@Icons.Material.Filled.Search">
+    <MudTextField @bind-Value="_term" Placeholder="@L["SearchPlaceholder"]" Variant="Variant.Outlined"
+                  Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Search"
+                  OnAdornmentClick="ReloadAsync" Immediate="false" DebounceInterval="300"
+                  TextChanged="@(async _ => await ReloadAsync())" Class="cv-search-box" />
+</PageHeader>
+
+<MudGrid>
+    <MudItem xs="12" md="6">
+        <MudPaper Class="cv-panel cv-list-card pa-2">
+            <MudStack Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="pa-2">
+                <MudText Typo="Typo.h6">@L["Positions"]</MudText>
+                <MudText Typo="Typo.caption">@L["SelectedCount", _selectedPositions.Count]</MudText>
+            </MudStack>
+            <MudDataGrid T="PositionDto" @ref="_positionGrid" ServerData="LoadPositionsAsync" Class="cv-list-table"
+                         MultiSelection="true" @bind-SelectedItems="_selectedPositions"
+                         Hover="true" Dense="true" RowsPerPage="5"
+                         RowClick="@(async (DataGridRowClickEventArgs<PositionDto> e) => await OnPositionClickAsync(e.Item))">
+                <Columns>
+                    <SelectColumn T="PositionDto" />
+                    <PropertyColumn Property="p => p.Title" Title="@L["Name"]" />
+                    <PropertyColumn Property="p => p.Company" Title="@L["Company"]" />
+                </Columns>
+                <NoRecordsContent><MudText Class="pa-4">@L["NoResults"]</MudText></NoRecordsContent>
+                <PagerContent><MudDataGridPager T="PositionDto" /></PagerContent>
+            </MudDataGrid>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" md="6">
+        <MudPaper Class="cv-panel cv-list-card pa-2">
+            <MudStack Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="pa-2">
+                <MudText Typo="Typo.h6">@L["Cvs"]</MudText>
+                <MudText Typo="Typo.caption">@L["SelectedCount", _selectedCvs.Count]</MudText>
+            </MudStack>
+            <MudDataGrid T="CvSearchHitDto" @ref="_cvGrid" ServerData="LoadCvsAsync" Class="cv-list-table"
+                         MultiSelection="true" @bind-SelectedItems="_selectedCvs"
+                         Hover="true" Dense="true" RowsPerPage="5"
+                         RowClick="@(async (DataGridRowClickEventArgs<CvSearchHitDto> e) => await OnCvClickAsync(e.Item))">
+                <Columns>
+                    <SelectColumn T="CvSearchHitDto" />
+                    <PropertyColumn Property="c => c.PositionTitle" Title="@L["Position"]" />
+                    <PropertyColumn Property="c => c.CandidateName" Title="@L["Candidates"]" />
+                </Columns>
+                <NoRecordsContent><MudText Class="pa-4">@L["NoResults"]</MudText></NoRecordsContent>
+                <PagerContent><MudDataGridPager T="CvSearchHitDto" /></PagerContent>
+            </MudDataGrid>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    [SupplyParameterFromQuery] public string? Term { get; set; }
+
+    private MudDataGrid<PositionDto>? _positionGrid;
+    private MudDataGrid<CvSearchHitDto>? _cvGrid;
+    private HashSet<PositionDto> _selectedPositions = [];
+    private HashSet<CvSearchHitDto> _selectedCvs = [];
+    private string _term = "";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _term = Term ?? "";
+        await ReloadAsync();
+    }
+
+    private async Task ReloadAsync()
+    {
+        _selectedPositions.Clear();
+        _selectedCvs.Clear();
+        if (_positionGrid is not null)
+            await _positionGrid.ReloadServerData();
+        if (_cvGrid is not null)
+            await _cvGrid.ReloadServerData();
+    }
+
+    private async Task<GridData<PositionDto>> LoadPositionsAsync(GridState<PositionDto> state, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(_term))
+            return new GridData<PositionDto>();
+        var actor = await GetActorAsync();
+        var result = await SearchService.SearchPositionsAsync(
+            actor, _term.Trim(), new PageRequest(state.Page + 1, state.PageSize), ct);
+        if (!result.Succeeded)
+            return new GridData<PositionDto>();
+        return new GridData<PositionDto>
+        {
+            TotalItems = result.Value.TotalCount,
+            Items = result.Value.Items,
+        };
+    }
+
+    private async Task<GridData<CvSearchHitDto>> LoadCvsAsync(GridState<CvSearchHitDto> state, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(_term))
+            return new GridData<CvSearchHitDto>();
+        var actor = await GetActorAsync();
+        var result = await SearchService.SearchCvsAsync(
+            actor, _term.Trim(), new PageRequest(state.Page + 1, state.PageSize), ct);
+        if (!result.Succeeded)
+            return new GridData<CvSearchHitDto>();
+        return new GridData<CvSearchHitDto>
+        {
+            TotalItems = result.Value.TotalCount,
+            Items = result.Value.Items,
+        };
+    }
+
+    private async Task OnPositionClickAsync(PositionDto position)
+    {
+        var actor = await GetActorAsync();
+        var target = actor.IsPrivileged
+            ? $"/positions/{position.Id}"
+            : $"/positions/{position.Id}/apply";
+        Navigation.NavigateTo(target);
+    }
+
+    private Task OnCvClickAsync(CvSearchHitDto hit)
+    {
+        Navigation.NavigateTo($"/cvs/{hit.CvId}");
+        return Task.CompletedTask;
+    }
+
+    private async Task<ActorContext> GetActorAsync()
+    {
+        var authState = await AuthProvider.GetAuthenticationStateAsync();
+        return new ActorContext(Guid.Parse(authState.User.FindFirstValue(ClaimTypes.NameIdentifier)!), authState.User.IsInRole(Roles.Admin), authState.User.IsInRole(Roles.Recruiter) || authState.User.IsInRole(Roles.Admin));
+    }
+}

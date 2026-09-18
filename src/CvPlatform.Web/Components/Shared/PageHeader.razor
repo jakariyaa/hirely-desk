@@ -1,12 +1,18 @@
 @using Microsoft.AspNetCore.Components.Web
 
 <div class="cv-page-header">
-    <div>
-        <MudText Typo="Typo.h5" Class="cv-page-title">@Title</MudText>
-        @if (!string.IsNullOrWhiteSpace(Subtitle))
+    <div class="cv-page-header-main">
+        @if (!string.IsNullOrWhiteSpace(Icon))
         {
-            <MudText Typo="Typo.body2" Class="cv-page-subtitle">@Subtitle</MudText>
+            <MudIcon Icon="@Icon" Color="Color.Primary" Size="Size.Medium" Class="cv-page-header-icon" />
         }
+        <div>
+            <MudText Typo="Typo.h5" Class="cv-page-title">@Title</MudText>
+            @if (!string.IsNullOrWhiteSpace(Subtitle))
+            {
+                <MudText Typo="Typo.body2" Class="cv-page-subtitle">@Subtitle</MudText>
+            }
+        </div>
     </div>
     @if (ChildContent is not null)
     {
@@ -15,10 +21,8 @@
 </div>
 
 @code {
-    /// <summary>Page title shown as the h5 heading.</summary>
     [Parameter, EditorRequired] public string Title { get; set; } = "";
-    /// <summary>Optional secondary line under the title.</summary>
     [Parameter] public string? Subtitle { get; set; }
-    /// <summary>Right-aligned action buttons.</summary>
+    [Parameter] public string? Icon { get; set; }
     [Parameter] public RenderFragment? ChildContent { get; set; }
 }

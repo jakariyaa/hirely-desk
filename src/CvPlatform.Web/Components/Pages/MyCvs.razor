@@ -1,0 +1,159 @@
+@page "/mycvs"
+@attribute [Authorize]
+@using CvPlatform.Application.Authorization
+@using CvPlatform.Application.Common
+@using CvPlatform.Application.Cvs
+@using CvPlatform.Core.Enums
+@using CvPlatform.Web.Components.Shared
+@using CvPlatform.Web.Resources
+@using Microsoft.Extensions.Localization
+@using System.Security.Claims
+@inject ICvService CvService
+@inject AuthenticationStateProvider AuthProvider
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+@inject IStringLocalizer<SharedResource> L
+
+<PageTitle>@L["MyCvs"]</PageTitle>
+
+<PageHeader Title="@L["MyCvs"]" Subtitle="@L["MyCvsSubtitle"]" Icon="@Icons.Material.Filled.Description">
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Work"
+               OnClick="@(() => Navigation.NavigateTo("/positions"))">@L["BrowsePositions"]</MudButton>
+</PageHeader>
+
+@if (_error is not null)
+{
+    <EmptyState Icon="@Icons.Material.Filled.ErrorOutline" Title="@L["LoadFailed"]" Description="@_error">
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="@(() => _grid?.ReloadServerData())">@L["Retry"]</MudButton>
+    </EmptyState>
+}
+else
+{
+    <MudPaper Class="cv-panel cv-list-card pa-2">
+        <MudStack Row Spacing="1" Class="pa-2" Justify="Justify.FlexEnd">
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.OpenInNew"
+                       Disabled="@(_loading || _selected.Count != 1)" OnClick="OpenSelectedAsync">@L["Open"]</MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.Delete"
+                       Disabled="@(_loading || _selected.Count == 0)" OnClick="DeleteSelectedAsync">@L["Delete"]</MudButton>
+        </MudStack>
+        <MudDataGrid T="CvDto" @ref="_grid" ServerData="LoadServerDataAsync" Class="cv-list-table" MultiSelection="true"
+                     @bind-SelectedItems="_selected" Hover="true" Striped="true" Dense="true"
+                     RowsPerPage="10" Loading="@_loading"
+                     RowClick="@(async (DataGridRowClickEventArgs<CvDto> e) => await OnRowClickAsync(e.Item))">
+            <Columns>
+                <SelectColumn T="CvDto" />
+                <PropertyColumn Property="c => c.PositionTitle" Title="@L["Position"]" />
+                <PropertyColumn Property="c => c.Company" Title="@L["Company"]" />
+                <PropertyColumn Property="c => c.Status" Title="@L["Status"]">
+                    <CellTemplate>
+                        <MudChip T="string" Size="Size.Small" Color="@(context.Item.Status == CvStatus.Published ? Color.Success : Color.Default)"
+                                 Text="@(context.Item.Status == CvStatus.Published ? L["StatusPublished"] : L["StatusDraft"])" />
+                    </CellTemplate>
+                </PropertyColumn>
+                <PropertyColumn Property="c => c.PublishedAt" Title="@L["PublishedAt"]" Format="yyyy-MM-dd" />
+            </Columns>
+            <NoRecordsContent>
+                <MudStack AlignItems="AlignItems.Center" Class="pa-6">
+                    <MudIcon Icon="@Icons.Material.Filled.Description" Size="Size.Large" />
+                    <MudText Typo="Typo.h6">@L["NoCvs"]</MudText>
+                    <MudText Typo="Typo.body2">@L["NoCvsHint"]</MudText>
+                </MudStack>
+            </NoRecordsContent>
+            <PagerContent>
+                <MudDataGridPager T="CvDto" />
+            </PagerContent>
+        </MudDataGrid>
+    </MudPaper>
+}
+
+@code {
+    private MudDataGrid<CvDto>? _grid;
+    private HashSet<CvDto> _selected = [];
+    private string? _error;
+    private bool _loading;
+
+    private async Task<GridData<CvDto>> LoadServerDataAsync(GridState<CvDto> state, CancellationToken ct)
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            var actor = await GetActorAsync();
+            var result = await CvService.ListMinePagedAsync(actor, new PageRequest(state.Page + 1, state.PageSize), ct);
+            if (!result.Succeeded)
+            {
+                _error = result.Error.Message;
+                return new GridData<CvDto>();
+            }
+
+            return new GridData<CvDto>
+            {
+                TotalItems = result.Value.TotalCount,
+                Items = result.Value.Items,
+            };
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private Task OnRowClickAsync(CvDto cv)
+    {
+        Navigation.NavigateTo($"/cvs/{cv.Id}");
+        return Task.CompletedTask;
+    }
+
+    private Task OpenSelectedAsync()
+    {
+        var cv = _selected.SingleOrDefault();
+        if (cv is not null)
+            Navigation.NavigateTo($"/cvs/{cv.Id}");
+        return Task.CompletedTask;
+    }
+
+    private async Task DeleteSelectedAsync()
+    {
+        if (_selected.Count == 0)
+            return;
+
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { dialog => dialog.ContentText, L["DeleteCvConfirm"].Value },
+            { dialog => dialog.YesText, L["Delete"].Value },
+            { dialog => dialog.NoText, L["Cancel"].Value },
+        };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>(title: L["DeleteCv"], parameters: parameters);
+        var result = await dialog.Result;
+        if (result is { Canceled: true } || result?.Data is not true)
+            return;
+
+        _loading = true;
+        try
+        {
+            var actor = await GetActorAsync();
+            foreach (var cv in _selected.ToList())
+            {
+                var deleteResult = await CvService.DeleteAsync(actor, cv.Id);
+                if (!deleteResult.Succeeded)
+                    Snackbar.Add(deleteResult.Error.Message, Severity.Error);
+            }
+
+            Snackbar.Add(L["CvDeleted"], Severity.Success);
+            _selected.Clear();
+            if (_grid is not null)
+                await _grid.ReloadServerData();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task<ActorContext> GetActorAsync()
+    {
+        var authState = await AuthProvider.GetAuthenticationStateAsync();
+        return new ActorContext(Guid.Parse(authState.User.FindFirstValue(ClaimTypes.NameIdentifier)!), authState.User.IsInRole(Roles.Admin), authState.User.IsInRole(Roles.Recruiter) || authState.User.IsInRole(Roles.Admin));
+    }
+}

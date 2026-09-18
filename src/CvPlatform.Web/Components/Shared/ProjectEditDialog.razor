@@ -12,7 +12,7 @@
 <MudForm @ref="@_form" Class="pa-2">
     <MudDialog>
         <DialogContent>
-            <MudPaper Class="cv-panel pa-3 mb-3" Outlined="true">
+            <div class="pa-1">
                 <MudTextField T="string" @bind-Value="@_name" Label="@L["ProjectName"]"
                               Variant="Variant.Outlined" Immediate="false"
                               Validation="@(new Func<string, IEnumerable<string>>(ValidateName))" />
@@ -39,15 +39,17 @@
                         </MudStack>
                     }
                     <MudStack Row Spacing="1" AlignItems="AlignItems.Center">
-                        <MudAutocomplete T="string" Value="@_newTag" ValueChanged="@(value => _newTag = value ?? "")"
-                                         SearchFunc="SearchTagsAsync" Placeholder="@L["AddTagHint"]"
-                                         Variant="Variant.Outlined" Immediate="true" Class="flex-grow-1"
-                                         CoerceText="true" />
+                    <MudAutocomplete T="string" @ref="_tagInput" Value="@_selectedTag"
+                                     ValueChanged="OnTagSelected" Text="@_newTag"
+                                     TextChanged="@(value => _newTag = value ?? "")"
+                                     SearchFunc="SearchTagsAsync" Placeholder="@L["AddTagHint"]"
+                                     Variant="Variant.Outlined" Immediate="true" Class="flex-grow-1"
+                                     CoerceText="false" OnKeyDown="OnTagKeyDown" />
                         <MudIconButton Icon="@Icons.Material.Filled.Add" Variant="Variant.Outlined"
-                                       title="@L["AddTag"]" OnClick="@(() => AddTag(_newTag))" />
+                                        title="@L["AddTag"]" OnClick="AddTagAsync" />
                     </MudStack>
                 </div>
-            </MudPaper>
+            </div>
         </DialogContent>
         <DialogActions>
             <MudButton Variant="Variant.Text" OnClick="@(() => MudDialog.Cancel())">@L["Cancel"]</MudButton>
@@ -68,6 +70,8 @@
     private string _description = "";
     private HashSet<string> _selectedTags = [];
     private string _newTag = "";
+    private string? _selectedTag;
+    private MudAutocomplete<string>? _tagInput;
     private MudForm? _form;
     private bool _saving;
 
@@ -91,23 +95,38 @@
             yield return L["ProjectNameTooLong"];
     }
 
-    private void OnTagKeyDown(KeyboardEventArgs args)
+    private async Task OnTagKeyDown(KeyboardEventArgs args)
     {
         if (args.Key == "Enter")
-            AddTag(_newTag);
+            await AddTagAsync();
     }
 
-    private void AddTag(string tag)
+    private async Task AddTagAsync()
     {
-        var trimmed = tag?.Trim() ?? "";
+        var trimmed = _newTag.Trim();
         if (trimmed.Length > 0)
         {
-            _selectedTags.Add(trimmed);
+            var existing = _selectedTags.FirstOrDefault(t =>
+                string.Equals(t, trimmed, StringComparison.OrdinalIgnoreCase));
+            if (existing is null)
+                _selectedTags.Add(trimmed);
+
             _newTag = "";
+            _selectedTag = null;
+            if (_tagInput is not null)
+                await _tagInput.ClearAsync();
         }
     }
 
     private void RemoveTag(string tag) => _selectedTags.Remove(tag);
+
+    private Task OnTagSelected(string? value)
+    {
+        _selectedTag = value;
+        if (!string.IsNullOrWhiteSpace(value))
+            _newTag = value;
+        return Task.CompletedTask;
+    }
 
     private async Task<IEnumerable<string>> SearchTagsAsync(string value, CancellationToken ct)
     {
@@ -165,8 +184,6 @@
     private async Task<ActorContext> GetActorAsync()
     {
         var authState = await AuthProvider.GetAuthenticationStateAsync();
-        return new ActorContext(
-            Guid.Parse(authState.User.FindFirstValue(ClaimTypes.NameIdentifier)!),
-            authState.User.IsInRole("Admin"));
+        return new ActorContext(Guid.Parse(authState.User.FindFirstValue(ClaimTypes.NameIdentifier)!), authState.User.IsInRole(Roles.Admin), authState.User.IsInRole(Roles.Recruiter) || authState.User.IsInRole(Roles.Admin));
     }
 }

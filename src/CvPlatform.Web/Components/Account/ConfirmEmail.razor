@@ -1,0 +1,47 @@
+@page "/Account/ConfirmEmail"
+@attribute [ExcludeFromInteractiveRouting]
+@attribute [AllowAnonymous]
+@layout AuthLayout
+
+@using CvPlatform.Web.Resources
+
+@inject UserManager<ApplicationUser> UserManager
+@inject IStringLocalizer<SharedResource> L
+
+<PageTitle>@L["ConfirmEmail"]</PageTitle>
+
+<MudPaper Elevation="2" Class="cv-auth-card">
+    <MudText Typo="Typo.h5" Class="mb-4">@L["ConfirmEmail"]</MudText>
+
+    @if (_confirmed)
+    {
+        <MudAlert Severity="Severity.Success" Class="mb-4">@L["EmailConfirmed"]</MudAlert>
+        <MudText Typo="Typo.body2">
+            <a href="/Account/Login">@L["Login"]</a>
+        </MudText>
+    }
+    else
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-4">@L["EmailConfirmFailed"]</MudAlert>
+    }
+</MudPaper>
+
+@code {
+    [SupplyParameterFromQuery(Name = "userId")]
+    private string? UserId { get; set; }
+
+    [SupplyParameterFromQuery(Name = "token")]
+    private string? Token { get; set; }
+
+    private bool _confirmed;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Guid.TryParse(UserId, out var id) && !string.IsNullOrEmpty(Token))
+        {
+            var user = await UserManager.FindByIdAsync(id.ToString());
+            if (user is not null)
+                _confirmed = (await UserManager.ConfirmEmailAsync(user, Token)).Succeeded;
+        }
+    }
+}

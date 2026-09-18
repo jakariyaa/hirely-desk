@@ -1,0 +1,461 @@
+@page "/cvs/{Id:guid}"
+@attribute [Authorize]
+@using CvPlatform.Application.Attributes
+@using CvPlatform.Application.Authorization
+@using CvPlatform.Application.Common
+@using CvPlatform.Application.Cvs
+@using CvPlatform.Application.Markdown
+@using CvPlatform.Application.Profiles
+@using CvPlatform.Core.Enums
+@using CvPlatform.Application.Likes
+@using CvPlatform.Web.Components.Shared
+@using CvPlatform.Web.Resources
+@using Microsoft.Extensions.Localization
+@using System.Security.Claims
+@inject ICvService CvService
+@inject IProfileService ProfileService
+@inject ILikeService LikeService
+@inject IMarkdownRenderer Markdown
+@inject AuthenticationStateProvider AuthProvider
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+@inject IStringLocalizer<SharedResource> L
+
+<PageTitle>@L["CvDetail"]</PageTitle>
+
+@if (_loading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate Class="cv-page-loading" />
+}
+else if (_error is not null)
+{
+    <EmptyState Icon="@Icons.Material.Filled.ErrorOutline" Title="@L["LoadFailed"]" Description="@_error">
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="LoadAsync">@L["Retry"]</MudButton>
+    </EmptyState>
+}
+else if (_detail is not null)
+{
+    <PageHeader Title="@_detail.Cv.PositionTitle" Subtitle="@_detail.Cv.Company"
+                Icon="@Icons.Material.Filled.Description">
+        <MudChip T="string" Size="Size.Small"
+                 Color="@(_detail.Cv.Status == CvStatus.Published ? Color.Success : Color.Default)">
+            @(_detail.Cv.Status == CvStatus.Published ? L["StatusPublished"] : L["StatusDraft"])
+        </MudChip>
+        @if (_detail.CanEdit)
+        {
+            @if (_detail.Cv.Status == CvStatus.Published)
+            {
+                <MudButton Variant="Variant.Outlined" Color="Color.Warning" StartIcon="@Icons.Material.Filled.VisibilityOff"
+                           OnClick="@(() => SetStatusAsync(publish: false))" Disabled="@_busy">@L["Unpublish"]</MudButton>
+            }
+            else
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Publish"
+                           OnClick="@(() => SetStatusAsync(publish: true))" Disabled="@(_busy || !_detail.PublishGateSatisfied)"
+                           title="@MissingSummary">@L["Publish"]</MudButton>
+            }
+            <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.Delete"
+                       OnClick="DeleteAsync" Disabled="@_busy">@L["Delete"]</MudButton>
+        }
+        <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.PictureAsPdf"
+                   Href="@($"/api/exports/cvs/{Id}/pdf")" Target="_blank" Disabled="@_busy">@L["ExportPdf"]</MudButton>
+        @if (_like is not null)
+        {
+            <MudButton Variant="Variant.Outlined" Color="@(_like.LikedByMe ? Color.Error : Color.Default)"
+                       StartIcon="@(_like.LikedByMe ? Icons.Material.Filled.Favorite : Icons.Material.Filled.FavoriteBorder)"
+                       OnClick="ToggleLikeAsync" Disabled="@_busy">
+                @string.Format(L["LikeCount"].Value, _like.LikeCount)
+            </MudButton>
+        }
+    </PageHeader>
+
+    @if (_detail.Cv.Status != CvStatus.Published && !_detail.PublishGateSatisfied)
+    {
+        <MudAlert Severity="Severity.Info" Class="mb-4">
+            @L["PublishGateHint"] <strong>@string.Join(", ", _detail.MissingRequired)</strong>
+        </MudAlert>
+    }
+
+    <MudGrid>
+        <MudItem xs="12" md="8">
+            <MudPaper Class="pa-4" Elevation="0">
+                <MudText Typo="Typo.h6" Class="mb-2">@L["CvFields"]</MudText>
+                @if (_detail.Rows.Count == 0)
+                {
+                    <MudText Typo="Typo.body2" Color="Color.Inherit">@L["NoFields"]</MudText>
+                }
+                else
+                {
+                    @foreach (var row in _detail.Rows)
+                    {
+                        <div class="cv-attribute-row">
+                            <div class="cv-attribute-label">
+                                <MudText Typo="Typo.body2" Inline>@AttributeLabels.Localize(L, row.Name)</MudText>
+                                @if (row.IsRequired)
+                                {
+                                    <MudText Typo="Typo.caption" Color="Color.Error" Inline>*</MudText>
+                                }
+                            </div>
+                            <div class="cv-attribute-value">
+                                @if (_detail.CanEdit)
+                                {
+                                    <AttributeValueEditor Definition="@ToDefinition(row)" Value="@Draft(row)"
+                                                           Disabled="@(IsSaving(row.AttributeDefinitionId) || _busy)"
+                                                           OnChanged="@(() => SaveAsync(row))" />
+                                }
+                                else
+                                {
+                                    @RenderReadOnly(row)
+                                }
+                                @if (!row.IsFilled)
+                                {
+                                    <MudText Typo="Typo.caption" Color="Color.Error">@L["NotFilled"]</MudText>
+                                }
+                            </div>
+                        </div>
+                    }
+                    <MudText Typo="Typo.caption" Color="Color.Inherit" Class="mt-2">@L["EditValuesHint"]</MudText>
+                }
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="4">
+            <MudPaper Class="pa-4" Elevation="0">
+                <MudText Typo="Typo.h6" Class="mb-2">@L["Projects"]</MudText>
+                <MudText Typo="Typo.caption" Class="mb-2">
+                    @string.Format(L["ProjectCount"].Value, _detail.Projects.Count(p => p.IsIncluded), _detail.Cv.MaxProjects)
+                </MudText>
+                @if (_detail.Projects.Count == 0)
+                {
+                    <MudText Typo="Typo.body2" Color="Color.Inherit">@L["NoProjects"]</MudText>
+                }
+                else
+                {
+                    <MudList T="string" Dense>
+                        @foreach (var project in _detail.Projects)
+                        {
+                            <MudListItem T="string">
+                                <MudCheckBox T="bool" Value="@project.IsIncluded"
+                                             ValueChanged="@(v => ToggleProjectAsync(project, v))"
+                                             Disabled="@(!_detail.CanEdit || _busy)" />
+                                <span>@project.Name</span>
+                            </MudListItem>
+                        }
+                    </MudList>
+                    <MudText Typo="Typo.caption" Color="Color.Inherit" Class="mt-2">@L["ProjectToggleHint"]</MudText>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private bool _loading = true;
+    private bool _busy;
+    private string? _error;
+    private CvDetailDto? _detail;
+    private LikeStateDto? _like;
+    private Dictionary<Guid, AttributeValueDraft> _drafts = [];
+    private HashSet<Guid> _saving = [];
+
+    private string MissingSummary => _detail is null ? string.Empty : string.Join(", ", _detail.MissingRequired);
+
+    protected override async Task OnParametersSetAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            var actor = await GetActorAsync();
+            var result = await CvService.GetRenderedAsync(actor, Id);
+            if (result.Succeeded)
+            {
+                _detail = result.Value!;
+                _drafts = _detail.Rows.ToDictionary(r => r.AttributeDefinitionId, ToDraft);
+                var likeResult = await LikeService.GetStateAsync(actor, Id);
+                _like = likeResult.Succeeded ? likeResult.Value : null;
+            }
+            else
+            {
+                _error = result.Error.Message;
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private AttributeValueDraft Draft(CvFieldRowDto row) =>
+        _drafts.TryGetValue(row.AttributeDefinitionId, out var draft)
+            ? draft
+            : _drafts[row.AttributeDefinitionId] = ToDraft(row);
+
+    private static AttributeValueDraft ToDraft(CvFieldRowDto row) => new()
+    {
+        String = row.StringValue,
+        Text = row.TextValue,
+        Numeric = row.NumericValue,
+        Date = row.DateValue,
+        PeriodStart = row.PeriodStart,
+        PeriodEnd = row.PeriodEnd,
+        Boolean = row.BooleanValue,
+        Dropdown = row.DropdownOption,
+        ImageUrl = row.ImageUrl,
+        Version = row.ValueVersion,
+    };
+
+    private static AttributeDefinitionDto ToDefinition(CvFieldRowDto row) => new(
+        row.AttributeDefinitionId,
+        row.Name,
+        row.DataType,
+        false,
+        row.Choices.Select(c => new DropdownChoice(c)).ToList());
+
+    private bool IsSaving(Guid definitionId) => _saving.Contains(definitionId);
+
+    private async Task SaveAsync(CvFieldRowDto row)
+    {
+        if (_detail is null || !_saving.Add(row.AttributeDefinitionId))
+            return;
+
+        try
+        {
+            var draft = _drafts[row.AttributeDefinitionId];
+            var input = new AttributeValueInput(
+                row.AttributeDefinitionId,
+                draft.String,
+                draft.Text,
+                draft.Numeric,
+                draft.Date,
+                draft.PeriodStart,
+                draft.PeriodEnd,
+                draft.Boolean,
+                draft.Dropdown,
+                draft.ImageUrl,
+                draft.Version);
+
+            var actor = await GetActorAsync();
+            var result = await ProfileService.SaveAttributeValueAsync(actor, _detail.Cv.UserId, input);
+            if (result.Succeeded && result.Value is not null)
+            {
+                var updated = result.Value.Values.FirstOrDefault(v => v.AttributeDefinitionId == row.AttributeDefinitionId);
+                if (updated is not null)
+                    _drafts[row.AttributeDefinitionId] = new AttributeValueDraft
+                    {
+                        String = updated.StringValue,
+                        Text = updated.TextValue,
+                        Numeric = updated.NumericValue,
+                        Date = updated.DateValue,
+                        PeriodStart = updated.PeriodStart,
+                        PeriodEnd = updated.PeriodEnd,
+                        Boolean = updated.BooleanValue,
+                        Dropdown = updated.DropdownOption,
+                        ImageUrl = updated.ImageUrl,
+                        Version = updated.Version,
+                    };
+                Snackbar.Add(L["Saved"], Severity.Success);
+                await LoadAsync();
+            }
+            else if (!result.Succeeded)
+            {
+                if (result.Error.Code == ErrorCodes.ConcurrencyConflict)
+                {
+                    var dialog = await DialogService.ShowAsync<ConcurrencyDialog>("Concurrency conflict");
+                    if ((await dialog.Result) is { Canceled: false, Data: true })
+                        await LoadAsync();
+                }
+                else
+                {
+                    Snackbar.Add(result.Error.Message, Severity.Error);
+                }
+            }
+        }
+        finally
+        {
+            _saving.Remove(row.AttributeDefinitionId);
+        }
+    }
+
+    private async Task ToggleProjectAsync(CvProjectOptionDto project, bool include)
+    {
+        if (_detail is null) return;
+        _busy = true;
+        try
+        {
+            var actor = await GetActorAsync();
+            var result = await CvService.ToggleProjectAsync(
+                actor, _detail.Cv.Id, new CvProjectToggleInput(project.ProjectId, _detail.Cv.Version));
+            if (!result.Succeeded)
+            {
+                if (result.Error.Code == ErrorCodes.ConcurrencyConflict)
+                {
+                    var dialog = await DialogService.ShowAsync<ConcurrencyDialog>("Concurrency conflict");
+                    if ((await dialog.Result) is { Canceled: false, Data: true })
+                        await LoadAsync();
+                    else
+                        Snackbar.Add(result.Error.Message, Severity.Error);
+                }
+                else
+                {
+                    Snackbar.Add(result.Error.Message, Severity.Error);
+                }
+            }
+
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task SetStatusAsync(bool publish)
+    {
+        if (_detail is null) return;
+        _busy = true;
+        try
+        {
+            var actor = await GetActorAsync();
+            var input = new CvStatusInput(_detail.Cv.Version);
+            var result = publish
+                ? await CvService.PublishAsync(actor, _detail.Cv.Id, input)
+                : await CvService.UnpublishAsync(actor, _detail.Cv.Id, input);
+            if (result.Succeeded)
+            {
+                Snackbar.Add(publish ? L["CvPublished"] : L["CvUnpublished"], Severity.Success);
+            }
+            else if (result.Error.Code == ErrorCodes.ConcurrencyConflict)
+            {
+                var dialog = await DialogService.ShowAsync<ConcurrencyDialog>("Concurrency conflict");
+                if ((await dialog.Result) is not { Canceled: false, Data: true })
+                    Snackbar.Add(result.Error.Message, Severity.Error);
+            }
+            else
+            {
+                Snackbar.Add(result.Error.Message, Severity.Error);
+            }
+
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task ToggleLikeAsync()
+    {
+        if (_detail is null || _busy)
+            return;
+        _busy = true;
+        try
+        {
+            var actor = await GetActorAsync();
+            var result = await LikeService.ToggleAsync(actor, _detail.Cv.Id);
+            if (result.Succeeded)
+                _like = result.Value;
+            else
+                Snackbar.Add(result.Error.Message, Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task DeleteAsync()
+    {
+        if (_detail is null) return;
+
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { dialog => dialog.ContentText, L["DeleteCvConfirm"].Value },
+            { dialog => dialog.YesText, L["Delete"].Value },
+            { dialog => dialog.NoText, L["Cancel"].Value },
+        };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>(title: L["DeleteCv"], parameters: parameters);
+        if (await dialog.Result is { Canceled: true } or { Data: not true })
+            return;
+
+        _busy = true;
+        try
+        {
+            var actor = await GetActorAsync();
+            var result = await CvService.DeleteAsync(actor, _detail.Cv.Id);
+            if (result.Succeeded)
+            {
+                Snackbar.Add(L["CvDeleted"], Severity.Success);
+                Navigation.NavigateTo("/mycvs");
+            }
+            else
+            {
+                Snackbar.Add(result.Error.Message, Severity.Error);
+            }
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private RenderFragment RenderReadOnly(CvFieldRowDto row) => builder =>
+    {
+        if (!row.IsFilled)
+        {
+            builder.AddContent(0, L["NotFilled"].Value);
+            return;
+        }
+
+        switch (row.DataType)
+        {
+            case AttributeDataType.Text when row.TextValue is not null:
+                var html = Markdown.ToSafeHtml(row.TextValue);
+                builder.AddContent(0, (MarkupString)html);
+                break;
+            case AttributeDataType.Image when row.ImageUrl is not null:
+                builder.OpenElement(0, "img");
+                builder.AddAttribute(1, "src", row.ImageUrl);
+                builder.AddAttribute(2, "alt", AttributeLabels.Localize(L, row.Name));
+                builder.AddAttribute(3, "class", "cv-field-image");
+                builder.AddAttribute(4, "loading", "lazy");
+                builder.CloseElement();
+                break;
+            case AttributeDataType.Boolean:
+                builder.AddContent(0, row.BooleanValue == true ? "✓" : "✗");
+                break;
+            default:
+                builder.AddContent(0, FormatValue(row));
+                break;
+        }
+    };
+
+    private static string FormatValue(CvFieldRowDto row) => row switch
+    {
+        { StringValue: { } s } => s,
+        { TextValue: { } t } => t,
+        { NumericValue: { } n } => n.ToString("0.##"),
+        { DateValue: { } d } => d.ToString("yyyy-MM-dd"),
+        { PeriodStart: { } start, PeriodEnd: { } end } => $"{start:yyyy/MM} – {end:yyyy/MM}",
+        { PeriodStart: { } start } => $"{start:yyyy/MM} – …",
+        { PeriodEnd: { } end } => $"… – {end:yyyy/MM}",
+        { BooleanValue: { } b } => b ? "✓" : "✗",
+        { DropdownOption: { } dd } => dd,
+        { ImageUrl: { } img } => img,
+        _ => "—",
+    };
+
+    private async Task<ActorContext> GetActorAsync()
+    {
+        var authState = await AuthProvider.GetAuthenticationStateAsync();
+        return new ActorContext(Guid.Parse(authState.User.FindFirstValue(ClaimTypes.NameIdentifier)!), authState.User.IsInRole(Roles.Admin), authState.User.IsInRole(Roles.Recruiter) || authState.User.IsInRole(Roles.Admin));
+    }
+}

@@ -1,0 +1,67 @@
+@page "/positions/{Id:guid}/view"
+@attribute [AllowAnonymous]
+@using CvPlatform.Application.Access
+@using CvPlatform.Application.Positions
+@using CvPlatform.Web.Components.Shared
+@using CvPlatform.Web.Resources
+@using Microsoft.Extensions.Localization
+@inject IPositionAccessService PositionAccess
+@inject NavigationManager Navigation
+@inject IStringLocalizer<SharedResource> L
+
+<PageTitle>@(_position?.Title ?? L["Positions"])</PageTitle>
+
+@if (_loading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate Class="cv-page-loading" />
+}
+else if (_error is not null)
+{
+    <EmptyState Icon="@Icons.Material.Filled.ErrorOutline" Title="@L["LoadFailed"]" Description="@_error">
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="LoadAsync">@L["Retry"]</MudButton>
+    </EmptyState>
+}
+else if (_position is not null)
+{
+    <PageHeader Title="@_position.Title" Subtitle="@_position.Company" Icon="@Icons.Material.Filled.Work" />
+    <MudPaper Class="cv-panel pa-4">
+        <MudText Typo="Typo.body1" Class="mb-3">@_position.ShortDescription</MudText>
+        <MudStack Row Spacing="2" Class="mb-4">
+            <MudChip T="string" Size="Size.Small" Color="Color.Success" Text="@L["Public"]" />
+            @if (_position.Level is not null)
+            {
+                <MudChip T="string" Size="Size.Small" Text="@_position.Level" />
+            }
+        </MudStack>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   OnClick="LoginToApply">@L["LoginToApply"]</MudButton>
+    </MudPaper>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private PositionDto? _position;
+    private bool _loading = true;
+    private string? _error;
+
+    protected override async Task OnParametersSetAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        var result = await PositionAccess.GetPublicAsync(Id);
+        if (result.Succeeded)
+            _position = result.Value;
+        else
+            _error = result.Error.Message;
+        _loading = false;
+    }
+
+    private void LoginToApply()
+    {
+        var returnUrl = Uri.EscapeDataString($"/positions/{Id}/apply");
+        Navigation.NavigateTo($"/Account/Login?returnUrl={returnUrl}", forceLoad: true);
+    }
+}

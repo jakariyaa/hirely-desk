@@ -8,33 +8,21 @@
 
 html, body {
     font-family: Roboto, 'Helvetica Neue', Helvetica, Arial, sans-serif;
-    background: #F4F6F9;
+    background-color: var(--mud-palette-background, #F4F6F9);
 }
 
-body.mud-theme-dark {
-    background: #0F1923;
-}
-
-.cv-brand-mark {
+.cv-brand-logo {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 38px;
     height: 38px;
-    padding: 0 8px;
-    border-radius: 9px;
-    background: linear-gradient(135deg, var(--cv-primary) 0%, var(--cv-primary-dark) 100%);
-    color: #fff;
-    font-weight: 700;
-    font-size: 0.95rem;
-    letter-spacing: 0.5px;
+    width: 38px;
+    object-fit: contain;
 }
 
-.cv-brand-mark-lg {
-    min-width: 52px;
+.cv-brand-logo-lg {
     height: 52px;
-    font-size: 1.25rem;
-    border-radius: 12px;
+    width: 52px;
 }
 
 .cv-drawer-header {
@@ -42,24 +30,44 @@ body.mud-theme-dark {
     align-items: center;
     gap: 12px;
     padding: 16px 20px;
+    width: 100%;
+    color: inherit;
 }
 
-.cv-drawer-header .cv-brand-title {
-    font-weight: 600;
-    color: #0D47A1;
+.cv-brand-home {
+    display: inline-flex;
+    align-items: center;
+    color: inherit;
 }
 
-.mud-theme-dark .cv-drawer-header .cv-brand-title {
-    color: #64B5F6;
+.cv-list-card {
+    overflow: hidden;
 }
 
-.cv-drawer-footer {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    padding: 12px 20px;
-    border-top: 1px solid rgba(13, 40, 71, 0.08);
+.cv-list-table,
+.cv-list-table .mud-table,
+.cv-list-table .mud-table-container {
+    border: 0 !important;
+    box-shadow: none !important;
+}
+
+.cv-list-table .mud-table-container {
+    border-radius: 0;
+}
+
+.cv-drawer .mud-drawer-content {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+.cv-drawer .cv-nav {
+    flex: 0 0 auto;
+    margin-top: auto;
+    width: 100%;
 }
 
 .cv-text-caption {
@@ -86,8 +94,26 @@ body.mud-theme-dark {
     max-width: 34vw;
 }
 
+.cv-global-search {
+    width: 280px;
+    max-width: 30vw;
+    margin-right: 8px;
+}
+
+@media (max-width: 599px) {
+    .cv-global-search {
+        width: 140px;
+    }
+}
+
 .cv-menu-actions {
     margin-left: 4px;
+}
+
+.cv-logout-form {
+    display: block;
+    margin: 0;
+    padding: 0;
 }
 
 .cv-user-chip {
@@ -118,6 +144,10 @@ body.mud-theme-dark {
     letter-spacing: 0.5px;
 }
 
+.cv-avatar-image {
+    object-fit: cover;
+}
+
 .cv-hidden-xs {
     display: none;
 }
@@ -130,14 +160,14 @@ body.mud-theme-dark {
 
 .cv-content-wrap {
     min-height: 100vh;
-    display: flex;
-    flex-direction: column;
+    background-color: var(--mud-palette-background, #F4F6F9);
 }
 
 .cv-main {
     flex: 1;
     display: flex;
     flex-direction: column;
+    background-color: var(--mud-palette-background, #F4F6F9);
 }
 
 .cv-page-container {
@@ -145,12 +175,6 @@ body.mud-theme-dark {
     padding-top: 24px;
     padding-bottom: 32px;
     width: 100%;
-}
-
-.cv-footer {
-    padding: 14px 24px;
-    border-top: 1px solid rgba(13, 40, 71, 0.08);
-    opacity: 0.8;
 }
 
 .cv-nav .cv-nav-link {
@@ -165,6 +189,17 @@ body.mud-theme-dark {
     gap: 16px;
     margin-bottom: 20px;
     flex-wrap: wrap;
+}
+
+.cv-page-header-main {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    min-width: 0;
+}
+
+.cv-page-header-icon {
+    margin-top: 2px;
 }
 
 .cv-page-title {
@@ -352,6 +387,60 @@ body.mud-theme-dark {
 .cv-auth-card {
     padding: 32px;
     border-radius: var(--cv-radius);
+}
+
+.cv-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 16px;
+}
+
+.cv-label {
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.cv-input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid rgba(0, 0, 0, 0.23);
+    border-radius: 4px;
+    font-size: 1rem;
+    font-family: inherit;
+    background: transparent;
+    color: inherit;
+    box-sizing: border-box;
+}
+
+.cv-input:focus {
+    outline: 2px solid var(--cv-primary);
+    border-color: var(--cv-primary);
+}
+
+.cv-validation {
+    color: #e50000;
+    font-size: 0.75rem;
+}
+
+.cv-submit {
+    width: 100%;
+    margin-top: 16px;
+    padding: 10px 16px;
+    border: none;
+    border-radius: 4px;
+    background: var(--cv-primary);
+    color: #fff;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    font-family: inherit;
+    letter-spacing: 0.02857em;
+    text-transform: uppercase;
+    cursor: pointer;
+}
+
+.cv-submit:hover {
+    background: var(--cv-primary-dark);
 }
 
 .cv-remember {

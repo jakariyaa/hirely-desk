@@ -1,5 +1,13 @@
 @using CvPlatform.Application.Attributes
 @using CvPlatform.Core.Enums
+@using CvPlatform.Core.Storage
+@using CvPlatform.Web.Resources
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.Extensions.Localization
+@using Microsoft.JSInterop
+@inject ICloudinaryClientConfiguration ImageUpload
+@inject IJSRuntime Js
+@inject IStringLocalizer<SharedResource> L
 
 <div class="cv-attribute-editor" @onfocusout="NotifyChangedAsync">
     @switch (Definition.DataType)
@@ -38,6 +46,10 @@
         case AttributeDataType.Dropdown:
             <MudSelect T="string" @bind-Value="Value.Dropdown"
                        Variant="Variant.Outlined" Clearable Disabled="Disabled">
+                @if (Value.Dropdown is not null && Definition.Choices.All(c => c.Value != Value.Dropdown))
+                {
+                    <MudSelectItem Value="@Value.Dropdown">@($"{Value.Dropdown} (retired)")</MudSelectItem>
+                }
                 @foreach (var choice in Definition.Choices)
                 {
                     <MudSelectItem Value="@choice.Value">@choice.Value</MudSelectItem>
@@ -45,8 +57,22 @@
             </MudSelect>
             break;
         case AttributeDataType.Image:
-            <MudTextField T="string" @bind-Value="Value.ImageUrl"
-                          Variant="Variant.Outlined" Placeholder="https://..." Disabled="Disabled" />
+            @if (!string.IsNullOrWhiteSpace(Value.ImageUrl))
+            {
+                <MudImage Src="@Value.ImageUrl" Alt="Uploaded image" Width="120" Height="120" ObjectFit="ObjectFit.Cover" Class="mb-2" />
+            }
+            @if (ImageUpload.SignedClientConfig is { } signedConfig)
+            {
+                <MudButton Variant="Variant.Outlined" Disabled="@(Disabled || _uploading)"
+                           OnClick="@(() => UploadViaWidgetAsync(signedConfig.CloudName, "", "/api/profile-images/signature"))"
+                           Class="mb-2">
+                    @( _uploading ? L["Uploading"] : L["UploadImage"] )
+                </MudButton>
+            }
+            @if (!string.IsNullOrEmpty(_uploadError))
+            {
+                <MudText Typo="Typo.caption" Color="Color.Error">@_uploadError</MudText>
+            }
             break;
     }
 </div>
@@ -57,7 +83,39 @@
     [Parameter] public bool Disabled { get; set; }
     [Parameter] public EventCallback OnChanged { get; set; }
 
+    private string? _uploadError;
+    private bool _uploading;
+
     private Task NotifyChangedAsync(FocusEventArgs _) => OnChanged.InvokeAsync();
+
+    private async Task UploadViaWidgetAsync(
+        string cloudName, string uploadPreset, string? signatureEndpoint)
+    {
+        if (_uploading || Disabled)
+            return;
+        _uploadError = null;
+        _uploading = true;
+        try
+        {
+            await using var module = await Js.InvokeAsync<IJSObjectReference>(
+                "import", "./js/cloudinaryUpload.js");
+            var url = await module.InvokeAsync<string?>(
+                "openUploadWidget", cloudName, uploadPreset, signatureEndpoint);
+            if (!string.IsNullOrWhiteSpace(url))
+            {
+                Value.ImageUrl = url;
+                await OnChanged.InvokeAsync();
+            }
+        }
+        catch (JSException)
+        {
+            _uploadError = L["ImageUploadFailed"];
+        }
+        finally
+        {
+            _uploading = false;
+        }
+    }
 
     private static DateTime? ToDateTime(DateOnly? date) =>
         date.HasValue ? date.Value.ToDateTime(TimeOnly.MinValue) : null;

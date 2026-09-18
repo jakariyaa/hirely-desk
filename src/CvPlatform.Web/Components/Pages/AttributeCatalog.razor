@@ -1,38 +1,55 @@
 @page "/Admin/Attributes"
-@attribute [Authorize(Roles = "Admin")]
+@attribute [Authorize(Roles = "Admin,Recruiter")]
 @using CvPlatform.Application.Attributes
 @using CvPlatform.Application.Authorization
 @using CvPlatform.Application.Common
 @using CvPlatform.Web.Components.Shared
+@using CvPlatform.Web.Resources
+@using Microsoft.Extensions.Localization
 @using System.Security.Claims
 @inject IAttributeCatalog Catalog
 @inject IAttributeDefinitionService Definitions
 @inject AuthenticationStateProvider AuthProvider
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
+@inject IStringLocalizer<SharedResource> L
 
-<PageTitle>Attribute catalog</PageTitle>
-<PageHeader Title="Attribute catalog" Subtitle="Manage shared profile attributes">
-    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CreateAsync">New attribute</MudButton>
+<PageTitle>@L["AttributeCatalog"]</PageTitle>
+<PageHeader Title="@L["AttributeCatalog"]" Subtitle="@L["AttributeCatalogSubtitle"]">
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CreateAsync">@L["NewAttribute"]</MudButton>
 </PageHeader>
 
-<MudTextField T="string" Value="_search" ValueChanged="SearchChangedAsync" Label="Search" Immediate="true" Class="mb-3" />
+<MudTextField T="string" Value="_search" ValueChanged="SearchChangedAsync" Label="@L["Search"]" Immediate="true" Class="mb-3" />
 @if (_page is null)
 {
     <MudProgressLinear Indeterminate="true" />
 }
 else
 {
-    <MudTable Items="_page.Items" Hover="true" Dense="true" TableAttributes="@TableAttributes">
-        <HeaderContent><MudTh>Name</MudTh><MudTh>Category</MudTh><MudTh>Type</MudTh><MudTh></MudTh></HeaderContent>
+    <MudTable Items="_page.Items" Class="cv-list-table" Hover="true" Dense="true" TableAttributes="@TableAttributes"
+              MultiSelection="true" @bind-SelectedItems="_selected" SelectOnRowClick="false">
+        <ToolBarContent>
+            <MudText Typo="Typo.h6">@L["AttributeCatalog"]</MudText>
+            <MudSpacer />
+            <MudText Typo="Typo.caption" Class="mr-2">@L["SelectedCount", _selected.Count]</MudText>
+            @if (_isAdmin)
+            {
+                <MudButton Variant="Variant.Outlined" Color="Color.Error"
+                           Disabled="@(_selected.Count != 1)"
+                           OnClick="DeleteSelectedAsync">@L["DeleteSelected"]</MudButton>
+            }
+        </ToolBarContent>
+        <HeaderContent>
+            <MudTHeadRow Checkable="true">
+                <MudTh>@L["Name"]</MudTh>
+                <MudTh>@L["Category"]</MudTh>
+                <MudTh>@L["Type"]</MudTh>
+            </MudTHeadRow>
+        </HeaderContent>
         <RowTemplate>
-            <MudTd>@context.Name</MudTd>
+            <MudTd @onclick="@(() => EditAsync(context))">@AttributeLabels.Localize(L, context.Name)</MudTd>
             <MudTd>@context.CategoryName</MudTd>
             <MudTd>@context.DataType</MudTd>
-            <MudTd>
-                <MudIconButton Icon="@Icons.Material.Filled.Edit" OnClick="@(() => EditAsync(context))" />
-                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" OnClick="@(() => DeleteAsync(context))" />
-            </MudTd>
         </RowTemplate>
     </MudTable>
     <MudPagination Count="@Math.Max(1, _page.TotalPages)" Selected="@_page.Page"
@@ -44,6 +61,8 @@ else
     private PagedResult<AttributeDefinitionAdminDto>? _page;
     private IReadOnlyList<AttributeCategoryDto> _categories = [];
     private string? _search;
+    private bool _isAdmin;
+    private HashSet<AttributeDefinitionAdminDto> _selected = [];
 
     protected override async Task OnInitializedAsync()
     {
@@ -56,6 +75,7 @@ else
     private async Task LoadAsync(int page)
     {
         var actor = await GetActorAsync();
+        _isAdmin = actor.IsAdmin;
         var result = await Definitions.ListAsync(
             actor, new AttributeCatalogQuery(Search: _search, Page: new PageRequest(page, 25)));
         if (result.Succeeded)
@@ -87,26 +107,35 @@ else
         if (!impact.Succeeded || impact.Value is null)
             return;
         var i = impact.Value;
-        var parameters = new DialogParameters
+        var parameters = new DialogParameters<ConfirmDialog>
         {
-            [nameof(ConfirmDialog.ContentText)] = $"Delete {definition.Name}? Profiles: {i.ProfileValues}; positions: {i.Positions}; rules: {i.AccessRules}; CVs: {i.Cvs}; restricted positions losing all gating: {i.RestrictedPositionsLosingGating}.",
-            [nameof(ConfirmDialog.YesText)] = "Delete",
-            [nameof(ConfirmDialog.NoText)] = "Cancel"
+            { dialog => dialog.ContentText, $"Delete {definition.Name}? Profiles: {i.ProfileValues}; positions: {i.Positions}; rules: {i.AccessRules}; CVs: {i.Cvs}; restricted positions losing all gating: {i.RestrictedPositionsLosingGating}." },
+            { dialog => dialog.YesText, "Delete" },
+            { dialog => dialog.NoText, "Cancel" }
         };
         var dialog = await DialogService.ShowAsync<ConfirmDialog>("Delete attribute", parameters);
         if ((await dialog.Result) is not { Canceled: false, Data: true })
             return;
-        var result = await Definitions.DeleteAsync(actor, definition.Id);
-        Snackbar.Add(result.Succeeded ? "Attribute deleted." : result.Error.Message,
-            result.Succeeded ? Severity.Success : Severity.Error);
+        var result = await Definitions.DeleteAsync(actor, definition.Id, definition.Version);
+        if (!result.Succeeded && result.Error.Code == ErrorCodes.ConcurrencyConflict)
+            Snackbar.Add(L["ConcurrencyReloadHint"], Severity.Warning);
+        else
+            Snackbar.Add(result.Succeeded ? "Attribute deleted." : result.Error.Message,
+                result.Succeeded ? Severity.Success : Severity.Error);
         await LoadAsync(_page?.Page ?? 1);
+    }
+
+    private async Task DeleteSelectedAsync()
+    {
+        if (_selected.Count != 1)
+            return;
+        await DeleteAsync(_selected.Single());
+        _selected.Clear();
     }
 
     private async Task<ActorContext> GetActorAsync()
     {
         var state = await AuthProvider.GetAuthenticationStateAsync();
-        return new ActorContext(
-            Guid.Parse(state.User.FindFirstValue(ClaimTypes.NameIdentifier)!),
-            state.User.IsInRole("Admin"));
+        return new ActorContext(Guid.Parse(state.User.FindFirstValue(ClaimTypes.NameIdentifier)!), state.User.IsInRole(Roles.Admin), state.User.IsInRole(Roles.Recruiter) || state.User.IsInRole(Roles.Admin));
     }
 }

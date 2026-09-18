@@ -6,11 +6,13 @@
 
 @using System.ComponentModel.DataAnnotations
 @using CvPlatform.Core.Data
+@using CvPlatform.Application.Authorization
 @using CvPlatform.Web.Resources
 
 @inject UserManager<ApplicationUser> UserManager
 @inject SignInManager<ApplicationUser> SignInManager
 @inject IAppDbContextFactory DbFactory
+@inject CvPlatform.Core.Email.IAppEmailSender EmailSender
 @inject NavigationManager Navigation
 @inject IStringLocalizer<SharedResource> L
 
@@ -25,17 +27,25 @@
         <MudAlert Severity="Severity.Error" Class="mb-4">@StatusMessage</MudAlert>
     }
 
-    <EditForm Model="Input" method="post" OnValidSubmit="RegisterUser" FormName="register" novalidate>
+    @if (!string.IsNullOrEmpty(InfoMessage))
+    {
+        <MudAlert Severity="Severity.Info" Class="mb-4">@InfoMessage</MudAlert>
+    }
+
+    <EditForm Model="Input" method="post" OnValidSubmit="RegisterUser" FormName="register">
         <DataAnnotationsValidator />
         <ValidationSummary />
-        <MudTextField T="string" Label="@L["Email"]" @bind-Value="Input.Email" For="() => Input.Email"
-                      UserAttributes="@EmailAttributes"
-                      Variant="Variant.Outlined" Class="mb-3" />
-        <MudTextField T="string" Label="@L["PasswordMinLength"]" @bind-Value="Input.Password" For="() => Input.Password"
-                      UserAttributes="@NewPasswordAttributes"
-                      Variant="Variant.Outlined" InputType="InputType.Password" Class="mb-3" />
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Class="mt-4"
-                   ButtonType="ButtonType.Submit">@L["Register"]</MudButton>
+        <div class="cv-field">
+            <label class="cv-label" for="register-email">@L["Email"]</label>
+            <InputText id="register-email" class="cv-input" @bind-Value="Input!.Email" autocomplete="email" />
+            <ValidationMessage class="cv-validation" For="() => Input!.Email" />
+        </div>
+        <div class="cv-field">
+            <label class="cv-label" for="register-password">@L["PasswordMinLength"]</label>
+            <InputText id="register-password" type="password" class="cv-input" @bind-Value="Input!.Password" autocomplete="new-password" />
+            <ValidationMessage class="cv-validation" For="() => Input!.Password" />
+        </div>
+        <button type="submit" class="cv-submit">@L["Register"]</button>
     </EditForm>
 
     <MudText Typo="Typo.body2" Class="mt-4">
@@ -44,32 +54,51 @@
 </MudPaper>
 
 @code {
-    [SupplyParameterFromForm]
-    private InputModel Input { get => _input ??= new(); set => _input = value; }
-    private InputModel? _input;
+    [SupplyParameterFromForm(FormName = "register")]
+    private InputModel? Input { get; set; }
 
     [SupplyParameterFromQuery]
     private string? ReturnUrl { get; set; }
 
     private string? StatusMessage;
-    private static readonly Dictionary<string, object> EmailAttributes =
-        new Dictionary<string, object> { ["autocomplete"] = "email" };
-    private static readonly Dictionary<string, object> NewPasswordAttributes =
-        new Dictionary<string, object> { ["autocomplete"] = "new-password" };
+    private string? InfoMessage;
+
+    protected override void OnInitialized()
+    {
+        Input ??= new();
+    }
 
     private async Task RegisterUser()
     {
-        var user = new ApplicationUser { UserName = Input.Email, Email = Input.Email };
-        var result = await UserManager.CreateAsync(user, Input.Password);
+        var user = new ApplicationUser { UserName = Input!.Email, Email = Input!.Email };
+        var result = await UserManager.CreateAsync(user, Input!.Password);
         if (!result.Succeeded)
         {
             StatusMessage = string.Join(" ", result.Errors.Select(e => e.Description));
             return;
         }
 
+        var roleResult = await UserManager.AddToRoleAsync(user, Roles.Candidate);
+        if (!roleResult.Succeeded)
+        {
+            await UserManager.DeleteAsync(user);
+            StatusMessage = string.Join(" ", roleResult.Errors.Select(e => e.Description));
+            return;
+        }
+
         using var db = DbFactory.CreateDbContext();
         db.Profiles.Add(new Profile { Id = Guid.NewGuid(), UserId = user.Id });
         await db.SaveChangesAsync();
+
+        if (UserManager.Options.SignIn.RequireConfirmedAccount)
+        {
+            var token = await UserManager.GenerateEmailConfirmationTokenAsync(user);
+            var link = Navigation.ToAbsoluteUri(
+                $"/Account/ConfirmEmail?userId={user.Id}&token={Uri.EscapeDataString(token)}&returnUrl={Uri.EscapeDataString(RedirectUrlHelper.SafeReturnUrl(ReturnUrl))}").ToString();
+            await EmailSender.SendConfirmationLinkAsync(user.Email!, link);
+            InfoMessage = L["EmailConfirmationSent"];
+            return;
+        }
 
         await SignInManager.SignInAsync(user, isPersistent: false);
         Navigation.NavigateTo(RedirectUrlHelper.SafeReturnUrl(ReturnUrl));

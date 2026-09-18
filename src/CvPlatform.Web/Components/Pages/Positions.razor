@@ -1,0 +1,275 @@
+@page "/positions"
+@attribute [AllowAnonymous]
+@using CvPlatform.Application.Access
+@using CvPlatform.Application.Authorization
+@using CvPlatform.Application.Common
+@using CvPlatform.Application.Positions
+@using CvPlatform.Web.Components.Shared
+@using CvPlatform.Web.Resources
+@using CvPlatform.Web.Auth
+@using Microsoft.Extensions.Localization
+@using System.Security.Claims
+@inject IPositionService PositionService
+@inject IPositionAccessService PositionAccess
+@inject AuthenticationStateProvider AuthProvider
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+@inject IStringLocalizer<SharedResource> L
+
+<PageTitle>@L["Positions"]</PageTitle>
+
+<PageHeader Title="@L["Positions"]" Subtitle="@L["PositionsSubtitle"]" Icon="@Icons.Material.Filled.Work">
+    @if (_isManagement)
+    {
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="@(() => Navigation.NavigateTo("/positions/new"))" Disabled="@_loading">@L["NewPosition"]</MudButton>
+    }
+</PageHeader>
+
+@if (_error is not null)
+{
+    <EmptyState Icon="@Icons.Material.Filled.ErrorOutline" Title="@L["LoadFailed"]" Description="@_error">
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="RetryAsync">@L["Retry"]</MudButton>
+    </EmptyState>
+}
+else
+{
+    <MudPaper Class="cv-panel cv-list-card pa-2">
+        @if (_isManagement)
+        {
+            <MudStack Row Spacing="1" Class="pa-2" Justify="Justify.FlexEnd">
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.ContentCopy"
+                           Disabled="@(_loading || _selected.Count == 0)" OnClick="DuplicateSelectedAsync">@L["Duplicate"]</MudButton>
+                <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.Delete"
+                           Disabled="@(_loading || _selected.Count == 0)" OnClick="DeleteSelectedAsync">@L["Delete"]</MudButton>
+                <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.TableChart"
+                           Href="/api/exports/positions/xlsx" Target="_blank" Disabled="@_loading">@L["ExportExcel"]</MudButton>
+            </MudStack>
+        }
+        <MudDataGrid T="PositionDto" @ref="_grid" ServerData="LoadServerDataAsync" Class="cv-list-table" MultiSelection="true"
+                     @bind-SelectedItems="_selected" Hover="true" Striped="true" Dense="true"
+                     RowsPerPage="10" Loading="@_loading"
+                     RowClick="@(async (DataGridRowClickEventArgs<PositionDto> e) => await OnRowClickAsync(e.Item))">
+            <Columns>
+                @if (_isManagement)
+                {
+                    <SelectColumn T="PositionDto" />
+                }
+                <PropertyColumn Property="p => p.Title" Title="@L["Name"]" />
+                <PropertyColumn Property="p => p.Company" Title="@L["Company"]" />
+                <PropertyColumn Property="p => p.Level" Title="@L["Level"]" />
+                <PropertyColumn Property="p => p.IsPublic" Title="@L["IsPublic"]">
+                    <CellTemplate>
+                        <MudChip T="string" Size="Size.Small" Color="@(context.Item.IsPublic ? Color.Success : Color.Warning)"
+                                 Text="@(context.Item.IsPublic ? L["Public"] : L["Restricted"])" />
+                    </CellTemplate>
+                </PropertyColumn>
+                <PropertyColumn Property="p => p.CvCount" Title="@L["Cvs"]" />
+                <PropertyColumn Property="p => p.LikeCount" Title="@L["Likes"]" />
+                <PropertyColumn Property="p => p.Version" Title="@L["VersionLabel"]" />
+            </Columns>
+        </MudDataGrid>
+    </MudPaper>
+}
+
+@code {
+    private MudDataGrid<PositionDto>? _grid;
+    private HashSet<PositionDto> _selected = [];
+    private string? _error;
+    private bool _loading;
+    private bool _isManagement;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthProvider.GetAuthenticationStateAsync();
+        _isManagement = authState.User.Identity?.IsAuthenticated == true &&
+            (authState.User.IsInRole(Roles.Admin) || authState.User.IsInRole(Roles.Recruiter));
+    }
+
+    private async Task<GridData<PositionDto>> LoadServerDataAsync(GridState<PositionDto> state, CancellationToken ct)
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            var authState = await AuthProvider.GetAuthenticationStateAsync();
+            if (!authState.User.Identity?.IsAuthenticated ?? true)
+            {
+                var publicResult = await PositionAccess.BrowsePublicAsync(
+                    new PageRequest(state.Page + 1, state.PageSize), null, ct);
+                return publicResult.Succeeded
+                    ? new GridData<PositionDto>
+                    {
+                        TotalItems = publicResult.Value!.TotalCount,
+                        Items = publicResult.Value!.Items,
+                    }
+                    : new GridData<PositionDto>();
+            }
+
+            var actor = ActorContexts.FromUser(authState.User);
+            _isManagement = actor.IsPrivileged;
+            if (!actor.IsPrivileged)
+            {
+                var candidateBrowse = await PositionAccess.BrowseAsync(
+                    actor, new PageRequest(state.Page + 1, state.PageSize), null, ct);
+                if (!candidateBrowse.Succeeded)
+                {
+                    _error = candidateBrowse.Error.Message;
+                    return new GridData<PositionDto>();
+                }
+
+                return new GridData<PositionDto>
+                {
+                    TotalItems = candidateBrowse.Value!.TotalCount,
+                    Items = candidateBrowse.Value!.Items,
+                };
+            }
+
+            var owned = await PositionService.ListAsync(
+                actor, new PageRequest(state.Page + 1, state.PageSize), null, ct);
+            if (!owned.Succeeded)
+            {
+                _error = owned.Error.Message;
+                return new GridData<PositionDto>();
+            }
+
+            if (owned.Value!.TotalCount > 0 || actor.IsAdmin)
+            {
+                return new GridData<PositionDto>
+                {
+                    TotalItems = owned.Value.TotalCount,
+                    Items = owned.Value.Items,
+                };
+            }
+
+            var browsed = await PositionAccess.BrowseAsync(
+                actor, new PageRequest(state.Page + 1, state.PageSize), null, ct);
+            if (!browsed.Succeeded)
+            {
+                _error = browsed.Error.Message;
+                return new GridData<PositionDto>();
+            }
+
+            return new GridData<PositionDto>
+            {
+                TotalItems = browsed.Value!.TotalCount,
+                    Items = browsed.Value!.Items,
+            };
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task OnRowClickAsync(PositionDto position)
+    {
+        var authState = await AuthProvider.GetAuthenticationStateAsync();
+        var target = !authState.User.Identity?.IsAuthenticated ?? true
+            ? $"/positions/{position.Id}/view"
+            : ActorContexts.FromUser(authState.User).IsPrivileged
+                ? $"/positions/{position.Id}"
+                : $"/positions/{position.Id}/apply";
+        Navigation.NavigateTo(target);
+    }
+
+    private async Task RetryAsync()
+    {
+        if (_grid is not null)
+            await _grid.ReloadServerData();
+    }
+
+    private async Task DuplicateSelectedAsync()
+    {
+        if (_selected.Count == 0)
+            return;
+
+        _loading = true;
+        try
+        {
+            var actor = await GetActorAsync();
+            foreach (var position in _selected.ToList())
+            {
+                var result = await PositionService.DuplicateAsync(actor, position.Id);
+                if (!result.Succeeded)
+                    Snackbar.Add(result.Error.Message, Severity.Error);
+            }
+
+            Snackbar.Add(L["PositionDuplicated"], Severity.Success);
+            _selected.Clear();
+            if (_grid is not null)
+                await _grid.ReloadServerData();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task DeleteSelectedAsync()
+    {
+        if (_selected.Count == 0)
+            return;
+
+        var actor = await GetActorAsync();
+        var totalCvs = 0;
+        var totalDiscussions = 0;
+        var totalLikes = 0;
+        foreach (var position in _selected.ToList())
+        {
+            var impact = await PositionService.GetDeleteImpactAsync(actor, position.Id);
+            if (impact.Succeeded && impact.Value is not null)
+            {
+                totalCvs += impact.Value.Cvs;
+                totalDiscussions += impact.Value.DiscussionPosts;
+                totalLikes += impact.Value.Likes;
+            }
+        }
+
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { dialog => dialog.ContentText, $"{L["DeletePositionConfirm"].Value} CVs: {totalCvs}; discussions: {totalDiscussions}; likes: {totalLikes}." },
+            { dialog => dialog.YesText, L["Delete"].Value },
+            { dialog => dialog.NoText, L["Cancel"].Value },
+        };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>(title: L["DeletePosition"], parameters: parameters);
+        var result = await dialog.Result;
+        if (result is { Canceled: true } || result?.Data is not true)
+            return;
+
+        _loading = true;
+        try
+        {
+            var hadConflict = false;
+            foreach (var position in _selected.ToList())
+            {
+                var deleteResult = await PositionService.DeleteAsync(actor, position.Id, position.Version);
+                if (!deleteResult.Succeeded)
+                {
+                    if (deleteResult.Error.Code == ErrorCodes.ConcurrencyConflict)
+                        hadConflict = true;
+                    Snackbar.Add(deleteResult.Error.Message, Severity.Error);
+                }
+            }
+
+            if (hadConflict)
+                Snackbar.Add(L["ConcurrencyReloadHint"], Severity.Warning);
+            else
+                Snackbar.Add(L["PositionDeleted"], Severity.Success);
+            _selected.Clear();
+            if (_grid is not null)
+                await _grid.ReloadServerData();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task<ActorContext> GetActorAsync()
+    {
+        var authState = await AuthProvider.GetAuthenticationStateAsync();
+        return ActorContexts.FromUser(authState.User);
+    }
+}

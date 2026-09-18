@@ -1,86 +1,181 @@
-# CV Management Platform — Phase 0
+# Hirely Desk
 
-Blazor Web App (Interactive Server) + EF Core 10 + PostgreSQL 18. Phase 0 delivers the
-scaffold, data model, Identity + OAuth wiring, MudBlazor themed shell with i18n hooks,
-Serilog, the initial migration, and an idempotent seed. No domain features yet.
+Hirely Desk is a CV management and recruitment platform. Candidates maintain reusable professional profiles and create CVs tailored to position requirements. Recruiters manage positions, define access rules, and review eligible candidate CVs.
 
-## Prerequisites
+## Features
 
-- .NET SDK 10.0.111+
-- podman 6.1.1+ + podman-compose 1.6.0+ (plain compose-spec, no `deploy:` sections)
-- `dotnet-ef` 10.x (`dotnet tool install --global dotnet-ef --version 10.*`)
+- Role-based authentication with Candidate, Recruiter, and Administrator roles
+- Reusable attribute library with typed values, categories, and dropdown options
+- Position and position-template management
+- Public and rule-restricted positions
+- Candidate profiles, projects, and generated CVs
+- CV publishing, full-text search, discussions, and recruiter likes
+- PDF CV export and CSV/XLSX position exports
+- Cloudinary image uploads
+- English and Polish localization, persisted theme preferences, and Serilog logging
+- Optimistic concurrency for versioned records
 
-## Quickstart
+## Technology stack
+
+| Area | Technology |
+| --- | --- |
+| Application | .NET 10, C# |
+| Web UI | Blazor Web App with Interactive Server render mode |
+| UI components | MudBlazor |
+| Authentication | ASP.NET Core Identity, Google OAuth, Facebook OAuth |
+| Database | PostgreSQL 18, Entity Framework Core 10, Npgsql |
+| Markdown | Markdig with HTML sanitization |
+| Files and exports | Cloudinary, QuestPDF, QRCoder, ClosedXML |
+| Logging | Serilog |
+| Testing | xUnit, AwesomeAssertions, bUnit, Testcontainers |
+
+## Requirements
+
+- .NET SDK 10.0 or later
+- PostgreSQL 18, or Docker/Podman with Compose support
+- .NET Entity Framework CLI tools for creating and applying migrations:
+
+  ```bash
+  dotnet tool install --global dotnet-ef --version 10.*
+  ```
+
+The supplied `compose.yml` is intended for local development. It exposes PostgreSQL on `localhost:5434` and uses development-only credentials.
+
+## Quick start
+
+1. Start the local database from the repository root:
+
+   ```bash
+   podman-compose up -d db
+   ```
+
+   Docker users can use `docker compose up -d db` instead.
+
+2. Configure the required local secrets. The application requires a connection string and passwords for its seeded accounts:
+
+   ```bash
+   dotnet user-secrets set --project src/CvPlatform.Web \
+     "ConnectionStrings:Default" \
+     "Host=localhost;Port=5434;Database=cvplatform;Username=cvplatform;Password=cvplatform"
+
+   dotnet user-secrets set --project src/CvPlatform.Web \
+     "Seed:AdminPassword" "replace-with-a-strong-password"
+
+   dotnet user-secrets set --project src/CvPlatform.Web \
+     "Seed:DemoPassword" "replace-with-a-strong-password"
+   ```
+
+3. Run the web application:
+
+   ```bash
+   dotnet run --project src/CvPlatform.Web --launch-profile http
+   ```
+
+   Open [http://localhost:5191](http://localhost:5191). On startup, the application applies pending EF Core migrations and runs the idempotent seed process.
+
+## Seeded development accounts
+
+The seed process creates these accounts. Their passwords are the values configured by `Seed:AdminPassword` and `Seed:DemoPassword`.
+
+| Account | Role | Email |
+| --- | --- | --- |
+| Administrator | Admin and Recruiter | `admin@cvplatform.local` |
+| Demo candidate | Candidate | `candidate@cvplatform.local` |
+| Demo recruiter | Recruiter | `recruiter@cvplatform.local` |
+
+The seed process also creates built-in profile attributes, attribute categories, a public demo position, a restricted Warsaw-only position, and demo candidate data. Seeding is safe to run repeatedly.
+
+## Configuration
+
+Configuration can be supplied through environment variables, user secrets, or another ASP.NET Core configuration provider. Use user secrets for local credentials and API keys; do not commit them to the repository.
+
+| Key | Required | Description |
+| --- | --- | --- |
+| `ConnectionStrings:Default` | Yes | PostgreSQL connection string |
+| `Seed:AdminPassword` | Yes | Seeded administrator password; minimum 8 characters |
+| `Seed:DemoPassword` | Yes | Seeded candidate and recruiter password; minimum 8 characters |
+| `Database:SkipMigrate` | No | Set to `true` to prevent automatic startup migrations |
+| `Authentication:Google:ClientId` and `ClientSecret` | No | Enables Google sign-in when both are set |
+| `Authentication:Facebook:AppId` and `AppSecret` | No | Enables Facebook sign-in when both are set |
+| `Cloudinary:CloudName` and `UploadPreset` | No | Enables unsigned image uploads |
+| `Cloudinary:CloudName`, `ApiKey`, and `ApiSecret` | No | Enables signed Cloudinary uploads |
+| `Cloudinary:Folder` | No | Upload folder; defaults to `cvplatform` |
+| `Gmail:Address` and `AppPassword` | No | Enables confirmation email delivery |
+| `Gmail:FromName` | No | Sender display name; defaults to `Hirely Desk` |
+| `Gmail:RequireConfirmedAccount` | No | Requires email confirmation when Gmail is configured |
+
+Optional integrations are disabled when their configuration is absent. The application uses a no-op email sender when Gmail is not configured, and image upload controls are unavailable when Cloudinary is not configured.
+
+For example, to enable Google sign-in locally:
 
 ```bash
-podman-compose up -d
-podman exec cvplatform-db pg_isready -U cvplatform -d cvplatform
-
-cd src/CvPlatform.Web
-dotnet user-secrets set "ConnectionStrings:Default" "Host=localhost;Port=5434;Database=cvplatform;Username=cvplatform;Password=cvplatform"
-dotnet user-secrets set "Seed:AdminPassword" "pick-a-strong-password"
-dotnet user-secrets set "Seed:DemoPassword" "pick-a-strong-password"
-
-dotnet ef database update --project ../CvPlatform.Infrastructure --startup-project .
-dotnet run --urls "http://localhost:5199"
+dotnet user-secrets set --project src/CvPlatform.Web \
+  "Authentication:Google:ClientId" "your-client-id"
+dotnet user-secrets set --project src/CvPlatform.Web \
+  "Authentication:Google:ClientSecret" "your-client-secret"
 ```
 
-Seed runs automatically at startup (idempotent): attribute categories, built-in `Me.*`
-attributes, the IELTS `Band` dropdown (bands 0–9), a demo position, the Admin account,
-and a demo candidate.
+## Development commands
 
-## User-secrets keys
-
-| Key | Purpose |
-|---|---|
-| `ConnectionStrings:Default` | Npgsql connection string (host port **5434**) |
-| `Seed:AdminPassword` | Password for `admin@cvplatform.local` (role `Admin`) |
-| `Seed:DemoPassword` | Password for `candidate@cvplatform.local` |
-| `Authentication:Google:ClientId` / `Authentication:Google:ClientSecret` | Google OAuth (optional) |
-| `Authentication:Facebook:AppId` / `Authentication:Facebook:AppSecret` | Facebook OAuth (optional) |
-
-Nothing secret lives in `appsettings.json`. OAuth handlers register only when their keys
-are present; local password login always works. To enable Google locally:
+Run commands from the repository root:
 
 ```bash
-dotnet user-secrets set "Authentication:Google:ClientId" "<id>"
-dotnet user-secrets set "Authentication:Google:ClientSecret" "<secret>"
+# Restore and build
+dotnet restore CvPlatform.slnx
+dotnet build CvPlatform.slnx
+
+# Run the complete test suite
+dotnet test CvPlatform.slnx
+
+# Run tests for the test project only
+dotnet test tests/CvPlatform.Tests/CvPlatform.Tests.csproj
 ```
 
-## Accounts (after seed)
+The PostgreSQL integration tests use Testcontainers and require a working Docker- or Podman-compatible container runtime. Most other tests use in-memory or SQLite databases.
 
-- Admin: `admin@cvplatform.local` (role `Admin`, has a profile row)
-- Demo candidate: `candidate@cvplatform.local` (has a profile row)
+## Entity Framework migrations
 
-## Layout
+Migrations are stored in `src/CvPlatform.Infrastructure/Migrations`. The web application applies pending migrations automatically unless `Database:SkipMigrate` is enabled.
 
+Create a migration after changing the data model:
+
+```bash
+dotnet ef migrations add MigrationName \
+  --project src/CvPlatform.Infrastructure \
+  --startup-project src/CvPlatform.Web
 ```
+
+Apply migrations manually when needed:
+
+```bash
+dotnet ef database update \
+  --project src/CvPlatform.Infrastructure \
+  --startup-project src/CvPlatform.Web
+```
+
+## Repository layout
+
+```text
 CvPlatform.slnx
-├─ src/CvPlatform.Core            // entities, enums, domain interfaces and logic
-├─ src/CvPlatform.Application     // use cases, DTOs, validators and application services
-├─ src/CvPlatform.Infrastructure   // AppDbContext, interceptor, configurations, migrations
-├─ src/CvPlatform.Web             // composition root, Identity, MudBlazor shell, seed
-└─ tests/CvPlatform.Tests        // xUnit + FluentAssertions
+├── src/
+│   ├── CvPlatform.Core/             Entities, enums, domain logic, and interfaces
+│   ├── CvPlatform.Application/      Use cases, DTOs, validators, and services
+│   ├── CvPlatform.Infrastructure/   EF Core, PostgreSQL, migrations, and integrations
+│   └── CvPlatform.Web/              Blazor UI, Identity, endpoints, and composition root
+├── tests/
+│   └── CvPlatform.Tests/            Unit, component, and integration tests
+└── compose.yml                      Local PostgreSQL service
 ```
 
-Core never references Infrastructure. Application services inject the Core-owned
-`IAppDbContextFactory` only. The `VersionIncrementInterceptor` is registered on the
-`AddDbContextFactory` options — the only registration that fires with factory-created
-contexts. Theme/language are read from `Blazored.LocalStorage` only in
-`OnAfterRenderAsync(firstRender)` (JS interop is unavailable during prerender).
+Application services use the Core-owned database interfaces and context factory. Infrastructure contains the concrete EF Core implementation, while Web is the composition root. The application does not expose a general-purpose REST API; its primary interface is the interactive Blazor web application.
 
-## Port note
+## Security notes
 
-`compose.yml` maps `"5434:5432"` (host 5434 avoids clashes with a local Postgres; the
-container still listens on 5432). The image reference is the fully-qualified
-`docker.io/library/postgres:18-alpine` (same image; podman has no short-name default
-registry here), and the data volume mounts at `/var/lib/postgresql` because the
-postgres:18 image refuses a mount directly on `/var/lib/postgresql/data`.
+- Never commit passwords, OAuth credentials, Gmail app passwords, or Cloudinary secrets.
+- The credentials in `compose.yml` are for local development only.
+- Configure HTTPS, trusted hosts, production database credentials, and an appropriate secret provider before deployment.
+- Keep `Database:SkipMigrate` and migration execution policy explicit in production environments.
 
-Credentials in `compose.yml` and the seed/user-secrets examples are dev-only: the
-container is for local development (bound to localhost), never reuse them outside it.
+## License
 
-## Deferred to later phases
-
-Attribute engine, profiles, positions + access rules, CV workflow, search/discussion/
-likes UI, PDF/QR/export, bUnit + Testcontainers suites.
+No license has been declared for this repository.

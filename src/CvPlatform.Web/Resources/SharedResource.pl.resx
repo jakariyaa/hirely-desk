@@ -13,7 +13,7 @@
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
   <data name="AppName" xml:space="preserve">
-    <value>CV Management Platform</value>
+    <value>Hirely Desk</value>
   </data>
   <data name="SearchPlaceholder" xml:space="preserve">
     <value>Szukaj stanowisk i CV…</value>
@@ -92,6 +92,9 @@
   <data name="Save" xml:space="preserve">
     <value>Zapisz</value>
   </data>
+  <data name="SaveAll" xml:space="preserve">
+    <value>Zapisz wszystko</value>
+  </data>
   <data name="Saved" xml:space="preserve">
     <value>Zapisano</value>
   </data>
@@ -164,4 +167,518 @@
   <data name="NoProjectsHint" xml:space="preserve">
     <value>Zaprezentuj swoją pracę, dodając pierwszy projekt portfolio.</value>
   </data>
+
+  <data name="PositionsSubtitle" xml:space="preserve">
+    <value>Szablony definiujące strukturę CV i reguły dostępu.</value>
+  </data>
+  <data name="NewPosition" xml:space="preserve">
+    <value>Nowe stanowisko</value>
+  </data>
+  <data name="EditPosition" xml:space="preserve">
+    <value>Edytuj stanowisko</value>
+  </data>
+  <data name="PositionEditSubtitle" xml:space="preserve">
+    <value>Podstawowe informacje, wymagane atrybuty i reguły dostępu.</value>
+  </data>
+  <data name="PositionTitle" xml:space="preserve">
+    <value>Tytuł</value>
+  </data>
+  <data name="PositionTitleRequired" xml:space="preserve">
+    <value>Tytuł jest wymagany.</value>
+  </data>
+  <data name="Company" xml:space="preserve">
+    <value>Firma</value>
+  </data>
+  <data name="Level" xml:space="preserve">
+    <value>Poziom</value>
+  </data>
+  <data name="MaxProjects" xml:space="preserve">
+    <value>Maks. projektów</value>
+  </data>
+  <data name="IsPublic" xml:space="preserve">
+    <value>Publiczne</value>
+  </data>
+  <data name="Public" xml:space="preserve">
+    <value>Publiczne</value>
+  </data>
+  <data name="Restricted" xml:space="preserve">
+    <value>Ograniczone</value>
+  </data>
+  <data name="IsPublicHint" xml:space="preserve">
+    <value>Publiczne stanowiska przyjmują CV od wszystkich; ograniczone wymagają spełnienia reguł dostępu.</value>
+  </data>
+  <data name="GeneralInfo" xml:space="preserve">
+    <value>Podstawowe informacje</value>
+  </data>
+  <data name="RequiredAttributes" xml:space="preserve">
+    <value>Atrybuty</value>
+  </data>
+  <data name="RequiredAttributesHint" xml:space="preserve">
+    <value>Atrybuty, które musi zawierać każde CV dla tego stanowiska; oznacz wymagane do publikacji.</value>
+  </data>
+  <data name="AddAttribute" xml:space="preserve">
+    <value>Dodaj atrybut</value>
+  </data>
+  <data name="IsRequired" xml:space="preserve">
+    <value>Wymagany</value>
+  </data>
+  <data name="NoAttributes" xml:space="preserve">
+    <value>Brak atrybutów. Dodaj atrybuty z wspólnej biblioteki.</value>
+  </data>
+  <data name="RemoveAttribute" xml:space="preserve">
+    <value>Usuń atrybut</value>
+  </data>
+  <data name="RemoveAttributeConfirm" xml:space="preserve">
+    <value>Usunąć ten atrybut ze stanowiska?</value>
+  </data>
+  <data name="AttributeRemoved" xml:space="preserve">
+    <value>Atrybut usunięty</value>
+  </data>
+  <data name="AttributeUsedByRules" xml:space="preserve">
+    <value>{0} reguł dostępu odwołujących się do tego atrybutu zostanie także usuniętych.</value>
+  </data>
+  <data name="AccessRules" xml:space="preserve">
+    <value>Reguły dostępu</value>
+  </data>
+  <data name="AccessRulesHint" xml:space="preserve">
+    <value>Ograniczone stanowiska wymagają, aby kandydaci spełniali te reguły.</value>
+  </data>
+  <data name="Operator" xml:space="preserve">
+    <value>Operator</value>
+  </data>
+  <data name="ComparisonValue" xml:space="preserve">
+    <value>Wartość porównania</value>
+  </data>
+  <data name="NoRules" xml:space="preserve">
+    <value>Brak reguł dostępu.</value>
+  </data>
+  <data name="RemoveRule" xml:space="preserve">
+    <value>Usuń regułę</value>
+  </data>
+  <data name="RemoveRuleConfirm" xml:space="preserve">
+    <value>Usunąć tę regułę dostępu?</value>
+  </data>
+  <data name="RuleRemoved" xml:space="preserve">
+    <value>Reguła usunięta</value>
+  </data>
+  <data name="DeletePosition" xml:space="preserve">
+    <value>Usuń stanowisko</value>
+  </data>
+  <data name="DeletePositionConfirm" xml:space="preserve">
+    <value>Usunąć wybrane stanowiska? Tej operacji nie można cofnąć.</value>
+  </data>
+  <data name="PositionDeleted" xml:space="preserve">
+    <value>Stanowiska usunięte</value>
+  </data>
+  <data name="PositionDuplicated" xml:space="preserve">
+    <value>Stanowiska zduplikowane</value>
+  </data>
+  <data name="PositionSaved" xml:space="preserve">
+    <value>Stanowisko zapisane</value>
+  </data>
+  <data name="SaveFailed" xml:space="preserve">
+    <value>Nie udało się zapisać.</value>
+  </data>
+  <data name="NotFoundGeneric" xml:space="preserve">
+    <value>Nie znaleziono lub zasób jest niedostępny.</value>
+  </data>
+  <data name="Positions" xml:space="preserve">
+    <value>Stanowiska</value>
+  </data>
+  <data name="Position" xml:space="preserve">
+    <value>Stanowisko</value>
+  </data>
+  <data name="Add" xml:space="preserve">
+    <value>Dodaj</value>
+  </data>
+  <data name="Attribute" xml:space="preserve">
+    <value>Atrybut</value>
+  </data>
+  <data name="Description" xml:space="preserve">
+    <value>Opis</value>
+  </data>
+  <data name="Duplicate" xml:space="preserve">
+    <value>Duplikuj</value>
+  </data>
+  <data name="Remove" xml:space="preserve">
+    <value>Usuń</value>
+  </data>
+  <data name="LoginHelper" xml:space="preserve">
+    <value>Wprowadź swoje dane, aby kontynuować.</value>
+  </data>
+  <data name="RegisterHelper" xml:space="preserve">
+    <value>Utwórz konto, aby rozpocząć.</value>
+  </data>
+  <data name="Email" xml:space="preserve">
+    <value>Adres e-mail</value>
+  </data>
+  <data name="Password" xml:space="preserve">
+    <value>Hasło</value>
+  </data>
+  <data name="PasswordMinLength" xml:space="preserve">
+    <value>Hasło (min. 8 znaków)</value>
+  </data>
+  <data name="RememberMe" xml:space="preserve">
+    <value>Zapamiętaj mnie</value>
+  </data>
+  <data name="ExternalLoginPrompt" xml:space="preserve">
+    <value>Lub kontynuuj przez</value>
+  </data>
+  <data name="RegisterNewAccount" xml:space="preserve">
+    <value>Zarejestruj nowe konto</value>
+  </data>
+  <data name="AlreadyHaveAccount" xml:space="preserve">
+    <value>Masz już konto? Zaloguj się</value>
+  </data>
+  <data name="ExternalNoEmail" xml:space="preserve">
+    <value>Dostawca zewnętrzny nie zwrócił adresu e-mail.</value>
+  </data>
+  <data name="ExternalCreateFailed" xml:space="preserve">
+    <value>Nie udało się utworzyć konta lokalnego dla logowania zewnętrznego.</value>
+  </data>
+  <data name="ExternalLoginFailed" xml:space="preserve">
+    <value>Logowanie zewnętrzne nie powiodło się: {0}</value>
+  </data>
+  <data name="ExternalLinkRequired" xml:space="preserve">
+    <value>Konto z tym adresem e-mail już istnieje. Zaloguj się hasłem przed połączeniem dostawcy.</value>
+  </data>
+  <data name="ExternalLoginUnavailable" xml:space="preserve">
+    <value>Logowanie zewnętrzne jest obecnie niedostępne. Spróbuj ponownie później.</value>
+  </data>
+  <data name="ExternalLoginNotAllowed" xml:space="preserve">
+    <value>To konto nie może obecnie się zalogować.</value>
+  </data>
+  <data name="AccountLockedOut" xml:space="preserve">
+    <value>To konto jest zablokowane. Spróbuj ponownie później.</value>
+  </data>
+  <data name="TwoFactorRequired" xml:space="preserve">
+    <value>To konto wymaga dodatkowej weryfikacji.</value>
+  </data>
+  <data name="LinkExternalProvider" xml:space="preserve">
+    <value>Połącz {0}</value>
+  </data>
+  <data name="ExternalProviderAlreadyLinked" xml:space="preserve">
+    <value>Ten dostawca jest już połączony z innym kontem.</value>
+  </data>
+  <data name="ExternalProviderLinkFailed" xml:space="preserve">
+    <value>Nie udało się połączyć dostawcy.</value>
+  </data>
+  <data name="InvalidCredentials" xml:space="preserve">
+    <value>Nieprawidłowy e-mail lub hasło.</value>
+  </data>
+  <data name="MyCvs" xml:space="preserve">
+    <value>Moje CV</value>
+  </data>
+  <data name="MyCvsSubtitle" xml:space="preserve">
+    <value>CV utworzone na otwarte stanowiska</value>
+  </data>
+  <data name="NoCvs" xml:space="preserve">
+    <value>Brak CV</value>
+  </data>
+  <data name="NoCvsHint" xml:space="preserve">
+    <value>Otwórz stanowisko, do którego się kwalifikujesz, i utwórz pierwsze CV.</value>
+  </data>
+  <data name="BrowsePositions" xml:space="preserve">
+    <value>Przeglądaj stanowiska</value>
+  </data>
+  <data name="Status" xml:space="preserve">
+    <value>Status</value>
+  </data>
+  <data name="StatusPublished" xml:space="preserve">
+    <value>Opublikowane</value>
+  </data>
+  <data name="StatusDraft" xml:space="preserve">
+    <value>Szkic</value>
+  </data>
+  <data name="PublishedAt" xml:space="preserve">
+    <value>Opublikowano</value>
+  </data>
+  <data name="Actions" xml:space="preserve">
+    <value>Akcje</value>
+  </data>
+  <data name="Open" xml:space="preserve">
+    <value>Otwórz</value>
+  </data>
+  <data name="CvDetail" xml:space="preserve">
+    <value>Szczegóły CV</value>
+  </data>
+  <data name="Unpublish" xml:space="preserve">
+    <value>Cofnij publikację</value>
+  </data>
+  <data name="Publish" xml:space="preserve">
+    <value>Opublikuj</value>
+  </data>
+  <data name="PublishGateHint" xml:space="preserve">
+    <value>Uzupełnij wszystkie wymagane pola, aby opublikować. Brakuje:</value>
+  </data>
+  <data name="CvFields" xml:space="preserve">
+    <value>Pola CV</value>
+  </data>
+  <data name="NoFields" xml:space="preserve">
+    <value>Ten szablon stanowiska nie definiuje pól.</value>
+  </data>
+  <data name="NotFilled" xml:space="preserve">
+    <value>Niewypełnione</value>
+  </data>
+  <data name="EditValuesHint" xml:space="preserve">
+    <value>Edytuj wartości w miejscu — zmiany zapisują się w profilu.</value>
+  </data>
+  <data name="ProjectToggleHint" xml:space="preserve">
+    <value>Wybierz, które projekty mają pojawić się w tym CV.</value>
+  </data>
+  <data name="CvPublished" xml:space="preserve">
+    <value>CV opublikowane.</value>
+  </data>
+  <data name="CvUnpublished" xml:space="preserve">
+    <value>Cofnięto publikację CV.</value>
+  </data>
+  <data name="DeleteCv" xml:space="preserve">
+    <value>Usuń CV</value>
+  </data>
+  <data name="DeleteCvConfirm" xml:space="preserve">
+    <value>Usunąć wybrane CV? Tej operacji nie można cofnąć.</value>
+  </data>
+  <data name="CvDeleted" xml:space="preserve">
+    <value>CV usunięte</value>
+  </data>
+  <data name="CreateCv" xml:space="preserve">
+    <value>Nowe CV</value>
+  </data>
+  <data name="CvCreated" xml:space="preserve">
+    <value>Utworzono CV.</value>
+  </data>
+  <data name="ProjectCount" xml:space="preserve">
+    <value>Dołączono {0} z {1} projektów</value>
+  </data>
+  <data name="Like" xml:space="preserve">
+    <value>Polub</value>
+  </data>
+  <data name="Likes" xml:space="preserve">
+    <value>Polubienia</value>
+  </data>
+  <data name="Liked" xml:space="preserve">
+    <value>Polubione</value>
+  </data>
+  <data name="Discussions" xml:space="preserve">
+    <value>Dyskusja</value>
+  </data>
+  <data name="NoDiscussions" xml:space="preserve">
+    <value>Brak wiadomości. Rozpocznij rozmowę.</value>
+  </data>
+  <data name="MessagePlaceholder" xml:space="preserve">
+    <value>Napisz wiadomość...</value>
+  </data>
+  <data name="Send" xml:space="preserve">
+    <value>Wyślij</value>
+  </data>
+  <data name="Search" xml:space="preserve">
+    <value>Szukaj</value>
+  </data>
+  <data name="SearchResults" xml:space="preserve">
+    <value>Wyniki wyszukiwania</value>
+  </data>
+  <data name="NoResults" xml:space="preserve">
+    <value>Brak wyników.</value>
+  </data>
+  <data name="LatestCvs" xml:space="preserve">
+    <value>Najnowsze CV</value>
+  </data>
+  <data name="PopularPositions" xml:space="preserve">
+    <value>Popularne stanowiska</value>
+  </data>
+  <data name="PositionCvs" xml:space="preserve">
+    <value>Zgłoszone CV</value>
+  </data>
+  <data name="CvCount" xml:space="preserve">
+    <value>{0} CV</value>
+  </data>
+  <data name="LikeCount" xml:space="preserve">
+    <value>{0} polubień</value>
+  </data>
+  <data name="CardLatestTitle" xml:space="preserve">
+    <value>Najnowsze CV</value>
+  </data>
+  <data name="CardPopularTitle" xml:space="preserve">
+    <value>Popularne stanowiska</value>
+  </data>
+  <data name="Candidates" xml:space="preserve">
+    <value>Kandydaci</value>
+  </data>
+  <data name="Cvs" xml:space="preserve">
+    <value>CV</value>
+  </data>
+  <data name="ConfirmEmail" xml:space="preserve">
+    <value>Potwierdź adres e-mail</value>
+  </data>
+  <data name="EmailConfirmationSent" xml:space="preserve">
+    <value>Rejestracja zakończona. Sprawdź skrzynkę, aby potwierdzić adres.</value>
+  </data>
+  <data name="EmailNotConfirmed" xml:space="preserve">
+    <value>Adres e-mail nie został potwierdzony. Sprawdź skrzynkę.</value>
+  </data>
+  <data name="EmailConfirmed" xml:space="preserve">
+    <value>Adres potwierdzony. Możesz się zalogować.</value>
+  </data>
+  <data name="EmailConfirmFailed" xml:space="preserve">
+    <value>Potwierdzenie nie powiodło się. Link mógł wygasnąć.</value>
+  </data>
+  <data name="ExportPdf" xml:space="preserve">
+    <value>Eksportuj PDF</value>
+  </data>
+  <data name="ExportExcel" xml:space="preserve">
+    <value>Eksportuj Excel</value>
+  </data>
+  <data name="ExportCsv" xml:space="preserve">
+    <value>Eksportuj CSV</value>
+  </data>
+  <data name="Badges" xml:space="preserve">
+    <value>Odznaki</value>
+  </data>
+  <data name="TagCloud" xml:space="preserve">
+    <value>Chmura tagów</value>
+  </data>
+  <data name="NoTags" xml:space="preserve">
+    <value>Brak tagów.</value>
+  </data>
+  <data name="BadgeProfileStarter" xml:space="preserve">
+    <value>Start profilu</value>
+  </data>
+  <data name="BadgeCvCreator" xml:space="preserve">
+    <value>Twórca CV</value>
+  </data>
+  <data name="BadgePublisher" xml:space="preserve">
+    <value>Publikujący</value>
+  </data>
+  <data name="BadgeLikedAuthor" xml:space="preserve">
+    <value>Lubiany autor</value>
+  </data>
+  <data name="BadgeRecruiter" xml:space="preserve">
+    <value>Rekruter</value>
+  </data>
+  <data name="ImageTooLarge" xml:space="preserve">
+    <value>Obraz nie może przekraczać 5 MB.</value>
+  </data>
+  <data name="ImageUploadFailed" xml:space="preserve">
+    <value>Przesyłanie nie powiodło się. Wklej adres HTTPS.</value>
+  </data>
+  <data name="UploadImage" xml:space="preserve">
+    <value>Prześlij obraz</value>
+  </data>
+  <data name="Uploading" xml:space="preserve">
+    <value>Przesyłanie…</value>
+  </data>
+  <data name="ConcurrencyReloadHint" xml:space="preserve">
+    <value>Ten rekord uległ zmianie — odśwież i spróbuj ponownie.</value>
+  </data>
+  <data name="Attr.Me.BirthDate" xml:space="preserve">
+    <value>Data urodzenia</value>
+  </data>
+  <data name="Attr.Me.Name" xml:space="preserve">
+    <value>Imię i nazwisko</value>
+  </data>
+  <data name="Attr.Me.Phone" xml:space="preserve">
+    <value>Telefon</value>
+  </data>
+  <data name="Attr.Me.City" xml:space="preserve">
+    <value>Miasto</value>
+  </data>
+  <data name="Attr.Me.Photo" xml:space="preserve">
+    <value>Zdjęcie</value>
+  </data>
+  <data name="Attr.Me.About" xml:space="preserve">
+    <value>O mnie</value>
+  </data>
+  <data name="Attr.IELTS Band" xml:space="preserve">
+    <value>IELTS Band</value>
+  </data>
+  <data name="Attributes" xml:space="preserve">
+    <value>Atrybuty</value>
+  </data>
+  <data name="AttributeCatalog" xml:space="preserve">
+    <value>Katalog atrybutów</value>
+  </data>
+  <data name="AttributeCatalogSubtitle" xml:space="preserve">
+    <value>Zarządzaj wspólnymi atrybutami profilu</value>
+  </data>
+  <data name="NewAttribute" xml:space="preserve">
+    <value>Nowy atrybut</value>
+  </data>
+  <data name="Category" xml:space="preserve">
+    <value>Kategoria</value>
+  </data>
+  <data name="Type" xml:space="preserve">
+    <value>Typ</value>
+  </data>
+  <data name="DataType" xml:space="preserve">
+    <value>Typ danych</value>
+  </data>
+  <data name="SelectedCount" xml:space="preserve">
+    <value>Wybrano: {0}</value>
+  </data>
+  <data name="DeleteSelected" xml:space="preserve">
+    <value>Usuń wybrane</value>
+  </data>
+  <data name="DropdownOptionsHint" xml:space="preserve">
+    <value>Dodaj wartości, które użytkownicy będą mogli wybrać.</value>
+  </data>
+  <data name="Choice" xml:space="preserve">
+    <value>Wartość</value>
+  </data>
+  <data name="AddChoice" xml:space="preserve">
+    <value>Dodaj wartość</value>
+  </data>
+  <data name="NumericOptionsHint" xml:space="preserve">
+    <value>Opcjonalnie ogranicz dozwolony zakres liczb.</value>
+  </data>
+  <data name="Minimum" xml:space="preserve">
+    <value>Minimum</value>
+  </data>
+  <data name="Maximum" xml:space="preserve">
+    <value>Maksimum</value>
+  </data>
+  <data name="TextOptionsHint" xml:space="preserve">
+    <value>Opcjonalnie ogranicz długość lub wymagany format.</value>
+  </data>
+  <data name="MaximumLength" xml:space="preserve">
+    <value>Maksymalna długość</value>
+  </data>
+  <data name="RegularExpression" xml:space="preserve">
+    <value>Wyrażenie regularne</value>
+  </data>
+  <data name="OptionsObjectRequired" xml:space="preserve">
+    <value>Opcje muszą być obiektem JSON.</value>
+  </data>
+  <data name="OptionsJsonInvalid" xml:space="preserve">
+    <value>Istniejące opcje nie są poprawnym JSON-em.</value>
+  </data>
+  <data name="LoginToApply" xml:space="preserve">
+    <value>Zaloguj się, aby aplikować</value>
+  </data>
+  <data name="PublicPositions" xml:space="preserve">
+    <value>Publiczne stanowiska</value>
+  </data>
+  <data name="PublishedCvs" xml:space="preserve">
+    <value>Opublikowane CV</value>
+  </data>
+  <data name="NewCvsLast24Hours" xml:space="preserve">
+    <value>Nowe CV w ciągu ostatnich 24 godzin</value>
+  </data>
+  <data name="PositionTemplates" xml:space="preserve"><value>Szablony stanowisk</value></data>
+  <data name="PositionTemplatesSubtitle" xml:space="preserve"><value>Twórz i używaj wspólnych wzorców stanowisk</value></data>
+  <data name="NewTemplate" xml:space="preserve"><value>Nowy szablon</value></data>
+  <data name="EditTemplate" xml:space="preserve"><value>Edytuj szablon</value></data>
+  <data name="TemplateContents" xml:space="preserve"><value>Zawartość szablonu</value></data>
+  <data name="TemplateAttributeCount" xml:space="preserve"><value>Atrybuty: {0}</value></data>
+  <data name="TemplateRuleCount" xml:space="preserve"><value>Reguły dostępu: {0}</value></data>
+  <data name="CreatePositionFromTemplate" xml:space="preserve"><value>Utwórz stanowisko z szablonu</value></data>
+  <data name="SaveAsTemplate" xml:space="preserve"><value>Zapisz jako szablon</value></data>
+  <data name="TemplateSaved" xml:space="preserve"><value>Szablon zapisany</value></data>
+  <data name="NoTemplates" xml:space="preserve"><value>Brak szablonów stanowisk.</value></data>
+  <data name="Active" xml:space="preserve"><value>Aktywny</value></data>
+  <data name="DeleteTemplate" xml:space="preserve"><value>Usuń szablon</value></data>
+  <data name="DeleteTemplateConfirm" xml:space="preserve"><value>Usunąć ten szablon stanowiska?</value></data>
+  <data name="DeleteTemplates" xml:space="preserve"><value>Usuń szablony</value></data>
+  <data name="DeleteTemplatesConfirm" xml:space="preserve"><value>Usunąć {0} wybranych szablonów stanowisk?</value></data>
+  <data name="TemplatesDeleted" xml:space="preserve"><value>Usunięto szablonów stanowisk: {0}.</value></data>
+  <data name="TemplateDeleted" xml:space="preserve"><value>Szablon usunięty</value></data>
 </root>

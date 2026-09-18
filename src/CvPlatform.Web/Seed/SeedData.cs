@@ -1,6 +1,9 @@
 using CvPlatform.Core.Data;
 using CvPlatform.Core.Entities;
 using CvPlatform.Core.Enums;
+using CvPlatform.Application.Profiles;
+using CvPlatform.Application.Authorization;
+using CvPlatform.Web.Configuration;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
@@ -10,9 +13,12 @@ public static class SeedData
 {
     public const string AdminEmail = "admin@cvplatform.local";
     public const string AdminRole = "Admin";
+    public const string RecruiterRole = "Recruiter";
+    public const string CandidateRole = Roles.Candidate;
     public const string DemoCandidateEmail = "candidate@cvplatform.local";
+    public const string DemoRecruiterEmail = "recruiter@cvplatform.local";
 
-    public static async Task SeedAsync(IServiceProvider services, IConfiguration config)
+    public static async Task SeedAsync(IServiceProvider services, SeedOptions options)
     {
         using var scope = services.CreateScope();
         var sp = scope.ServiceProvider;
@@ -20,18 +26,39 @@ public static class SeedData
         var roles = sp.GetRequiredService<RoleManager<IdentityRole<Guid>>>();
         if (!await roles.RoleExistsAsync(AdminRole))
             await roles.CreateAsync(new IdentityRole<Guid>(AdminRole));
+        if (!await roles.RoleExistsAsync(RecruiterRole))
+            await roles.CreateAsync(new IdentityRole<Guid>(RecruiterRole));
+        if (!await roles.RoleExistsAsync(CandidateRole))
+            await roles.CreateAsync(new IdentityRole<Guid>(CandidateRole));
 
         var users = sp.GetRequiredService<UserManager<ApplicationUser>>();
         var factory = sp.GetRequiredService<IAppDbContextFactory>();
 
-        await EnsureUserAsync(users, factory, AdminEmail, config["Seed:AdminPassword"], [AdminRole]);
-        await EnsureUserAsync(users, factory, DemoCandidateEmail, config["Seed:DemoPassword"], []);
+        await EnsureUserAsync(users, factory, AdminEmail, options.AdminPassword, [AdminRole, RecruiterRole]);
+        await EnsureUserAsync(users, factory, DemoCandidateEmail, options.DemoPassword, [CandidateRole]);
+        await EnsureUserAsync(users, factory, DemoRecruiterEmail, options.DemoPassword, [RecruiterRole]);
+        await EnsureCandidateRolesAsync(users);
 
         await using var db = factory.CreateDbContext();
         await EnsureCategoriesAsync(db);
         await EnsureAttributesAsync(db);
         await EnsureDemoPositionAsync(db);
+        await EnsureRestrictedPositionAsync(db);
+        await EnsureDemoCandidateValuesAsync(db);
+        await EnsureDemoCvAsync(db);
         await db.SaveChangesAsync();
+    }
+
+    private static async Task EnsureCandidateRolesAsync(UserManager<ApplicationUser> users)
+    {
+        var allUsers = await users.Users.ToListAsync();
+        foreach (var user in allUsers)
+        {
+            if (await users.IsInRoleAsync(user, AdminRole) || await users.IsInRoleAsync(user, RecruiterRole))
+                continue;
+            if (!await users.IsInRoleAsync(user, CandidateRole))
+                await users.AddToRoleAsync(user, CandidateRole);
+        }
     }
 
     private static async Task EnsureUserAsync(
@@ -79,6 +106,7 @@ public static class SeedData
         var categories = await db.AttributeCategories.ToDictionaryAsync(c => c.Name, c => c.Id);
         var defs = new (string Name, string Category, AttributeDataType Type, bool BuiltIn, string? Options)[]
         {
+            (ProfileAttributeNames.Name, "Me", AttributeDataType.String, true, null),
             ("Me.BirthDate", "Me", AttributeDataType.Date, true, null),
             ("Me.Phone", "Me", AttributeDataType.String, true, null),
             ("Me.City", "Me", AttributeDataType.String, true, null),
@@ -116,6 +144,97 @@ public static class SeedData
                 Level = "Senior",
                 IsPublic = true,
                 MaxProjects = 3,
+            });
+        await db.SaveChangesAsync();
+    }
+
+    private static async Task EnsureRestrictedPositionAsync(IAppDbContext db)
+    {
+        const string title = "Senior .NET Developer (EU Only)";
+        if (await db.Positions.AnyAsync(p => p.Title == title))
+            return;
+        var ownerId = await db.Users.Where(u => u.Email == AdminEmail).Select(u => u.Id).SingleAsync();
+        var cityId = await db.AttributeDefinitions
+            .Where(d => d.Name == "Me.City")
+            .Select(d => d.Id)
+            .SingleAsync();
+        var positionId = Guid.NewGuid();
+        db.Positions.Add(new Position
+        {
+            Id = positionId,
+            OwnerId = ownerId,
+            Title = title,
+            ShortDescription = "Demo restricted position: only candidates located in Warsaw may apply.",
+            Company = "Demo Corp",
+            Level = "Senior",
+            IsPublic = false,
+            MaxProjects = 3,
+            Attributes =
+            [
+                new PositionAttribute
+                {
+                    PositionId = positionId,
+                    AttributeDefinitionId = cityId,
+                    IsRequired = true,
+                    SortOrder = 0,
+                },
+            ],
+            AccessRules =
+            [
+                new AccessRule
+                {
+                    Id = Guid.NewGuid(),
+                    PositionId = positionId,
+                    AttributeDefinitionId = cityId,
+                    DataType = AttributeDataType.String,
+                    Operator = RuleOperator.Equals,
+                    ComparisonValue = "Warsaw",
+                },
+            ],
+        });
+        await db.SaveChangesAsync();
+    }
+
+    private static async Task EnsureDemoCandidateValuesAsync(IAppDbContext db)
+    {
+        var profileId = await db.Profiles
+            .Where(p => p.User.Email == DemoCandidateEmail)
+            .Select(p => p.Id)
+            .SingleAsync();
+        var cityId = await db.AttributeDefinitions
+            .Where(d => d.Name == "Me.City")
+            .Select(d => d.Id)
+            .SingleAsync();
+        if (!await db.ProfileAttributeValues.AnyAsync(
+                v => v.ProfileId == profileId && v.AttributeDefinitionId == cityId))
+            db.ProfileAttributeValues.Add(new ProfileAttributeValue
+            {
+                Id = Guid.NewGuid(),
+                ProfileId = profileId,
+                AttributeDefinitionId = cityId,
+                StringValue = "Warsaw",
+            });
+        await db.SaveChangesAsync();
+    }
+
+    private static async Task EnsureDemoCvAsync(IAppDbContext db)
+    {
+        var profileId = await db.Profiles
+            .Where(p => p.User.Email == DemoCandidateEmail)
+            .Select(p => p.Id)
+            .SingleAsync();
+        var positionId = await db.Positions
+            .Where(p => p.Title == "Senior .NET Developer")
+            .Select(p => p.Id)
+            .SingleAsync();
+        if (!await db.Cvs.AnyAsync(c => c.ProfileId == profileId && c.PositionId == positionId))
+            db.Cvs.Add(new Cv
+            {
+                Id = Guid.NewGuid(),
+                ProfileId = profileId,
+                PositionId = positionId,
+                CreatedAt = DateTime.UtcNow,
+                Status = CvStatus.Draft,
             });
         await db.SaveChangesAsync();
     }

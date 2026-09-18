@@ -23,21 +23,24 @@
         <MudAlert Severity="Severity.Error" Class="mb-4">@StatusMessage</MudAlert>
     }
 
-    <EditForm Model="Input" method="post" OnValidSubmit="LoginUser" FormName="login" novalidate>
+    <EditForm Model="Input" method="post" OnValidSubmit="LoginUser" FormName="login">
         <DataAnnotationsValidator />
         <ValidationSummary />
-        <MudTextField T="string" Label="@L["Email"]" @bind-Value="Input.Email" For="() => Input.Email"
-                      UserAttributes="@EmailAttributes"
-                      Variant="Variant.Outlined" Class="mb-3" />
-        <MudTextField T="string" Label="@L["Password"]" @bind-Value="Input.Password" For="() => Input.Password"
-                      UserAttributes="@CurrentPasswordAttributes"
-                      Variant="Variant.Outlined" InputType="InputType.Password" Class="mb-3" />
+        <div class="cv-field">
+            <label class="cv-label" for="login-email">@L["Email"]</label>
+            <InputText id="login-email" class="cv-input" @bind-Value="Input!.Email" autocomplete="username" />
+            <ValidationMessage class="cv-validation" For="() => Input!.Email" />
+        </div>
+        <div class="cv-field">
+            <label class="cv-label" for="login-password">@L["Password"]</label>
+            <InputText id="login-password" type="password" class="cv-input" @bind-Value="Input!.Password" autocomplete="current-password" />
+            <ValidationMessage class="cv-validation" For="() => Input!.Password" />
+        </div>
         <label class="cv-remember">
-            <InputCheckbox @bind-Value="Input.RememberMe" />
+            <InputCheckbox @bind-Value="Input!.RememberMe" />
             <span>@L["RememberMe"]</span>
         </label>
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Class="mt-4"
-                   ButtonType="ButtonType.Submit">@L["Login"]</MudButton>
+        <button type="submit" class="cv-submit">@L["Login"]</button>
     </EditForm>
 
     @if (_externalLogins.Count > 0)
@@ -64,9 +67,8 @@
     [CascadingParameter]
     private HttpContext HttpContext { get; set; } = default!;
 
-    [SupplyParameterFromForm]
-    private InputModel Input { get => _input ??= new(); set => _input = value; }
-    private InputModel? _input;
+    [SupplyParameterFromForm(FormName = "login")]
+    private InputModel? Input { get; set; }
 
     [SupplyParameterFromQuery]
     private string? ReturnUrl { get; set; }
@@ -76,19 +78,22 @@
 
     private string? StatusMessage;
     private IList<AuthenticationScheme> _externalLogins = [];
-    private static readonly Dictionary<string, object> EmailAttributes =
-        new Dictionary<string, object> { ["autocomplete"] = "username" };
-    private static readonly Dictionary<string, object> CurrentPasswordAttributes =
-        new Dictionary<string, object> { ["autocomplete"] = "current-password" };
 
     protected override async Task OnInitializedAsync()
     {
+        Input ??= new();
+
         if (!string.IsNullOrEmpty(Error))
             StatusMessage = Error switch
             {
                 "noemail" => L["ExternalNoEmail"],
                 "createfailed" => L["ExternalCreateFailed"],
-                _ => L["ExternalLoginFailed", Error],
+                "externallinkrequired" => L["ExternalLinkRequired"],
+                "providerunavailable" or "providererror" => L["ExternalLoginUnavailable"],
+                "lockedout" => L["AccountLockedOut"],
+                "twofactor" => L["TwoFactorRequired"],
+                "notallowed" => L["ExternalLoginNotAllowed"],
+                _ => L["ExternalLoginUnavailable"],
             };
 
         if (HttpMethods.IsGet(HttpContext.Request.Method))
@@ -100,14 +105,19 @@
 
     private async Task LoginUser()
     {
-        var result = await SignInManager.PasswordSignInAsync(Input.Email, Input.Password, Input.RememberMe, lockoutOnFailure: false);
+        var result = await SignInManager.PasswordSignInAsync(Input!.Email, Input!.Password, Input!.RememberMe, lockoutOnFailure: false);
         if (result.Succeeded)
         {
             Navigation.NavigateTo(RedirectUrlHelper.SafeReturnUrl(ReturnUrl));
         }
+        else if (result.IsNotAllowed)
+        {
+            Input!.Password = string.Empty;
+            StatusMessage = L["EmailNotConfirmed"];
+        }
         else
         {
-            Input.Password = string.Empty;
+            Input!.Password = string.Empty;
             StatusMessage = L["InvalidCredentials"];
         }
     }

@@ -1,4 +1,4 @@
-@page "/Profile/Projects"
+@page "/profile/projects"
 @attribute [Authorize]
 @using CvPlatform.Application.Common
 @using CvPlatform.Application.Authorization
@@ -28,22 +28,23 @@
 @if (_error is not null)
 {
     <EmptyState Icon="@Icons.Material.Filled.ErrorOutline" Title="@L["LoadFailed"]" Description="@_error">
-        <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="@(async () => await LoadPageAsync(1))">@L["Retry"]</MudButton>
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="@(async () => { if (_grid is not null) await _grid.ReloadServerData(); })">@L["Retry"]</MudButton>
     </EmptyState>
 }
-else if (_page is { Items.Count: 0 })
+else
 {
-    <EmptyState Icon="@Icons.Material.Filled.FolderOpen" Title="@L["NoProjects"]" Description="@L["NoProjectsHint"]">
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
-                   OnClick="OpenCreateDialogAsync">@L["NewProject"]</MudButton>
-    </EmptyState>
-}
-else if (_page is not null)
-{
-    <MudPaper Class="cv-panel pa-2">
-        <MudDataGrid T="ProjectDto" Items="@_page.Items" ReadOnly Hover="true" Striped="true"
-                     Dense="true" class="cv-projects-grid">
-            <Columns>
+    <MudPaper Class="cv-panel cv-list-card pa-2">
+    <MudDataGrid T="ProjectDto" ServerData="LoadServerDataAsync" @ref="_grid" Class="cv-list-table cv-projects-grid" ReadOnly Hover="true" Striped="true"
+                 Dense="true" RowsPerPage="10" Loading="@_loading" MultiSelection="true"
+                 @bind-SelectedItems="_selected" RowClick="OnRowClick">
+        <ToolBarContent>
+            <MudText Typo="Typo.h6">@L["Projects"]</MudText>
+            <MudSpacer />
+            <MudButton Variant="Variant.Outlined" Color="Color.Error" Disabled="@(_selected.Count != 1)"
+                       OnClick="DeleteSelectedAsync">@L["Delete"]</MudButton>
+        </ToolBarContent>
+        <Columns>
+                <SelectColumn T="ProjectDto" />
                 <PropertyColumn Property="p => p.Name" Title="@L["Name"]" />
                 <TemplateColumn Title="@L["Period"]">
                     <CellTemplate>
@@ -67,41 +68,31 @@ else if (_page is not null)
                         }
                     </CellTemplate>
                 </TemplateColumn>
-                <TemplateColumn Title="" Sortable="false" Filterable="false">
-                    <CellTemplate>
-                        <MudStack Row Spacing="1" Justify="Justify.FlexEnd">
-                            <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary"
-                                           Disabled="@_loading" title="@L["EditProject"]"
-                                           OnClick="@(() => OpenEditDialogAsync(context.Item))" />
-                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
-                                           Disabled="@_loading" title="@L["DeleteProject"]"
-                                           OnClick="@(() => ConfirmDeleteAsync(context.Item))" />
-                        </MudStack>
-                    </CellTemplate>
-                </TemplateColumn>
-            </Columns>
+        </Columns>
+            <NoRecordsContent>
+                <MudStack AlignItems="AlignItems.Center" Class="pa-6">
+                    <MudIcon Icon="@Icons.Material.Filled.FolderOpen" Size="Size.Large" />
+                    <MudText Typo="Typo.h6">@L["NoProjects"]</MudText>
+                    <MudText Typo="Typo.body2">@L["NoProjectsHint"]</MudText>
+                </MudStack>
+            </NoRecordsContent>
+            <PagerContent>
+                <MudDataGridPager T="ProjectDto" />
+            </PagerContent>
         </MudDataGrid>
     </MudPaper>
-    <MudStack Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mt-2">
-        <MudSelect T="int" Value="@_pageSize" ValueChanged="@(async v => await HandlePageSizeChangedAsync(v))"
-                   Variant="Variant.Outlined" Style="max-width:110px">
-            <MudSelectItem Value="5">5</MudSelectItem>
-            <MudSelectItem Value="10">10</MudSelectItem>
-            <MudSelectItem Value="25">25</MudSelectItem>
-        </MudSelect>
-        <MudPagination Count="@Math.Max(1, _page.TotalPages)" Selected="@_page.Page"
-                       SelectedChanged="@(async p => { if (p is int n) await LoadPageAsync(n); })" />
-    </MudStack>
+}
 
 @code {
-    private PagedResult<ProjectDto>? _page;
+    private MudDataGrid<ProjectDto>? _grid;
     private bool _loading;
     private string? _error;
-    private int _pageSize = 10;
+    private HashSet<ProjectDto> _selected = [];
 
-    protected override async Task OnInitializedAsync() => await LoadPageAsync(1);
+    private Task OnRowClick(DataGridRowClickEventArgs<ProjectDto> args) =>
+        OpenEditDialogAsync(args.Item);
 
-    private async Task LoadPageAsync(int page)
+    private async Task<GridData<ProjectDto>> LoadServerDataAsync(GridState<ProjectDto> state, CancellationToken ct)
     {
         _loading = true;
         _error = null;
@@ -109,15 +100,18 @@ else if (_page is not null)
         {
             var actor = await GetActorAsync();
             var result = await ProjectService.ListForProfileAsync(
-                actor, actor.UserId, new PageRequest(page, _pageSize));
+                actor, actor.UserId, new PageRequest(state.Page + 1, state.PageSize), ct);
             if (!result.Succeeded)
             {
                 _error = result.Error.Message;
-                _page = null;
-                return;
+                return new GridData<ProjectDto>();
             }
 
-            _page = result.Value;
+            return new GridData<ProjectDto>
+            {
+                TotalItems = result.Value.TotalCount,
+                Items = result.Value.Items,
+            };
         }
         finally
         {
@@ -125,18 +119,12 @@ else if (_page is not null)
         }
     }
 
-    private async Task HandlePageSizeChangedAsync(int pageSize)
-    {
-        _pageSize = pageSize;
-        await LoadPageAsync(1);
-    }
-
     private async Task OpenCreateDialogAsync()
     {
         var dialog = await DialogService.ShowAsync<ProjectEditDialog>(title: L["NewProject"]);
         var result = await dialog.Result;
-        if (result is { Canceled: false, Data: ProjectDto })
-            await RefreshCurrentPageAsync();
+        if (result is { Canceled: false, Data: ProjectDto } && _grid is not null)
+            await _grid.ReloadServerData();
     }
 
     private async Task OpenEditDialogAsync(ProjectDto project)
@@ -147,17 +135,17 @@ else if (_page is not null)
         };
         var dialog = await DialogService.ShowAsync<ProjectEditDialog>(title: L["EditProject"], parameters: parameters);
         var result = await dialog.Result;
-        if (result is { Canceled: false, Data: ProjectDto })
-            await RefreshCurrentPageAsync();
+        if (result is { Canceled: false, Data: ProjectDto } && _grid is not null)
+            await _grid.ReloadServerData();
     }
 
     private async Task ConfirmDeleteAsync(ProjectDto project)
     {
-        var parameters = new DialogParameters
+        var parameters = new DialogParameters<ConfirmDialog>
         {
-            [nameof(ConfirmDialog.ContentText)] = L["DeleteProjectConfirm"],
-            [nameof(ConfirmDialog.YesText)] = L["Delete"],
-            [nameof(ConfirmDialog.NoText)] = L["Cancel"],
+            { dialog => dialog.ContentText, L["DeleteProjectConfirm"].Value },
+            { dialog => dialog.YesText, L["Delete"].Value },
+            { dialog => dialog.NoText, L["Cancel"].Value },
         };
         var dialog = await DialogService.ShowAsync<ConfirmDialog>(title: L["DeleteProject"], parameters: parameters);
         var result = await dialog.Result;
@@ -169,7 +157,8 @@ else if (_page is not null)
         if (deleteResult.Succeeded)
         {
             Snackbar.Add(L["ProjectDeleted"], Severity.Success);
-            await RefreshCurrentPageAsync();
+            if (_grid is not null)
+                await _grid.ReloadServerData();
         }
         else
         {
@@ -177,12 +166,12 @@ else if (_page is not null)
         }
     }
 
-    private async Task RefreshCurrentPageAsync()
+    private async Task DeleteSelectedAsync()
     {
-        var currentPage = _page?.Page ?? 1;
-        if (_page is not null && _page.Items.Count == 1 && currentPage > 1)
-            currentPage--;
-        await LoadPageAsync(currentPage);
+        if (_selected.Count != 1)
+            return;
+        await ConfirmDeleteAsync(_selected.Single());
+        _selected.Clear();
     }
 
     private static string FormatPeriod(ProjectDto project) => project switch
@@ -196,10 +185,6 @@ else if (_page is not null)
     private async Task<ActorContext> GetActorAsync()
     {
         var authState = await AuthProvider.GetAuthenticationStateAsync();
-        return new ActorContext(
-            Guid.Parse(authState.User.FindFirstValue(ClaimTypes.NameIdentifier)!),
-            authState.User.IsInRole("Admin"));
+        return new ActorContext(Guid.Parse(authState.User.FindFirstValue(ClaimTypes.NameIdentifier)!), authState.User.IsInRole(Roles.Admin), authState.User.IsInRole(Roles.Recruiter) || authState.User.IsInRole(Roles.Admin));
     }
-}
-
 }

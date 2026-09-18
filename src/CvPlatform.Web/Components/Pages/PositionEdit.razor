@@ -1,0 +1,631 @@
+@page "/positions/new"
+@page "/positions/{Id:guid}"
+@attribute [Authorize(Roles = "Admin,Recruiter")]
+@implements IAsyncDisposable
+@using CvPlatform.Application.Authorization
+@using CvPlatform.Application.Attributes
+@using CvPlatform.Application.Common
+@using CvPlatform.Application.Positions
+@using CvPlatform.Application.PositionTemplates
+@using CvPlatform.Core.Access
+@using CvPlatform.Core.Enums
+@using CvPlatform.Web.Components.Shared
+@using CvPlatform.Web.Resources
+@using Microsoft.Extensions.Localization
+@using System.Security.Claims
+@inject IPositionService PositionService
+@inject IPositionTemplateService Templates
+@inject AuthenticationStateProvider AuthProvider
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+@inject IStringLocalizer<SharedResource> L
+
+<PageTitle>@(_isNew ? L["NewPosition"] : L["EditPosition"])</PageTitle>
+
+<PageHeader Title="@(_isNew ? L["NewPosition"] : L["EditPosition"])" Subtitle="@L["PositionEditSubtitle"]"
+            Icon="@Icons.Material.Filled.Work">
+    @if (!_isNew)
+    {
+        <MudChip T="string" Size="Size.Small" Color="@(_detail?.Position.IsPublic == true ? Color.Success : Color.Warning)"
+                 Text="@(_detail?.Position.IsPublic == true ? L["Public"] : L["Restricted"])" />
+        <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="SaveAsTemplateAsync">
+            @L["SaveAsTemplate"]
+        </MudButton>
+    }
+</PageHeader>
+
+@if (_loading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate Class="cv-page-loading" />
+}
+
+@if (_error is not null)
+{
+    <EmptyState Icon="@Icons.Material.Filled.ErrorOutline" Title="@L["LoadFailed"]" Description="@_error">
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="LoadAsync">@L["Retry"]</MudButton>
+    </EmptyState>
+}
+else
+{
+    <MudPaper Class="cv-panel pa-4 mb-4">
+        <MudText Typo="Typo.h6" Class="mb-3">@L["GeneralInfo"]</MudText>
+        <MudForm @ref="_form" Validations="@(new Dictionary<string, Func<object, string?>>())">
+            <MudGrid Spacing="3">
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="_title" Label="@L["PositionTitle"]" Variant="Variant.Outlined"
+                                  Required="true" RequiredError="@L["PositionTitleRequired"]" Immediate="false" />
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="_company" Label="@L["Company"]" Variant="Variant.Outlined" Immediate="false" />
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="_level" Label="@L["Level"]" Variant="Variant.Outlined" Immediate="false" />
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <MudNumericField @bind-Value="_maxProjects" Label="@L["MaxProjects"]" Min="0" Max="20"
+                                     Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="_shortDescription" Label="@L["Description"]" Lines="3"
+                                  Variant="Variant.Outlined" Immediate="false" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudSwitch @bind-Value="_isPublic" Label="@L["IsPublic"]" Color="Color.Primary" />
+                    <MudText Typo="Typo.caption" Class="mt-1">@L["IsPublicHint"]</MudText>
+                </MudItem>
+            </MudGrid>
+            <MudStack Row Spacing="1" Justify="Justify.FlexEnd" Class="mt-3">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Save"
+                           Disabled="@_saving" OnClick="SaveGeneralAsync">@L["Save"]</MudButton>
+            </MudStack>
+        </MudForm>
+    </MudPaper>
+
+    @if (_isNew)
+    {
+        <MudPaper Class="cv-panel pa-4 mb-4">
+            <MudText Typo="Typo.h6" Class="mb-1">@L["RequiredAttributes"]</MudText>
+            <MudText Typo="Typo.caption" Class="mb-3">@L["RequiredAttributesHint"]</MudText>
+            <MudStack Row AlignItems="AlignItems.End" Spacing="2" Class="mb-3">
+                <MudItem class="pa-0" xs="12" md="5" Style="flex:1 1 280px">
+                    <AttributePicker Label="@L["AddAttribute"]" Value="_pickedAttribute"
+                                     ValueChanged="@(d => _pickedAttribute = d)" />
+                </MudItem>
+                <MudSwitch @bind-Value="_newAttributeRequired" Label="@L["IsRequired"]" Color="Color.Primary" Class="mb-1" />
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                           Disabled="@(_pickedAttribute is null || _savingAttr)" OnClick="AddDraftAttribute">
+                    @L["Add"]
+                </MudButton>
+            </MudStack>
+            @if (_draftAttributes.Count == 0)
+            {
+                <MudText Typo="Typo.body2" Class="mt-2">@L["NoAttributes"]</MudText>
+            }
+            else
+            {
+                @foreach (var draft in _draftAttributes)
+                {
+                    <div class="cv-attribute-row">
+                        <MudStack Row Spacing="2" AlignItems="AlignItems.Center">
+                            <MudText Typo="Typo.body2" Class="cv-attribute-label">@AttributeLabels.Localize(L, draft.Definition.Name)</MudText>
+                            <MudChip T="string" Size="Size.Small" Text="@draft.Definition.DataType.ToString()" />
+                        </MudStack>
+                        <MudStack Row Spacing="0" AlignItems="AlignItems.Center">
+                            <MudSwitch T="bool" Value="draft.IsRequired" Color="Color.Primary"
+                                       ValueChanged="@(value => ToggleDraftRequired(draft, value))" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                           OnClick="@(() => RemoveDraftAttribute(draft))" />
+                        </MudStack>
+                    </div>
+                }
+            }
+        </MudPaper>
+    }
+
+    @if (_detail is not null && !_isNew)
+    {
+        <MudPaper Class="cv-panel pa-4 mb-4">
+            <MudText Typo="Typo.h6" Class="mb-1">@L["RequiredAttributes"]</MudText>
+            <MudText Typo="Typo.caption" Class="mb-3">@L["RequiredAttributesHint"]</MudText>
+            <MudStack Row AlignItems="AlignItems.End" Spacing="2" Class="mb-3">
+                <MudItem class="pa-0" xs="12" md="5" Style="flex:1 1 280px">
+                    <AttributePicker Label="@L["AddAttribute"]" Value="_pickedAttribute"
+                                     ValueChanged="@(d => _pickedAttribute = d)" />
+                </MudItem>
+                <MudSwitch @bind-Value="_newAttributeRequired" Label="@L["IsRequired"]" Color="Color.Primary" Class="mb-1" />
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                           Disabled="@(_pickedAttribute is null || _savingAttr)" OnClick="@(async () => await AddAttributeAsync())">
+                    @L["Add"]
+                </MudButton>
+            </MudStack>
+            @if (_detail!.Attributes.Count == 0)
+            {
+                <MudText Typo="Typo.body2" Class="mt-2">@L["NoAttributes"]</MudText>
+            }
+            else
+            {
+                @foreach (var attr in _detail.Attributes)
+                {
+                    var ruleCount = _detail.AccessRules.Count(r => r.AttributeDefinitionId == attr.AttributeDefinitionId);
+                    <div class="cv-attribute-row">
+                        <MudStack Row Spacing="2" AlignItems="AlignItems.Center">
+                            <MudText Typo="Typo.body2" Class="cv-attribute-label">@AttributeLabels.Localize(L, attr.Name)</MudText>
+                            <MudChip T="string" Size="Size.Small" Text="@attr.CategoryName" />
+                            <MudChip T="string" Size="Size.Small" Text="@attr.DataType.ToString()" />
+                        </MudStack>
+                        <MudStack Row Spacing="0" AlignItems="AlignItems.Center">
+                            <MudSwitch T="bool" Value="attr.IsRequired" Color="Color.Primary"
+                                       Disabled="@_savingAttr" title="@L["IsRequired"]"
+                                       ValueChanged="@(v => ToggleRequiredAsync(attr, v))" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                           Disabled="@_savingAttr" title="@L["Remove"]"
+                                           OnClick="@(() => RemoveAttributeAsync(attr))" />
+                        </MudStack>
+                    </div>
+                    @if (ruleCount > 0)
+                    {
+                        <MudText Typo="Typo.caption" Class="cv-attr-rule-hint">
+                            @string.Format(L["AttributeUsedByRules"], ruleCount)
+                        </MudText>
+                    }
+                }
+            }
+        </MudPaper>
+
+        <MudPaper Class="cv-panel pa-4">
+            <MudText Typo="Typo.h6" Class="mb-1">@L["AccessRules"]</MudText>
+            <MudText Typo="Typo.caption" Class="mb-3">@L["AccessRulesHint"]</MudText>
+            @if (_detail.Attributes.Count > 0)
+            {
+                <MudStack Row AlignItems="AlignItems.End" Spacing="2" Class="mb-3" Wrap="Wrap.Wrap">
+                    <MudSelect T="PositionAttributeDto" Value="_ruleAttribute" Label="@L["Attribute"]"
+                               Variant="Variant.Outlined" Class="cv-picker-wide"
+                               ValueChanged="@(async (PositionAttributeDto? attr) => { _ruleAttribute = attr; OnRuleAttributeChanged(); await InvokeAsync(StateHasChanged); })">
+                        @foreach (var attr in _detail.Attributes)
+                        {
+                            <MudSelectItem Value="attr">@AttributeLabels.Localize(L, attr.Name)</MudSelectItem>
+                        }
+                    </MudSelect>
+                    <MudSelect T="RuleOperator" @bind-Value="_ruleOperator" Label="@L["Operator"]"
+                               Variant="Variant.Outlined" Class="cv-picker-narrow">
+                        @foreach (var op in _ruleOperators)
+                        {
+                            <MudSelectItem Value="op">@OperatorLabel(op)</MudSelectItem>
+                        }
+                    </MudSelect>
+                    <MudTextField @bind-Value="_ruleComparison" Label="@L["ComparisonValue"]"
+                                  Variant="Variant.Outlined" Class="cv-picker-narrow"
+                                  Disabled="@(_ruleOperator is RuleOperator.IsTrue or RuleOperator.IsFalse)" />
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                               Disabled="@(_ruleAttribute is null || _savingRule)" OnClick="AddRuleAsync">@L["Add"]</MudButton>
+                </MudStack>
+            }
+            @if (_detail.AccessRules.Count == 0)
+            {
+                <MudText Typo="Typo.body2">@L["NoRules"]</MudText>
+            }
+            else
+            {
+                @foreach (var rule in _detail.AccessRules)
+                {
+                    <div class="cv-attribute-row">
+                        <MudStack Row Spacing="2" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap">
+                            <MudText Typo="Typo.body2" Class="cv-attribute-label">@AttributeLabels.Localize(L, rule.AttributeName)</MudText>
+                            <MudChip T="string" Size="Size.Small" Text="@OperatorLabel(rule.Operator)" />
+                            <MudText Typo="Typo.body2">@(string.IsNullOrWhiteSpace(rule.ComparisonValue) ? "—" : rule.ComparisonValue)</MudText>
+                        </MudStack>
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                       Disabled="@_savingRule" title="@L["Remove"]"
+                                       OnClick="@(async () => await RemoveRuleAsync(rule))" />
+                    </div>
+                }
+            }
+        </MudPaper>
+
+        @if (_detail is not null && !_isNew && Id.HasValue)
+        {
+            <div class="mt-4">
+                <DiscussionPanel PositionId="Id.Value" />
+            </div>
+        }
+    }
+}
+
+@code {
+    [Parameter] public Guid? Id { get; set; }
+
+    private MudForm? _form;
+    private PositionDetailDto? _detail;
+    private AttributeDefinitionDto? _pickedAttribute;
+    private PositionAttributeDto? _ruleAttribute;
+    private RuleOperator _ruleOperator;
+    private IReadOnlyList<RuleOperator> _ruleOperators = [];
+    private string? _ruleComparison;
+    private bool _isNew;
+    private bool _loading;
+    private bool _saving;
+    private bool _savingAttr;
+    private bool _savingRule;
+    private string? _error;
+    private string _title = "";
+    private string _shortDescription = "";
+    private string? _company;
+    private string? _level;
+    private bool _isPublic;
+    private int _maxProjects = 3;
+    private bool _newAttributeRequired;
+    private readonly List<DraftAttribute> _draftAttributes = [];
+
+    private sealed record DraftAttribute(AttributeDefinitionDto Definition, bool IsRequired);
+
+    protected override async Task OnInitializedAsync()
+    {
+        _isNew = Id is null;
+        _ruleOperator = RuleOperator.Equals;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        if (_isNew)
+            return;
+
+        _loading = true;
+        _error = null;
+        try
+        {
+            var actor = await GetActorAsync();
+            var result = await PositionService.GetForEditAsync(actor, Id!.Value);
+            if (!result.Succeeded || result.Value is null)
+            {
+                _error = result.Succeeded ? L["NotFoundGeneric"].Value : result.Error.Message;
+                return;
+            }
+
+            _detail = result.Value;
+            var p = _detail.Position;
+            _title = p.Title;
+            _shortDescription = p.ShortDescription;
+            _company = p.Company;
+            _level = p.Level;
+            _isPublic = p.IsPublic;
+            _maxProjects = p.MaxProjects;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task SaveGeneralAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_title))
+            return;
+
+        _saving = true;
+        try
+        {
+            var actor = await GetActorAsync();
+            var input = new PositionInput(
+                _title, _shortDescription, _company, _level, _isPublic, _maxProjects,
+                _detail?.Position.Version,
+                _isNew
+                    ? _draftAttributes.Select((draft, index) => new AttributeRequirementInput(
+                        draft.Definition.Id, draft.IsRequired, index)).ToArray()
+                    : null);
+
+            if (_isNew)
+            {
+                var created = await PositionService.CreateAsync(actor, input);
+                if (!created.Succeeded || created.Value is null)
+                {
+                    Snackbar.Add(created.Succeeded ? L["SaveFailed"].Value : created.Error.Message, Severity.Error);
+                    return;
+                }
+
+                Snackbar.Add(L["PositionSaved"], Severity.Success);
+                Navigation.NavigateTo("/positions");
+            }
+            else
+            {
+                var updated = await PositionService.UpdateAsync(actor, Id!.Value, input);
+                if (updated.Succeeded)
+                {
+                    Snackbar.Add(L["PositionSaved"], Severity.Success);
+                    await LoadAsync();
+                }
+                else if (updated.Error.Code == ErrorCodes.ConcurrencyConflict)
+                {
+                    await ShowConcurrencyDialogAsync();
+                }
+                else
+                {
+                    Snackbar.Add(updated.Error.Message, Severity.Error);
+                }
+            }
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task SaveAsTemplateAsync()
+    {
+        if (Id is null)
+            return;
+        var actor = await GetActorAsync();
+        var result = await Templates.SaveFromPositionAsync(actor, Id.Value, $"{_title} template");
+        if (result.Succeeded)
+            Snackbar.Add(L["TemplateSaved"], Severity.Success);
+        else
+            Snackbar.Add(result.Error.Message, Severity.Error);
+    }
+
+    private async Task ShowConcurrencyDialogAsync()
+    {
+        var dialog = await DialogService.ShowAsync<ConcurrencyDialog>("Concurrency conflict");
+        if ((await dialog.Result) is { Canceled: false, Data: true })
+            await LoadAsync();
+    }
+
+    private async Task AddRuleAsync()
+    {
+        if (_ruleAttribute is null || _savingRule || _detail is null)
+            return;
+
+        var definition = ToDefinition(_ruleAttribute);
+        var error = AttributeValueRules.ValidateComparison(
+            definition, _ruleOperator, _ruleComparison);
+        if (error is not null)
+        {
+            Snackbar.Add(error, Severity.Error);
+            return;
+        }
+
+        _savingRule = true;
+        try
+        {
+            var actor = await GetActorAsync();
+            var input = new AccessRuleInput(
+                _ruleAttribute.AttributeDefinitionId, _ruleOperator, _ruleComparison?.Trim(),
+                null, _detail.Position.Version);
+            var result = await PositionService.SaveRuleAsync(actor, Id!.Value, input);
+            if (result.Succeeded)
+            {
+                _ruleAttribute = null;
+                _ruleOperator = RuleOperator.Equals;
+                _ruleComparison = null;
+                await LoadAsync();
+            }
+            else if (result.Error.Code == ErrorCodes.ConcurrencyConflict)
+            {
+                await ShowConcurrencyDialogAsync();
+            }
+            else
+            {
+                Snackbar.Add(result.Error.Message, Severity.Error);
+            }
+        }
+        finally
+        {
+            _savingRule = false;
+        }
+    }
+
+    private async Task RemoveRuleAsync(AccessRuleDto rule)
+    {
+        if (_savingRule || _detail is null)
+            return;
+
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { dialog => dialog.ContentText, L["RemoveRuleConfirm"].Value },
+            { dialog => dialog.YesText, L["Remove"].Value },
+            { dialog => dialog.NoText, L["Cancel"].Value },
+        };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>(title: L["RemoveRule"], parameters: parameters);
+        if (await dialog.Result is { Canceled: true } or { Data: not true })
+            return;
+
+        _savingRule = true;
+        try
+        {
+            var actor = await GetActorAsync();
+            var result = await PositionService.RemoveRuleAsync(
+                actor, Id!.Value, rule.Id, _detail.Position.Version);
+            if (result.Succeeded)
+            {
+                Snackbar.Add(L["RuleRemoved"], Severity.Success);
+                await LoadAsync();
+            }
+            else if (result.Error.Code == ErrorCodes.ConcurrencyConflict)
+            {
+                await ShowConcurrencyDialogAsync();
+            }
+            else
+            {
+                Snackbar.Add(result.Error.Message, Severity.Error);
+            }
+        }
+        finally
+        {
+            _savingRule = false;
+        }
+    }
+
+    private void OnRuleAttributeChanged()
+    {
+        if (_ruleAttribute is null)
+            return;
+
+        var allowed = RuleOperatorCatalog.For(_ruleAttribute.DataType);
+        _ruleOperators = allowed;
+        if (!allowed.Contains(_ruleOperator))
+            _ruleOperator = allowed.FirstOrDefault();
+    }
+
+    private static string OperatorLabel(RuleOperator op) => op switch
+    {
+        RuleOperator.Equals => "==",
+        RuleOperator.NotEquals => "!=",
+        RuleOperator.Contains => "contains",
+        RuleOperator.GreaterThan => ">",
+        RuleOperator.LessThan => "<",
+        RuleOperator.On => "on",
+        RuleOperator.Before => "before",
+        RuleOperator.After => "after",
+        RuleOperator.StartedBefore => "started before",
+        RuleOperator.StartedAfter => "started after",
+        RuleOperator.IsTrue => "is true",
+        RuleOperator.IsFalse => "is false",
+        _ => op.ToString(),
+    };
+
+    private static AttributeDefinition ToDefinition(PositionAttributeDto attr) => new()
+    {
+        Id = attr.AttributeDefinitionId,
+        Name = attr.Name,
+        DataType = attr.DataType,
+        CategoryId = Guid.Empty,
+        IsBuiltIn = false,
+    };
+
+    private async Task<ActorContext> GetActorAsync()
+    {
+        var authState = await AuthProvider.GetAuthenticationStateAsync();
+        return new ActorContext(Guid.Parse(authState.User.FindFirstValue(ClaimTypes.NameIdentifier)!), authState.User.IsInRole(Roles.Admin), authState.User.IsInRole(Roles.Recruiter) || authState.User.IsInRole(Roles.Admin));
+    }
+
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+
+    private async Task AddAttributeAsync()
+    {
+        if (_pickedAttribute is null || _savingAttr || _detail is null)
+            return;
+
+        _savingAttr = true;
+        try
+        {
+            var actor = await GetActorAsync();
+            var input = new PositionAttributeInput(
+                _pickedAttribute.Id, _newAttributeRequired, null, _detail.Position.Version);
+            var result = await PositionService.SaveAttributeAsync(actor, Id!.Value, input);
+            if (result.Succeeded)
+            {
+                _pickedAttribute = null;
+                _newAttributeRequired = false;
+                await LoadAsync();
+            }
+            else if (result.Error.Code == ErrorCodes.ConcurrencyConflict)
+            {
+                await ShowConcurrencyDialogAsync();
+            }
+            else
+            {
+                Snackbar.Add(result.Error.Message, Severity.Error);
+            }
+        }
+        finally
+        {
+            _savingAttr = false;
+        }
+    }
+
+    private void AddDraftAttribute()
+    {
+        if (_pickedAttribute is null || _draftAttributes.Any(a => a.Definition.Id == _pickedAttribute.Id))
+            return;
+
+        _draftAttributes.Add(new DraftAttribute(_pickedAttribute, _newAttributeRequired));
+        _pickedAttribute = null;
+        _newAttributeRequired = false;
+    }
+
+    private void RemoveDraftAttribute(DraftAttribute draft) => _draftAttributes.Remove(draft);
+
+    private void ToggleDraftRequired(DraftAttribute draft, bool value)
+    {
+        var index = _draftAttributes.IndexOf(draft);
+        if (index >= 0)
+            _draftAttributes[index] = draft with { IsRequired = value };
+    }
+
+    private async Task ToggleRequiredAsync(PositionAttributeDto attr, bool isRequired)
+    {
+        if (_savingAttr || _detail is null)
+            return;
+
+        _savingAttr = true;
+        try
+        {
+            var actor = await GetActorAsync();
+            var input = new PositionAttributeInput(
+                attr.AttributeDefinitionId, isRequired, null, _detail.Position.Version);
+            var result = await PositionService.SaveAttributeAsync(actor, Id!.Value, input);
+            if (result.Succeeded)
+            {
+                await LoadAsync();
+            }
+            else if (result.Error.Code == ErrorCodes.ConcurrencyConflict)
+            {
+                await ShowConcurrencyDialogAsync();
+            }
+            else
+            {
+                Snackbar.Add(result.Error.Message, Severity.Error);
+            }
+        }
+        finally
+        {
+            _savingAttr = false;
+        }
+    }
+
+    private async Task RemoveAttributeAsync(PositionAttributeDto attr)
+    {
+        if (_savingAttr || _detail is null)
+            return;
+
+        var ruleCount = _detail.AccessRules.Count(r => r.AttributeDefinitionId == attr.AttributeDefinitionId);
+        var confirmText = ruleCount > 0
+            ? $"{string.Format(L["AttributeUsedByRules"].Value, ruleCount)} {L["RemoveAttributeConfirm"].Value}"
+            : L["RemoveAttributeConfirm"].Value;
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { dialog => dialog.ContentText, confirmText },
+            { dialog => dialog.YesText, L["Remove"].Value },
+            { dialog => dialog.NoText, L["Cancel"].Value },
+        };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>(title: L["RemoveAttribute"], parameters: parameters);
+        if (await dialog.Result is { Canceled: true } or { Data: not true })
+            return;
+
+        _savingAttr = true;
+        try
+        {
+            var actor = await GetActorAsync();
+            var result = await PositionService.RemoveAttributeAsync(
+                actor, Id!.Value, attr.AttributeDefinitionId, _detail.Position.Version);
+            if (result.Succeeded)
+            {
+                Snackbar.Add(L["AttributeRemoved"], Severity.Success);
+                await LoadAsync();
+            }
+            else if (result.Error.Code == ErrorCodes.ConcurrencyConflict)
+            {
+                await ShowConcurrencyDialogAsync();
+            }
+            else
+            {
+                Snackbar.Add(result.Error.Message, Severity.Error);
+            }
+        }
+        finally
+        {
+            _savingAttr = false;
+        }
+    }
+
+}

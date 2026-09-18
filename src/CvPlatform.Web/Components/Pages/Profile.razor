@@ -1,4 +1,4 @@
-@page "/Profile"
+@page "/profile"
 @attribute [Authorize]
 @implements IAsyncDisposable
 @using CvPlatform.Application.Attributes
@@ -6,8 +6,12 @@
 @using CvPlatform.Application.Common
 @using CvPlatform.Application.Profiles
 @using CvPlatform.Core.Enums
+@using CvPlatform.Core.Entities
 @using CvPlatform.Web.Components.Shared
 @using CvPlatform.Web.Resources
+@using CvPlatform.Web.State
+@using Microsoft.AspNetCore.Authentication
+@using Microsoft.AspNetCore.Identity
 @using Microsoft.Extensions.Localization
 @using System.Security.Claims
 @inject IProfileService ProfileService
@@ -15,10 +19,24 @@
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 @inject IStringLocalizer<SharedResource> L
+@inject ProfileHeaderState ProfileHeader
+@inject SignInManager<ApplicationUser> SignIn
 
 <PageTitle>@L["Profile"]</PageTitle>
 
-<PageHeader Title="@L["Profile"]" Subtitle="@L["ProfileSubtitle"]" Icon="@Icons.Material.Filled.Person" />
+<PageHeader Title="@L["Profile"]" Subtitle="@L["ProfileSubtitle"]" Icon="@Icons.Material.Filled.Person">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Save"
+                   Disabled="@(!HasUnsavedChanges || _savingAll || _loading)" OnClick="SaveAllAsync">
+            @L["SaveAll"]@(_dirty.Count > 0 ? $" ({_dirty.Count})" : "")
+        </MudButton>
+        @foreach (var provider in _externalSchemes)
+        {
+            <MudButton Href="@($"/Account/LinkExternalLogin?provider={Uri.EscapeDataString(provider.Name)}&returnUrl=%2Fprofile")"
+                       Variant="Variant.Outlined" Color="Color.Primary">
+                @L["LinkExternalProvider", provider.DisplayName ?? provider.Name]
+            </MudButton>
+        }
+    </PageHeader>
 
 @if (_loading)
 {
@@ -31,40 +49,73 @@
         <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="LoadAsync">@L["Retry"]</MudButton>
     </EmptyState>
 }
-else if (_catalog is not null)
+@if (LinkError is not null)
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">@LinkErrorMessage</MudAlert>
+}
+
+@if (_catalog is not null)
 {
     @foreach (var category in _catalog)
     {
         <MudPaper Class="cv-panel pa-4 mb-4">
             <MudText Typo="Typo.h6" Class="mb-3">@category.Name</MudText>
-            @foreach (var definition in category.Definitions)
+            @foreach (var definition in category.Definitions
+                .OrderBy(d => d.Name == ProfileAttributeNames.Name ? 0 : 1)
+                .ThenBy(d => d.Name))
             {
                 <div class="cv-attribute-row">
-                    <MudText Typo="Typo.body2" Class="cv-attribute-label">@definition.Name</MudText>
+                    <MudText Typo="Typo.body2" Class="cv-attribute-label">@AttributeLabels.Localize(L, definition.Name)</MudText>
                     <AttributeValueEditor Definition="definition" Value="@Draft(definition.Id)"
                                            Disabled="@IsSaving(definition.Id)"
                                            OnChanged="@(() => DraftChangedAsync(definition.Id))" />
-                    <MudIconButton Icon="@Icons.Material.Filled.Save" Color="Color.Primary"
-                                   Variant="Variant.Text" Disabled="@IsSaving(definition.Id)"
-                                   title="@L["Save"]"
-                                   OnClick="@(() => SaveAsync(definition))" />
+                    @if (IsSaving(definition.Id))
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                    }
                 </div>
             }
         </MudPaper>
     }
+}
 
 @code {
     private IReadOnlyList<AttributeCategoryDto>? _catalog;
     private Dictionary<Guid, AttributeValueDraft> _drafts = [];
     private HashSet<Guid> _saving = [];
+    private HashSet<Guid> _dirty = [];
     private readonly Dictionary<Guid, CancellationTokenSource> _autosave = [];
     private bool _loading;
+    private bool _savingAll;
     private string? _error;
+    [SupplyParameterFromQuery(Name = "error")]
+    private string? LinkError { get; set; }
 
-    protected override async Task OnInitializedAsync() => await LoadAsync();
+    private string LinkErrorMessage => LinkError switch
+    {
+        "provideralreadylinked" => L["ExternalProviderAlreadyLinked"],
+        "linkfailed" => L["ExternalProviderLinkFailed"],
+        _ => L["ExternalLoginUnavailable"],
+    };
+
+    private IReadOnlyList<AuthenticationScheme> _externalSchemes = [];
+
+    private bool HasUnsavedChanges => _dirty.Count > 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _externalSchemes = (await SignIn.GetExternalAuthenticationSchemesAsync()).ToList();
+        await LoadAsync();
+    }
 
     private async Task LoadAsync()
     {
+        foreach (var source in _autosave.Values)
+            await source.CancelAsync();
+        _autosave.Clear();
+        _saving.Clear();
+        _dirty.Clear();
+        _savingAll = false;
         _loading = true;
         _error = null;
         try
@@ -90,6 +141,7 @@ else if (_catalog is not null)
 
             _drafts = profileResult.Value.Values.ToDictionary(
                 v => v.AttributeDefinitionId, v => ToDraft(v));
+            _dirty.Clear();
         }
         finally
         {
@@ -116,6 +168,19 @@ else if (_catalog is not null)
         Version = value.Version,
     };
 
+    private static AttributeValueInput ToInput(Guid definitionId, AttributeValueDraft draft) => new(
+        definitionId,
+        draft.String,
+        draft.Text,
+        draft.Numeric,
+        draft.Date,
+        draft.PeriodStart,
+        draft.PeriodEnd,
+        draft.Boolean,
+        draft.Dropdown,
+        draft.ImageUrl,
+        draft.Version);
+
     private async Task SaveAsync(AttributeDefinitionDto definition)
     {
         if (!_saving.Add(definition.Id))
@@ -123,19 +188,9 @@ else if (_catalog is not null)
 
         try
         {
-            var draft = _drafts[definition.Id];
-            var input = new AttributeValueInput(
-                definition.Id,
-                draft.String,
-                draft.Text,
-                draft.Numeric,
-                draft.Date,
-                draft.PeriodStart,
-                draft.PeriodEnd,
-                draft.Boolean,
-                draft.Dropdown,
-                draft.ImageUrl,
-                draft.Version);
+            if (!_drafts.TryGetValue(definition.Id, out var draft))
+                return;
+            var input = ToInput(definition.Id, draft);
 
             var actor = await GetActorAsync();
             var result = await ProfileService.SaveAttributeValueAsync(actor, actor.UserId, input);
@@ -145,6 +200,8 @@ else if (_catalog is not null)
                 var updated = result.Value.Values.FirstOrDefault(v => v.AttributeDefinitionId == definition.Id);
                 if (updated is not null)
                     _drafts[definition.Id] = ToDraft(updated);
+                _dirty.Remove(definition.Id);
+                await ProfileHeader.NotifyChangedAsync();
             }
             else if (!result.Succeeded)
             {
@@ -164,10 +221,68 @@ else if (_catalog is not null)
         }
     }
 
-    private bool IsSaving(Guid definitionId) => _saving.Contains(definitionId);
+    private async Task SaveAllAsync()
+    {
+        if (_savingAll || _dirty.Count == 0)
+            return;
+
+        foreach (var source in _autosave.Values)
+            await source.CancelAsync();
+        _autosave.Clear();
+
+        var ids = _dirty.Where(id => !_saving.Contains(id)).ToList();
+        if (ids.Count == 0)
+            return;
+
+        _savingAll = true;
+        try
+        {
+            var inputs = ids
+                .Where(id => _drafts.ContainsKey(id))
+                .Select(id => ToInput(id, _drafts[id]))
+                .ToList();
+            if (inputs.Count == 0)
+                return;
+
+            var actor = await GetActorAsync();
+            var result = await ProfileService.SaveAttributeValuesAsync(actor, actor.UserId, inputs);
+            if (result.Succeeded && result.Value is not null)
+            {
+                Snackbar.Add(L["Saved"], Severity.Success);
+                var byId = result.Value.Values.ToDictionary(v => v.AttributeDefinitionId);
+                foreach (var id in ids)
+                {
+                    if (byId.TryGetValue(id, out var updated))
+                        _drafts[id] = ToDraft(updated);
+                    _dirty.Remove(id);
+                }
+                await ProfileHeader.NotifyChangedAsync();
+            }
+            else if (!result.Succeeded)
+            {
+                if (result.Error.Code == ErrorCodes.ConcurrencyConflict)
+                {
+                    var dialog = await DialogService.ShowAsync<ConcurrencyDialog>("Concurrency conflict");
+                    if ((await dialog.Result) is { Canceled: false, Data: true })
+                        await LoadAsync();
+                }
+                else
+                    Snackbar.Add(result.Error.Message, Severity.Error);
+            }
+        }
+        finally
+        {
+            _savingAll = false;
+        }
+    }
+
+    private bool IsSaving(Guid definitionId) => _saving.Contains(definitionId) || _savingAll;
 
     private async Task DraftChangedAsync(Guid definitionId)
     {
+        _dirty.Add(definitionId);
+        StateHasChanged();
+
         if (_autosave.Remove(definitionId, out var previous))
             await previous.CancelAsync();
 
@@ -181,6 +296,7 @@ else if (_catalog is not null)
                 var definition = _catalog.SelectMany(c => c.Definitions)
                     .Single(d => d.Id == definitionId);
                 await SaveAsync(definition);
+                StateHasChanged();
             }
         }
         catch (OperationCanceledException) when (current.IsCancellationRequested)
@@ -196,9 +312,7 @@ else if (_catalog is not null)
     private async Task<ActorContext> GetActorAsync()
     {
         var authState = await AuthProvider.GetAuthenticationStateAsync();
-        return new ActorContext(
-            Guid.Parse(authState.User.FindFirstValue(ClaimTypes.NameIdentifier)!),
-            authState.User.IsInRole("Admin"));
+        return new ActorContext(Guid.Parse(authState.User.FindFirstValue(ClaimTypes.NameIdentifier)!), authState.User.IsInRole(Roles.Admin), authState.User.IsInRole(Roles.Recruiter) || authState.User.IsInRole(Roles.Admin));
     }
 
     public async ValueTask DisposeAsync()
@@ -209,6 +323,4 @@ else if (_catalog is not null)
             source.Dispose();
         _autosave.Clear();
     }
-}
-
 }

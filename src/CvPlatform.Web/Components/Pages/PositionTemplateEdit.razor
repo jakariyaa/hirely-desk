@@ -1,0 +1,207 @@
+@page "/positions/templates/new"
+@page "/positions/templates/{Id:guid}"
+@attribute [Authorize(Roles = "Admin,Recruiter")]
+@using CvPlatform.Application.Attributes
+@using CvPlatform.Application.Authorization
+@using CvPlatform.Application.PositionTemplates
+@using CvPlatform.Core.Enums
+@using CvPlatform.Web.Auth
+@using CvPlatform.Web.Components.Shared
+@using CvPlatform.Web.Resources
+@using Microsoft.Extensions.Localization
+@inject IPositionTemplateService Templates
+@inject AuthenticationStateProvider AuthProvider
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject IStringLocalizer<SharedResource> L
+
+<PageTitle>@(_isNew ? L["NewTemplate"] : L["EditTemplate"])</PageTitle>
+<PageHeader Title="@(_isNew ? L["NewTemplate"] : L["EditTemplate"])" Subtitle="@L["PositionTemplatesSubtitle"]" />
+
+@if (_loading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate Class="cv-page-loading" />
+}
+else if (_error is not null)
+{
+    <EmptyState Icon="@Icons.Material.Filled.ErrorOutline" Title="@L["LoadFailed"]" Description="@_error" />
+}
+else
+{
+    <MudPaper Class="cv-panel pa-4">
+        <MudTextField @bind-Value="_name" Label="@L["Name"]" Required="true" Variant="Variant.Outlined" Class="mb-3" />
+        <MudTextField @bind-Value="_description" Label="@L["Description"]" Lines="3" Variant="Variant.Outlined" Class="mb-3" />
+        <MudTextField @bind-Value="_company" Label="@L["Company"]" Variant="Variant.Outlined" Class="mb-3" />
+        <MudTextField @bind-Value="_level" Label="@L["Level"]" Variant="Variant.Outlined" Class="mb-3" />
+        <MudNumericField @bind-Value="_maxProjects" Label="@L["MaxProjects"]" Min="0" Max="20" Variant="Variant.Outlined" Class="mb-3" />
+        <MudSwitch @bind-Value="_isActive" Label="@L["Active"]" Color="Color.Primary" />
+        <MudStack Row Justify="Justify.FlexEnd" Class="mt-4">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@_saving" OnClick="SaveAsync">@L["Save"]</MudButton>
+        </MudStack>
+    </MudPaper>
+
+    <MudPaper Class="cv-panel pa-4 mt-4">
+        <MudText Typo="Typo.h6" Class="mb-1">@L["RequiredAttributes"]</MudText>
+        <MudText Typo="Typo.caption" Class="mb-3">@L["RequiredAttributesHint"]</MudText>
+        <MudStack Row AlignItems="AlignItems.End" Spacing="2" Class="mb-3">
+            <MudItem class="pa-0" xs="12" md="5" Style="flex:1 1 280px">
+                <AttributePicker Label="@L["AddAttribute"]" Value="_pickedAttribute"
+                                 ValueChanged="@(d => _pickedAttribute = d)" />
+            </MudItem>
+            <MudSwitch @bind-Value="_newAttributeRequired" Label="@L["IsRequired"]" Color="Color.Primary" Class="mb-1" />
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                       Disabled="@(_pickedAttribute is null || _saving)" OnClick="AddDraftAttribute">
+                @L["Add"]
+            </MudButton>
+        </MudStack>
+        @if (_draftAttributes.Count == 0)
+        {
+            <MudText Typo="Typo.body2" Class="mt-2">@L["NoAttributes"]</MudText>
+        }
+        else
+        {
+            @foreach (var draft in _draftAttributes)
+            {
+                <div class="cv-attribute-row">
+                    <MudStack Row Spacing="2" AlignItems="AlignItems.Center">
+                        <MudText Typo="Typo.body2" Class="cv-attribute-label">@AttributeLabels.Localize(L, draft.Name)</MudText>
+                        <MudChip T="string" Size="Size.Small" Text="@draft.DataType.ToString()" />
+                    </MudStack>
+                    <MudStack Row Spacing="0" AlignItems="AlignItems.Center">
+                        <MudSwitch T="bool" Value="draft.IsRequired" Color="Color.Primary"
+                                   ValueChanged="@(value => ToggleDraftRequired(draft, value))" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                       OnClick="@(() => RemoveDraftAttribute(draft))" />
+                    </MudStack>
+                </div>
+            }
+        }
+    </MudPaper>
+
+    @if (_detail is not null)
+    {
+        <MudPaper Class="cv-panel pa-4 mt-4">
+            <MudText Typo="Typo.h6">@L["TemplateContents"]</MudText>
+            <MudText Typo="Typo.body2">@string.Format(L["TemplateAttributeCount"].Value, _detail.Attributes.Count)</MudText>
+            <MudText Typo="Typo.body2">@string.Format(L["TemplateRuleCount"].Value, _detail.AccessRules.Count)</MudText>
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Class="mt-3" OnClick="CreatePositionAsync">
+                @L["CreatePositionFromTemplate"]
+            </MudButton>
+        </MudPaper>
+    }
+}
+
+@code {
+    [Parameter] public Guid? Id { get; set; }
+
+    private PositionTemplateDetailDto? _detail;
+    private bool _isNew;
+    private bool _loading;
+    private bool _saving;
+    private string? _error;
+    private string _name = "";
+    private string _description = "";
+    private string? _company;
+    private string? _level;
+    private int _maxProjects = 3;
+    private bool _isActive = true;
+    private AttributeDefinitionDto? _pickedAttribute;
+    private bool _newAttributeRequired;
+    private readonly List<DraftAttribute> _draftAttributes = [];
+
+    private sealed record DraftAttribute(Guid Id, string Name, AttributeDataType DataType, bool IsRequired);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _isNew = Id is null;
+        if (!_isNew)
+            await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        var auth = await AuthProvider.GetAuthenticationStateAsync();
+        var result = await Templates.GetAsync(ActorContexts.FromUser(auth.User), Id!.Value);
+        if (!result.Succeeded || result.Value is null)
+        {
+            _error = result.Succeeded ? L["NotFoundGeneric"].Value : result.Error.Message;
+        }
+        else
+        {
+            _detail = result.Value;
+            var template = result.Value.Template;
+            _name = template.Name;
+            _description = template.Description;
+            _company = template.Company;
+            _level = template.Level;
+            _maxProjects = template.MaxProjects;
+            _isActive = template.IsActive;
+            _draftAttributes.Clear();
+            _draftAttributes.AddRange(result.Value.Attributes.Select(attribute => new DraftAttribute(
+                attribute.AttributeDefinitionId, attribute.Name, attribute.DataType, attribute.IsRequired)));
+        }
+        _loading = false;
+    }
+
+    private async Task SaveAsync()
+    {
+        _saving = true;
+        try
+        {
+            var auth = await AuthProvider.GetAuthenticationStateAsync();
+            var actor = ActorContexts.FromUser(auth.User);
+            var input = new PositionTemplateInput(_name, _description, _company, _level, _maxProjects, _isActive,
+                _detail?.Template.Version,
+                _draftAttributes.Select((draft, index) => new AttributeRequirementInput(
+                    draft.Id, draft.IsRequired, index)).ToArray());
+            var result = _isNew
+                ? await Templates.CreateAsync(actor, input)
+                : await Templates.UpdateAsync(actor, Id!.Value, input);
+            if (!result.Succeeded)
+            {
+                Snackbar.Add(result.Error.Message, Severity.Error);
+                return;
+            }
+            Snackbar.Add(L["TemplateSaved"], Severity.Success);
+            Navigation.NavigateTo($"/positions/templates/{result.Value!.Id}");
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task CreatePositionAsync()
+    {
+        if (_detail is null)
+            return;
+        var auth = await AuthProvider.GetAuthenticationStateAsync();
+        var result = await Templates.CreatePositionAsync(ActorContexts.FromUser(auth.User), _detail.Template.Id);
+        if (result.Succeeded)
+            Navigation.NavigateTo($"/positions/{result.Value!.Id}");
+        else
+            Snackbar.Add(result.Error.Message, Severity.Error);
+    }
+
+    private void AddDraftAttribute()
+    {
+        if (_pickedAttribute is null || _draftAttributes.Any(a => a.Id == _pickedAttribute.Id))
+            return;
+
+        _draftAttributes.Add(new DraftAttribute(
+            _pickedAttribute.Id, _pickedAttribute.Name, _pickedAttribute.DataType, _newAttributeRequired));
+        _pickedAttribute = null;
+        _newAttributeRequired = false;
+    }
+
+    private void RemoveDraftAttribute(DraftAttribute draft) => _draftAttributes.Remove(draft);
+
+    private void ToggleDraftRequired(DraftAttribute draft, bool value)
+    {
+        var index = _draftAttributes.IndexOf(draft);
+        if (index >= 0)
+            _draftAttributes[index] = draft with { IsRequired = value };
+    }
+}

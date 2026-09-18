@@ -1,0 +1,49 @@
+@using CvPlatform.Application.Authorization
+@using CvPlatform.Application.Common
+@using CvPlatform.Application.Search
+@using CvPlatform.Web.Resources
+@using Microsoft.Extensions.Localization
+@using System.Security.Claims
+@inject ISearchService SearchService
+@inject AuthenticationStateProvider AuthProvider
+@inject NavigationManager Navigation
+@inject IStringLocalizer<SharedResource> L
+
+<MudAutocomplete T="SearchItem" SearchFunc="SearchAsync" ToStringFunc="@(i => i?.Title ?? "")"
+                 ValueChanged="OnSelectedAsync" Placeholder="@L["SearchPlaceholder"]"
+                 AdornmentIcon="@Icons.Material.Filled.Search" Adornment="Adornment.Start"
+                 DebounceInterval="300" MinCharacters="2" Clearable="true" Dense="true"
+                 Class="cv-global-search" />
+
+@code {
+    public sealed record SearchItem(string Kind, Guid Id, string Title, string Url);
+
+    private async Task<IEnumerable<SearchItem>> SearchAsync(string value, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(value) || value.Trim().Length < 2)
+            return [];
+        var actor = await GetActorAsync();
+        var result = await SearchService.SearchAsync(actor, value.Trim(), new PageRequest(1, 10), ct);
+        if (!result.Succeeded || result.Value is null)
+            return [];
+        var items = new List<SearchItem>();
+        items.AddRange(result.Value.Positions.Items.Select(p =>
+            new SearchItem("position", p.Id, p.Title, $"/positions/{p.Id}/apply")));
+        items.AddRange(result.Value.Cvs.Items.Select(c =>
+            new SearchItem("cv", c.CvId, $"{c.PositionTitle} — {c.CandidateName}", $"/cvs/{c.CvId}")));
+        return items;
+    }
+
+    private Task OnSelectedAsync(SearchItem? item)
+    {
+        if (item is not null)
+            Navigation.NavigateTo(item.Url);
+        return Task.CompletedTask;
+    }
+
+    private async Task<ActorContext> GetActorAsync()
+    {
+        var authState = await AuthProvider.GetAuthenticationStateAsync();
+        return new ActorContext(Guid.Parse(authState.User.FindFirstValue(ClaimTypes.NameIdentifier)!), authState.User.IsInRole(Roles.Admin), authState.User.IsInRole(Roles.Recruiter) || authState.User.IsInRole(Roles.Admin));
+    }
+}

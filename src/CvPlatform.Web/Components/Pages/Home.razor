@@ -1,41 +1,210 @@
 ﻿@page "/"
 
+@using CvPlatform.Application.Authorization
+@using CvPlatform.Application.Badges
+@using CvPlatform.Application.Home
 @using CvPlatform.Web.Components.Shared
 @using CvPlatform.Web.Resources
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.Extensions.Localization
-
-@attribute [Authorize]
+@using CvPlatform.Web.Auth
+@attribute [AllowAnonymous]
+@inject IHomeStatsService HomeStats
+@inject IBadgeService Badges
+@inject AuthenticationStateProvider AuthProvider
+@inject NavigationManager Navigation
 @inject IStringLocalizer<SharedResource> L
 
 <PageTitle>@L["Home"]</PageTitle>
 
 <PageHeader Title="@L["HomeWelcome"]" />
 
-<MudGrid Spacing="4">
-    <MudItem xs="12" md="6" lg="4">
-        <MudPaper Class="cv-card" Elevation="1">
-            <div class="cv-card-icon cv-card-icon-primary"><MudIcon Icon="@Icons.Material.Filled.PeopleAlt" /></div>
-            <MudText Typo="Typo.subtitle1" Class="font-weight-bold">@L["CardCandidatesTitle"]</MudText>
-            <MudText Typo="Typo.body2" Class="cv-text-secondary">@L["CardCandidatesDesc"]</MudText>
-            <MudButton Variant="Variant.Text" Color="Color.Primary" Disabled="true" Class="cv-card-cta">@L["CardComingSoon"]</MudButton>
-        </MudPaper>
-    </MudItem>
-    <MudItem xs="12" md="6" lg="4">
-        <MudPaper Class="cv-card" Elevation="1">
-            <div class="cv-card-icon cv-card-icon-secondary"><MudIcon Icon="@Icons.Material.Filled.Work" /></div>
-            <MudText Typo="Typo.subtitle1" Class="font-weight-bold">@L["CardPositionsTitle"]</MudText>
-            <MudText Typo="Typo.body2" Class="cv-text-secondary">@L["CardPositionsDesc"]</MudText>
-            <MudButton Variant="Variant.Text" Color="Color.Primary" Disabled="true" Class="cv-card-cta">@L["CardComingSoon"]</MudButton>
-        </MudPaper>
-    </MudItem>
-    <MudItem xs="12" md="6" lg="4">
-        <MudPaper Class="cv-card" Elevation="1">
-            <div class="cv-card-icon cv-card-icon-accent"><MudIcon Icon="@Icons.Material.Filled.Description" /></div>
-            <MudText Typo="Typo.subtitle1" Class="font-weight-bold">@L["CardCvsTitle"]</MudText>
-            <MudText Typo="Typo.body2" Class="cv-text-secondary">@L["CardCvsDesc"]</MudText>
-            <MudButton Variant="Variant.Text" Color="Color.Primary" Disabled="true" Class="cv-card-cta">@L["CardComingSoon"]</MudButton>
-        </MudPaper>
-    </MudItem>
-</MudGrid>
+@if (_loading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate Class="cv-page-loading" />
+}
+else if (_error is not null)
+{
+    <EmptyState Icon="@Icons.Material.Filled.ErrorOutline" Title="@L["LoadFailed"]" Description="@_error">
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="LoadAsync">@L["Retry"]</MudButton>
+    </EmptyState>
+}
+else if (_publicStats is not null)
+{
+    <MudGrid Spacing="4">
+        <MudItem xs="12" sm="4">
+            <MudPaper Class="cv-panel cv-list-card pa-4">
+                <MudText Typo="Typo.caption">@L["PublicPositions"]</MudText>
+                <MudText Typo="Typo.h4">@_publicStats.PublicPositionCount</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="4">
+            <MudPaper Class="cv-panel pa-4">
+                <MudText Typo="Typo.caption">@L["PublishedCvs"]</MudText>
+                <MudText Typo="Typo.h4">@_publicStats.PublishedCvCount</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="4">
+            <MudPaper Class="cv-panel pa-4">
+                <MudText Typo="Typo.caption">@L["NewCvsLast24Hours"]</MudText>
+                <MudText Typo="Typo.h4">@_publicStats.NewPublishedCvsLast24Hours</MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+    <MudStack Row Justify="Justify.Center" Class="mt-4">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => Navigation.NavigateTo("/positions"))">
+            @L["BrowsePositions"]
+        </MudButton>
+    </MudStack>
+}
+else
+{
+    <MudGrid Spacing="4">
+        <MudItem xs="12" md="6">
+            <MudPaper Class="cv-panel pa-4">
+                <MudStack Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-2">
+                    <MudText Typo="Typo.h6">@L["LatestCvs"]</MudText>
+                    <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="@(() => Navigation.NavigateTo("/mycvs"))">@L["Open"]</MudButton>
+                </MudStack>
+                @if (_stats!.LatestCvs.Count == 0)
+                {
+                    <MudText Typo="Typo.body2">@L["NoResults"]</MudText>
+                }
+                else
+                {
+                    <MudTable Items="_stats.LatestCvs" Class="cv-list-table" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm">
+                        <HeaderContent>
+                            <MudTh>@L["Position"]</MudTh>
+                            <MudTh>@L["Candidates"]</MudTh>
+                            <MudTh>@L["PublishedAt"]</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="@L["Position"]">
+                                <MudLink Href="@($"/cvs/{context.CvId}")">@context.PositionTitle</MudLink>
+                            </MudTd>
+                            <MudTd DataLabel="@L["Candidates"]">@context.CandidateName</MudTd>
+                            <MudTd DataLabel="@L["PublishedAt"]">@context.PublishedAt?.ToString("yyyy-MM-dd")</MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                }
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="6">
+            <MudPaper Class="cv-panel cv-list-card pa-4">
+                <MudStack Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-2">
+                    <MudText Typo="Typo.h6">@L["PopularPositions"]</MudText>
+                    <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="@(() => Navigation.NavigateTo("/positions"))">@L["Open"]</MudButton>
+                </MudStack>
+                @if (_stats!.PopularPositions.Count == 0)
+                {
+                    <MudText Typo="Typo.body2">@L["NoResults"]</MudText>
+                }
+                else
+                {
+                    <MudTable Items="_stats.PopularPositions" Class="cv-list-table" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm">
+                        <HeaderContent>
+                            <MudTh>@L["Name"]</MudTh>
+                            <MudTh>@L["Cvs"]</MudTh>
+                            <MudTh>@L["Likes"]</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="@L["Name"]">
+                                <MudLink Href="@($"/positions/{context.PositionId}/apply")">@context.Title</MudLink>
+                            </MudTd>
+                            <MudTd DataLabel="@L["Cvs"]">@string.Format(L["CvCount"].Value, context.CvCount)</MudTd>
+                            <MudTd DataLabel="@L["Likes"]">@string.Format(L["LikeCount"].Value, context.LikeCount)</MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                }
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="6">
+            <MudPaper Class="cv-panel pa-4">
+                <MudText Typo="Typo.h6" Class="mb-2">@L["Badges"]</MudText>
+                @if (_badges.Count == 0)
+                {
+                    <MudText Typo="Typo.body2">@L["NoResults"]</MudText>
+                }
+                else
+                {
+                    <MudChipSet T="string" ReadOnly="true">
+                        @foreach (var badge in _badges)
+                        {
+                            <MudChip T="string" Color="Color.Primary" Icon="@Icons.Material.Filled.Verified">@L[$"Badge{badge.Key}"]</MudChip>
+                        }
+                    </MudChipSet>
+                }
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="6">
+            <MudPaper Class="cv-panel pa-4">
+                <MudText Typo="Typo.h6" Class="mb-2">@L["TagCloud"]</MudText>
+                @if (_stats!.TagCloud.Count == 0)
+                {
+                    <MudText Typo="Typo.body2">@L["NoTags"]</MudText>
+                }
+                else
+                {
+                    <MudChipSet T="string">
+                        @foreach (var tag in _stats.TagCloud)
+                        {
+                            <MudChip T="string" OnClick="@(() => Navigation.NavigateTo($"/search?Term={Uri.EscapeDataString(tag.Tag)}"))"
+                                     Size="@(tag.Count > 2 ? Size.Large : Size.Medium)">@($"{tag.Tag} ({tag.Count})")</MudChip>
+                        }
+                    </MudChipSet>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
 
+@code {
+    private bool _loading = true;
+    private string? _error;
+    private HomeStatsDto? _stats;
+    private PublicHomeStatsDto? _publicStats;
+    private IReadOnlyList<BadgeDto> _badges = [];
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        _stats = null;
+        _publicStats = null;
+        _badges = [];
+        try
+        {
+            var authState = await AuthProvider.GetAuthenticationStateAsync();
+            if (authState.User.Identity?.IsAuthenticated != true)
+            {
+                var publicResult = await HomeStats.GetPublicAsync();
+                if (publicResult.Succeeded)
+                    _publicStats = publicResult.Value;
+                else
+                    _error = publicResult.Error.Message;
+            }
+            else
+            {
+                var actor = ActorContexts.FromUser(authState.User);
+                var result = await HomeStats.GetAsync(actor);
+                if (result.Succeeded)
+                    _stats = result.Value;
+                else
+                    _error = result.Error.Message;
+                var badges = await Badges.GetForUserAsync(actor, actor.UserId);
+                if (badges.Succeeded && badges.Value is not null)
+                    _badges = badges.Value;
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

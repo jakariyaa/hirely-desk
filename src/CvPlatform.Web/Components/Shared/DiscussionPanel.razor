@@ -1,0 +1,144 @@
+@using CvPlatform.Application.Authorization
+@using CvPlatform.Application.Common
+@using CvPlatform.Application.Discussions
+@using CvPlatform.Application.Markdown
+@using CvPlatform.Web.Resources
+@using CvPlatform.Web.Auth
+@using Microsoft.Extensions.Localization
+@using System.Security.Claims
+@inject IDiscussionService Discussions
+@inject IDiscussionNotifier Notifier
+@inject IMarkdownRenderer Markdown
+@inject AuthenticationStateProvider AuthProvider
+@inject ISnackbar Snackbar
+@inject IStringLocalizer<SharedResource> L
+@implements IDisposable
+
+<MudPaper Class="pa-4" Elevation="0">
+    <MudText Typo="Typo.h6" Class="mb-2">@L["Discussions"]</MudText>
+    @if (_error is not null)
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-2">@_error</MudAlert>
+    }
+    @if (_posts.Count == 0 && !_loading)
+    {
+        <MudText Typo="Typo.body2" Class="mb-2">@L["NoDiscussions"]</MudText>
+    }
+    else
+    {
+        <MudList T="string" Dense>
+            @foreach (var post in _posts)
+            {
+                <MudListItem T="string">
+                    <MudStack Spacing="0">
+                        <MudText Typo="Typo.caption">@post.AuthorName · @post.CreatedAt.ToString("yyyy-MM-dd HH:mm")</MudText>
+                        <MudText Typo="Typo.body2">@((MarkupString)Markdown.ToSafeHtml(post.TextMarkdown))</MudText>
+                    </MudStack>
+                </MudListItem>
+            }
+        </MudList>
+    }
+    <MudStack Row Spacing="1" Class="mt-2">
+        <MudTextField @bind-Value="_draft" Label="@L["MessagePlaceholder"]" Variant="Variant.Outlined"
+                      Lines="2" Immediate="false" Disabled="@_sending" Class="flex-grow-1" />
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@(_sending || string.IsNullOrWhiteSpace(_draft))"
+                   OnClick="SendAsync">@L["Send"]</MudButton>
+    </MudStack>
+</MudPaper>
+
+@code {
+    [Parameter] public Guid PositionId { get; set; }
+
+    private List<DiscussionPostDto> _posts = [];
+    private string _draft = "";
+    private string? _error;
+    private bool _loading = true;
+    private bool _sending;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Notifier.PostAdded += OnPostAdded;
+        await LoadAsync();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!_loading)
+            await LoadAsync();
+    }
+
+    private async void OnPostAdded(Guid positionId, DiscussionPostDto post)
+    {
+        if (positionId != PositionId)
+            return;
+        try
+        {
+            await InvokeAsync(() =>
+            {
+                if (!_posts.Any(p => p.Id == post.Id))
+                    _posts.Add(post);
+                StateHasChanged();
+            });
+        }
+        catch (InvalidOperationException)
+        {
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            var actor = await GetActorAsync();
+            var result = await Discussions.ListAsync(actor, PositionId, new PageRequest(1, 50));
+            if (result.Succeeded)
+                _posts = result.Value!.Items.OrderBy(p => p.CreatedAt).ToList();
+            else
+                _error = result.Error.Message;
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task SendAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_draft) || _sending)
+            return;
+        _sending = true;
+        try
+        {
+            var actor = await GetActorAsync();
+            var result = await Discussions.AddAsync(actor, PositionId, new DiscussionPostInput(_draft.Trim()));
+            if (result.Succeeded)
+            {
+                _draft = "";
+                if (!_posts.Any(p => p.Id == result.Value!.Id))
+                    _posts.Add(result.Value!);
+            }
+            else
+            {
+                Snackbar.Add(result.Error.Message, Severity.Error);
+            }
+        }
+        finally
+        {
+            _sending = false;
+        }
+    }
+
+    private async Task<ActorContext> GetActorAsync()
+    {
+        var authState = await AuthProvider.GetAuthenticationStateAsync();
+        return ActorContexts.FromUser(authState.User);
+    }
+
+    public void Dispose() => Notifier.PostAdded -= OnPostAdded;
+}
