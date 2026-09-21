@@ -78,6 +78,34 @@ public class AttributeValueRulesTests
     }
 
     [Fact]
+    public void Validate_rejects_non_cloudinary_image_urls()
+    {
+        var definition = new AttributeDefinition
+        {
+            Name = ProfileAttributeNames.Photo,
+            DataType = AttributeDataType.Image,
+        };
+
+        AttributeValueRules.Validate(definition, new AttributeValueInput(
+            Guid.NewGuid(), ImageUrl: "https://images.example.test/photo.jpg"))
+            .Should().Be("Image must be uploaded through Cloudinary.");
+    }
+
+    [Fact]
+    public void Validate_accepts_cloudinary_image_urls()
+    {
+        var definition = new AttributeDefinition
+        {
+            Name = ProfileAttributeNames.Photo,
+            DataType = AttributeDataType.Image,
+        };
+
+        AttributeValueRules.Validate(definition, new AttributeValueInput(
+            Guid.NewGuid(), ImageUrl: "https://res.cloudinary.com/demo/image/upload/photo.jpg"))
+            .Should().BeNull();
+    }
+
+    [Fact]
     public void ValidateComparison_rejects_invalid_operator_and_value()
     {
         var definition = new AttributeDefinition

@@ -2,6 +2,7 @@ using CvPlatform.Application.Common;
 using CvPlatform.Application.Authorization;
 using CvPlatform.Application.Projects;
 using CvPlatform.Core.Data;
+using CvPlatform.Core.Entities;
 using CvPlatform.Infrastructure.Data;
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
@@ -43,6 +44,39 @@ public class ProjectServiceTests
         var profileId = db.Profiles.Single(p => p.UserId == userId).Id;
         db.Projects.Should().ContainSingle(p => p.Name == "Alpha" && p.ProfileId == profileId);
         db.ProjectTags.Select(t => t.Name).Should().BeEquivalentTo(["a", "b"]);
+    }
+
+    [Fact]
+    public async Task SearchTagsAsync_is_case_insensitive()
+    {
+        var factory = CreateFactory(out var db);
+        var service = new ProjectService(factory);
+        db.ProjectTags.Add(new ProjectTag { Id = Guid.NewGuid(), Name = "Blazor" });
+        await db.SaveChangesAsync();
+
+        var result = await service.SearchTagsAsync("BLAZ");
+
+        result.Succeeded.Should().BeTrue();
+        result.Value.Should().ContainSingle().Which.Should().Be("Blazor");
+    }
+
+    [Fact]
+    public async Task CreateAsync_reuses_tag_when_casing_differs()
+    {
+        var factory = CreateFactory(out var db);
+        var service = new ProjectService(factory);
+        var userId = Guid.NewGuid();
+
+        var first = await service.CreateAsync(
+            Actor(userId), new ProjectInput("First", null, null, "", ["Blazor"]));
+        var second = await service.CreateAsync(
+            Actor(userId), new ProjectInput("Second", null, null, "", ["blazor"]));
+
+        first.Succeeded.Should().BeTrue();
+        second.Succeeded.Should().BeTrue();
+        db.ProjectTags.Should().ContainSingle();
+        db.Projects.Include(p => p.Tags).SelectMany(p => p.Tags).Select(t => t.Name)
+            .Should().AllBe("Blazor");
     }
 
     [Fact]

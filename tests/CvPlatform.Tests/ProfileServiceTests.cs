@@ -71,6 +71,71 @@ public class ProfileServiceTests
     }
 
     [Fact]
+    public async Task GetSummaryForUserAsync_returns_name_and_photo()
+    {
+        var factory = CreateFactory(out var db);
+        var service = new ProfileService(factory);
+        var userId = Guid.NewGuid();
+        var profile = new Profile { Id = Guid.NewGuid(), UserId = userId };
+        db.Profiles.Add(profile);
+        var name = await SeedDefinitionAsync(db, ProfileAttributeNames.Name, AttributeDataType.String);
+        var photo = await SeedDefinitionAsync(db, ProfileAttributeNames.Photo, AttributeDataType.Image);
+        db.ProfileAttributeValues.AddRange(
+            new ProfileAttributeValue
+            {
+                ProfileId = profile.Id,
+                AttributeDefinitionId = name.Id,
+                StringValue = "Ada Lovelace",
+            },
+            new ProfileAttributeValue
+            {
+                ProfileId = profile.Id,
+                AttributeDefinitionId = photo.Id,
+                ImageUrl = "https://cdn.example.test/ada.jpg",
+            });
+        await db.SaveChangesAsync();
+
+        var result = await service.GetSummaryForUserAsync(Actor(userId), userId);
+
+        result.Succeeded.Should().BeTrue();
+        result.Value!.Name.Should().Be("Ada Lovelace");
+        result.Value.ImageUrl.Should().Be("https://cdn.example.test/ada.jpg");
+    }
+
+    [Fact]
+    public async Task GetSummaryForUserAsync_rejects_different_actor()
+    {
+        var factory = CreateFactory(out _);
+        var service = new ProfileService(factory);
+
+        var result = await service.GetSummaryForUserAsync(
+            Actor(Guid.NewGuid()), Guid.NewGuid());
+
+        result.Succeeded.Should().BeFalse();
+        result.Error.Code.Should().Be(ErrorCodes.Forbidden);
+    }
+
+    [Fact]
+    public async Task SaveAttributeValueAsync_rejects_cloudinary_image_outside_user_folder()
+    {
+        var factory = CreateFactory(out var db);
+        var service = new ProfileService(factory);
+        var userId = Guid.NewGuid();
+        db.Profiles.Add(new Profile { Id = Guid.NewGuid(), UserId = userId });
+        var photo = await SeedDefinitionAsync(db, ProfileAttributeNames.Photo, AttributeDataType.Image);
+
+        var result = await service.SaveAttributeValueAsync(
+            Actor(userId),
+            userId,
+            new AttributeValueInput(
+                photo.Id,
+                ImageUrl: "https://res.cloudinary.com/demo/image/upload/cvplatform/another-user/profile/photo.jpg"));
+
+        result.Succeeded.Should().BeFalse();
+        result.Error.Code.Should().Be(ErrorCodes.ValidationFailed);
+    }
+
+    [Fact]
     public async Task SaveAttributeValueAsync_creates_then_updates_value()
     {
         var factory = CreateFactory(out var db);
@@ -218,7 +283,7 @@ public class ProfileServiceTests
         await db.SaveChangesAsync();
         var service = new AttributeDefinitionService(factory);
 
-        var result = await service.DeleteAsync(new ActorContext(Guid.NewGuid(), true), definition.Id);
+        var result = await service.DeleteAsync(new ActorContext(Guid.NewGuid(), true), definition.Id, definition.Version);
 
         result.Succeeded.Should().BeFalse();
         result.Error.Code.Should().Be(ErrorCodes.Forbidden);
