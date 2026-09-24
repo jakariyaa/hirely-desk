@@ -1,0 +1,42 @@
+services:
+  db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: hirelydesk
+      POSTGRES_USER: hirelydesk
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hirelydesk -d hirelydesk"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    init: true
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_HTTP_PORTS: 8080
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
+      AllowedHosts: hirelydesk.jakariya.eu.org
+      ConnectionStrings__Default: "Host=db;Port=5432;Database=hirelydesk;Username=hirelydesk;Password=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}"
+      Seed__AdminPassword: ${ADMIN_PASSWORD:?ADMIN_PASSWORD must be set}
+      Seed__DemoPassword: ${DEMO_PASSWORD:?DEMO_PASSWORD must be set}
+      Database__SkipMigrate: "false"
+    ports:
+      - "127.0.0.1:5000:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - application_logs:/app/logs
+
+volumes:
+  postgres_data:
+  application_logs:

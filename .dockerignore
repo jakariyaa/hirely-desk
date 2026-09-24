@@ -1,0 +1,12 @@
+.git
+.gitignore
+.vs
+.vscode
+.idea
+.agents
+.env
+.env.*
+**/bin
+**/obj
+**/logs
+tests
