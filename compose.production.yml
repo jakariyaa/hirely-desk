@@ -29,8 +29,21 @@ services:
       Seed__AdminPassword: ${ADMIN_PASSWORD:?ADMIN_PASSWORD must be set}
       Seed__DemoPassword: ${DEMO_PASSWORD:?DEMO_PASSWORD must be set}
       Database__SkipMigrate: "false"
+      Authentication__Google__ClientId: ${GOOGLE_CLIENT_ID:-}
+      Authentication__Google__ClientSecret: ${GOOGLE_CLIENT_SECRET:-}
+      Authentication__Facebook__AppId: ${FACEBOOK_APP_ID:-}
+      Authentication__Facebook__AppSecret: ${FACEBOOK_APP_SECRET:-}
+      Cloudinary__CloudName: ${CLOUDINARY_CLOUD_NAME:-}
+      Cloudinary__UploadPreset: ${CLOUDINARY_UPLOAD_PRESET:-}
+      Cloudinary__ApiKey: ${CLOUDINARY_API_KEY:-}
+      Cloudinary__ApiSecret: ${CLOUDINARY_API_SECRET:-}
+      Cloudinary__Folder: ${CLOUDINARY_FOLDER:-cvplatform}
+      Gmail__Address: ${GMAIL_ADDRESS:-}
+      Gmail__AppPassword: ${GMAIL_APP_PASSWORD:-}
+      Gmail__FromName: ${GMAIL_FROM_NAME:-Hirely Desk}
+      Gmail__RequireConfirmedAccount: ${GMAIL_REQUIRE_CONFIRMED_ACCOUNT:-false}
     ports:
-      - "127.0.0.1:5000:8080"
+      - "127.0.0.1:5192:8080"
     depends_on:
       db:
         condition: service_healthy
