@@ -1,11 +1,9 @@
 @using CvPlatform.Application.Attributes
 @using CvPlatform.Core.Enums
-@using CvPlatform.Core.Storage
 @using CvPlatform.Web.Resources
 @using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.Extensions.Localization
 @using Microsoft.JSInterop
-@inject ICloudinaryClientConfiguration ImageUpload
 @inject IJSRuntime Js
 @inject IStringLocalizer<SharedResource> L
 
@@ -57,18 +55,12 @@
             </MudSelect>
             break;
         case AttributeDataType.Image:
-            @if (!string.IsNullOrWhiteSpace(Value.ImageUrl))
+            @if (Value.ImageValueId is not null)
             {
-                <MudImage Src="@Value.ImageUrl" Alt="Uploaded image" Width="120" Height="120" ObjectFit="ObjectFit.Cover" Class="mb-2" />
+                <MudImage Src="@ImageContentUrl(Value.ImageValueId.Value)" Alt="Uploaded image" Width="120" Height="120" ObjectFit="ObjectFit.Cover" Class="mb-2" />
             }
-            @if (ImageUpload.SignedClientConfig is { } signedConfig)
-            {
-                <MudButton Variant="Variant.Outlined" Disabled="@(Disabled || _uploading)"
-                           OnClick="@(() => UploadViaWidgetAsync(signedConfig.CloudName, "", "/api/profile-images/signature"))"
-                           Class="mb-2">
-                    @( _uploading ? L["Uploading"] : L["UploadImage"] )
-                </MudButton>
-            }
+            <input @ref="_fileInput" type="file" accept="image/jpeg,image/png,image/webp"
+                   disabled="@(Disabled || _uploading)" @onchange="UploadImageAsync" />
             @if (!string.IsNullOrEmpty(_uploadError))
             {
                 <MudText Typo="Typo.caption" Color="Color.Error">@_uploadError</MudText>
@@ -85,11 +77,13 @@
 
     private string? _uploadError;
     private bool _uploading;
+    private ElementReference _fileInput;
+    private const string PresignEndpoint = "/api/profile-images/presign";
+    private const string CompleteEndpoint = "/api/profile-images/complete";
 
     private Task NotifyChangedAsync(FocusEventArgs _) => OnChanged.InvokeAsync();
 
-    private async Task UploadViaWidgetAsync(
-        string cloudName, string uploadPreset, string? signatureEndpoint)
+    private async Task UploadImageAsync(ChangeEventArgs _)
     {
         if (_uploading || Disabled)
             return;
@@ -98,18 +92,20 @@
         try
         {
             await using var module = await Js.InvokeAsync<IJSObjectReference>(
-                "import", "./js/cloudinaryUpload.js");
-            var url = await module.InvokeAsync<string?>(
-                "openUploadWidget", cloudName, uploadPreset, signatureEndpoint);
-            if (!string.IsNullOrWhiteSpace(url))
+                "import", "./js/directImageUpload.js");
+            var objectKey = await module.InvokeAsync<string?>(
+                "uploadImage", _fileInput, PresignEndpoint, CompleteEndpoint);
+            if (!string.IsNullOrWhiteSpace(objectKey))
             {
-                Value.ImageUrl = url;
+                Value.ImageObjectKey = objectKey;
                 await OnChanged.InvokeAsync();
             }
         }
-        catch (JSException)
+        catch (JSException ex)
         {
-            _uploadError = L["ImageUploadFailed"];
+            _uploadError = string.IsNullOrWhiteSpace(ex.Message)
+                ? L["ImageUploadFailed"]
+                : $"{L["ImageUploadFailed"]} ({ex.Message})";
         }
         finally
         {
@@ -122,4 +118,7 @@
 
     private static DateOnly? ToDateOnly(DateTime? dateTime) =>
         dateTime.HasValue ? DateOnly.FromDateTime(dateTime.Value) : null;
+
+    private static string ImageContentUrl(Guid valueId) =>
+        $"/api/profile-images/{valueId:D}/content";
 }

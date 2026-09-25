@@ -559,7 +559,7 @@
     <value>Obraz nie może przekraczać 5 MB.</value>
   </data>
   <data name="ImageUploadFailed" xml:space="preserve">
-    <value>Przesyłanie nie powiodło się. Wklej adres HTTPS.</value>
+    <value>Przesyłanie nie powiodło się.</value>
   </data>
   <data name="UploadImage" xml:space="preserve">
     <value>Prześlij obraz</value>

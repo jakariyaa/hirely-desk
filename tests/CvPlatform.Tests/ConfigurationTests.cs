@@ -16,8 +16,10 @@ public class ConfigurationTests
             ["Database:SkipMigrate"] = "true",
             ["Seed:AdminPassword"] = "admin-password",
             ["Seed:DemoPassword"] = "demo-password",
-            ["Cloudinary:CloudName"] = "demo",
-            ["Cloudinary:UploadPreset"] = "uploads",
+            ["B2:Region"] = "us-west-004",
+            ["B2:BucketName"] = "images",
+            ["B2:ApplicationKeyId"] = "application-key-id",
+            ["B2:ApplicationKey"] = "application-key",
             ["Gmail:Address"] = "user@example.com",
             ["Gmail:AppPassword"] = "app-password",
             ["Authentication:Google:ClientId"] = "google-client-id",
@@ -29,7 +31,7 @@ public class ConfigurationTests
 
         appConfiguration.ConnectionStrings.Default.Should().Be("Host=localhost;Database=cvplatform");
         appConfiguration.Database.SkipMigrate.Should().BeTrue();
-        appConfiguration.Cloudinary.IsConfigured.Should().BeTrue();
+        appConfiguration.B2.IsConfigured.Should().BeTrue();
         appConfiguration.Gmail.IsConfigured.Should().BeTrue();
         appConfiguration.Authentication.Google.IsConfigured.Should().BeTrue();
     }
@@ -48,14 +50,34 @@ public class ConfigurationTests
 
         var appConfiguration = services.AddCvPlatformConfiguration(configuration);
 
-        appConfiguration.Cloudinary.IsConfigured.Should().BeFalse();
+        appConfiguration.B2.IsConfigured.Should().BeFalse();
         appConfiguration.Gmail.IsConfigured.Should().BeFalse();
         appConfiguration.Authentication.Google.IsConfigured.Should().BeFalse();
         appConfiguration.Authentication.Facebook.IsConfigured.Should().BeFalse();
     }
 
+    [Fact]
+    public void Partial_b2_configuration_is_rejected()
+    {
+        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        {
+            ["ConnectionStrings:Default"] = "Host=localhost;Database=cvplatform",
+            ["Seed:AdminPassword"] = "admin-password",
+            ["Seed:DemoPassword"] = "demo-password",
+            ["B2:Region"] = "us-west-004",
+            ["B2:BucketName"] = "images",
+        });
+
+        var services = new ServiceCollection();
+
+        var exception = Record.Exception(() => services.AddCvPlatformConfiguration(configuration));
+
+        exception.Should().NotBeNull();
+        exception!.Message.Should().Contain("B2:ApplicationKeyId");
+    }
+
     [Theory]
-    [InlineData("Cloudinary:ApiKey", "Cloudinary:ApiSecret")]
+    [InlineData("B2:ApplicationKeyId", "B2:ApplicationKey")]
     [InlineData("Authentication:Google:ClientId", "Authentication:Google:ClientSecret")]
     [InlineData("Authentication:Facebook:AppId", "Authentication:Facebook:AppSecret")]
     [InlineData("Gmail:Address", "Gmail:AppPassword")]

@@ -16,7 +16,7 @@ internal static class ApplicationConfigurationValidator
             .. ValidateGoogle(configuration.Authentication.Google),
             .. ValidateFacebook(configuration.Authentication.Facebook),
             .. ValidateSeed(configuration.Seed),
-            .. ValidateCloudinary(configuration.Cloudinary),
+            .. ValidateB2(configuration.B2),
             .. ValidateGmail(configuration.Gmail),
         ];
     }
@@ -77,24 +77,41 @@ internal static class ApplicationConfigurationValidator
         return failures;
     }
 
-    public static IReadOnlyList<string> ValidateCloudinary(CloudinaryOptions options)
+    public static IReadOnlyList<string> ValidateB2(B2Options options)
     {
-        var hasCloudName = !string.IsNullOrWhiteSpace(options.CloudName);
-        var hasUploadPreset = !string.IsNullOrWhiteSpace(options.UploadPreset);
-        var hasApiKey = !string.IsNullOrWhiteSpace(options.ApiKey);
-        var hasApiSecret = !string.IsNullOrWhiteSpace(options.ApiSecret);
-        var hasAnyValue = hasCloudName || hasUploadPreset || hasApiKey || hasApiSecret;
+        var hasRegion = !string.IsNullOrWhiteSpace(options.Region);
+        var hasBucketName = !string.IsNullOrWhiteSpace(options.BucketName);
+        var hasApplicationKeyId = !string.IsNullOrWhiteSpace(options.ApplicationKeyId);
+        var hasApplicationKey = !string.IsNullOrWhiteSpace(options.ApplicationKey);
+        var hasAnyValue = hasRegion || hasBucketName || hasApplicationKeyId ||
+            hasApplicationKey;
 
         if (!hasAnyValue)
             return [];
 
         var failures = new List<string>();
-        if (!hasCloudName)
-            failures.Add("Cloudinary:CloudName is required when Cloudinary is configured.");
-        if (hasApiKey != hasApiSecret)
-            failures.Add("Cloudinary:ApiKey and Cloudinary:ApiSecret must be configured together.");
-        if (!hasUploadPreset && !(hasApiKey && hasApiSecret))
-            failures.Add("Cloudinary:UploadPreset or the Cloudinary API key pair is required.");
+        if (!hasRegion)
+            failures.Add("B2:Region is required when B2 is configured.");
+        if (!hasBucketName)
+            failures.Add("B2:BucketName is required when B2 is configured.");
+        if (!hasApplicationKeyId)
+            failures.Add("B2:ApplicationKeyId is required when B2 is configured.");
+        if (!hasApplicationKey)
+            failures.Add("B2:ApplicationKey is required when B2 is configured.");
+        if (string.IsNullOrWhiteSpace(options.KeyPrefix) || options.KeyPrefix.Contains("..", StringComparison.Ordinal))
+            failures.Add("B2:KeyPrefix must be a safe object-key prefix when B2 is configured.");
+        if (!Uri.TryCreate(options.ServiceUrl, UriKind.Absolute, out var serviceUri) ||
+            serviceUri.Scheme != Uri.UriSchemeHttps ||
+            serviceUri.AbsolutePath != "/" ||
+            !serviceUri.Host.StartsWith("s3.", StringComparison.OrdinalIgnoreCase) ||
+            !serviceUri.Host.EndsWith(".backblazeb2.com", StringComparison.OrdinalIgnoreCase))
+            failures.Add("B2:Region must produce a valid Backblaze S3 endpoint.");
+        if (options.PresignedUrlLifetimeSeconds is < 1 or > 604800)
+            failures.Add("B2:PresignedUrlLifetimeSeconds must be between 1 and 604800.");
+        if (options.DownloadUrlLifetimeSeconds is < 1 or > 604800)
+            failures.Add("B2:DownloadUrlLifetimeSeconds must be between 1 and 604800.");
+        if (options.MaxUploadBytes is <= 0 or > 25 * 1024 * 1024)
+            failures.Add("B2:MaxUploadBytes must be between 1 and 26214400.");
         return failures;
     }
 
@@ -156,10 +173,10 @@ internal sealed class SeedOptionsValidator : IValidateOptions<SeedOptions>
         ValidateOptionsResultFactory.Create(ApplicationConfigurationValidator.ValidateSeed(options));
 }
 
-internal sealed class CloudinaryOptionsValidator : IValidateOptions<CloudinaryOptions>
+internal sealed class B2OptionsValidator : IValidateOptions<B2Options>
 {
-    public ValidateOptionsResult Validate(string? name, CloudinaryOptions options) =>
-        ValidateOptionsResultFactory.Create(ApplicationConfigurationValidator.ValidateCloudinary(options));
+    public ValidateOptionsResult Validate(string? name, B2Options options) =>
+        ValidateOptionsResultFactory.Create(ApplicationConfigurationValidator.ValidateB2(options));
 }
 
 internal sealed class GmailOptionsValidator : IValidateOptions<GmailOptions>

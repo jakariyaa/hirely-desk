@@ -25,7 +25,7 @@
 @if (_error is not null)
 {
     <EmptyState Icon="@Icons.Material.Filled.ErrorOutline" Title="@L["LoadFailed"]" Description="@_error">
-        <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="@(() => _grid?.ReloadServerData())">@L["Retry"]</MudButton>
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="RetryLoadAsync">@L["Retry"]</MudButton>
     </EmptyState>
 }
 else
@@ -104,6 +104,8 @@ else
         Navigation.NavigateTo($"/cvs/{cv.Id}");
         return Task.CompletedTask;
     }
+
+    private Task RetryLoadAsync() => _grid?.ReloadServerData() ?? Task.CompletedTask;
 
     private Task OpenSelectedAsync()
     {

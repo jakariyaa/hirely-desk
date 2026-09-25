@@ -54,9 +54,9 @@
                         <div class="cv-user-chip" @onclick="@menuCtx.ToggleAsync" role="button" tabindex="0"
                              @onkeydown="@(async (KeyboardEventArgs e) => { if (e.Key == "Enter" || e.Key == " ") await menuCtx.ToggleAsync(); })"
                              aria-haspopup="menu">
-                            @if (!string.IsNullOrWhiteSpace(_profileImageUrl))
+                            @if (_profileImageValueId is not null)
                             {
-                                <MudImage Src="@_profileImageUrl" Alt="@_displayName" Class="cv-avatar cv-avatar-image" />
+                                <MudImage Src="@ImageContentUrl(_profileImageValueId.Value)" Alt="@_displayName" Class="cv-avatar cv-avatar-image" />
                             }
                             else
                             {
@@ -109,7 +109,7 @@
     private bool _drawerOpen;
     private bool _darkMode;
     private string? _initials;
-    private string? _profileImageUrl;
+    private Guid? _profileImageValueId;
 
     private void ToggleDrawer() => _drawerOpen = !_drawerOpen;
 
@@ -138,7 +138,7 @@
                     ? summary.Value.Name
                     : user.UserName;
                 _email = user.Email;
-                _profileImageUrl = summary.Succeeded ? summary.Value?.ImageUrl : null;
+                _profileImageValueId = summary.Succeeded ? summary.Value?.ImageValueId : null;
                 _initials = BuildInitials(_displayName, user.Email);
             }
             ApplyTheme(user?.PreferredTheme);
@@ -157,6 +157,9 @@
     });
 
     public void Dispose() => ProfileHeader.Changed -= RefreshHeaderAsync;
+
+    private static string ImageContentUrl(Guid valueId) =>
+        $"/api/profile-images/{valueId:D}/content";
 
     private static string BuildInitials(string? name, string? email)
     {

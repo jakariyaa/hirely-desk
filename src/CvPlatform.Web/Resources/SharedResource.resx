@@ -559,7 +559,7 @@
     <value>Image cannot exceed 5 MB.</value>
   </data>
   <data name="ImageUploadFailed" xml:space="preserve">
-    <value>Upload failed. Paste an HTTPS URL instead.</value>
+    <value>Upload failed.</value>
   </data>
   <data name="UploadImage" xml:space="preserve">
     <value>Upload image</value>

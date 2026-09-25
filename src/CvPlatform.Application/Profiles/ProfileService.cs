@@ -5,11 +5,12 @@ using CvPlatform.Application.Cvs;
 using CvPlatform.Core.Data;
 using CvPlatform.Core.Entities;
 using CvPlatform.Core.Enums;
+using CvPlatform.Core.Storage;
 using Microsoft.EntityFrameworkCore;
 
 namespace CvPlatform.Application.Profiles;
 
-public sealed class ProfileService(IAppDbContextFactory factory) : IProfileService
+public sealed class ProfileService(IAppDbContextFactory factory, IImageStorage imageStorage) : IProfileService
 {
     public async Task<Result<ProfileSummaryDto>> GetSummaryForUserAsync(
         ActorContext actor, Guid userId, CancellationToken ct = default)
@@ -28,13 +29,15 @@ public sealed class ProfileService(IAppDbContextFactory factory) : IProfileServi
             {
                 v.AttributeDefinition.Name,
                 v.StringValue,
-                v.ImageUrl,
+                v.Id,
+                v.ImageObjectKey,
             })
             .ToListAsync(ct);
 
         return Result<ProfileSummaryDto>.Success(new ProfileSummaryDto(
             values.FirstOrDefault(v => v.Name == ProfileAttributeNames.Name)?.StringValue,
-            values.FirstOrDefault(v => v.Name == ProfileAttributeNames.Photo)?.ImageUrl));
+            values.FirstOrDefault(v => v.Name == ProfileAttributeNames.Photo &&
+                !string.IsNullOrWhiteSpace(v.ImageObjectKey))?.Id));
     }
 
     public async Task<Result<ProfileDto>> GetForUserAsync(ActorContext actor, Guid userId, CancellationToken ct = default)
@@ -106,11 +109,11 @@ public sealed class ProfileService(IAppDbContextFactory factory) : IProfileServi
             if (validationError is not null)
                 return Result<ProfileDto>.Failure(ErrorCodes.ValidationFailed, validationError);
             if (definition.DataType == AttributeDataType.Image &&
-                normalized.ImageUrl is not null &&
-                !IsOwnedCloudinaryImage(normalized.ImageUrl, userId))
+                normalized.ImageObjectKey is not null &&
+                !imageStorage.IsOwnedObjectKey(normalized.ImageObjectKey, userId))
                 return Result<ProfileDto>.Failure(
                     ErrorCodes.ValidationFailed,
-                    "Image must be uploaded to the current user's Cloudinary folder.");
+                    "Image must reference an object uploaded by the current user.");
             normalizedById[input.AttributeDefinitionId] = normalized;
         }
 
@@ -135,7 +138,7 @@ public sealed class ProfileService(IAppDbContextFactory factory) : IProfileServi
                     PeriodEnd = normalized.PeriodEnd,
                     BooleanValue = normalized.BooleanValue,
                     DropdownOption = normalized.DropdownOption,
-                    ImageUrl = normalized.ImageUrl,
+                    ImageObjectKey = normalized.ImageObjectKey,
                 });
             }
             else
@@ -153,7 +156,7 @@ public sealed class ProfileService(IAppDbContextFactory factory) : IProfileServi
                 value.PeriodEnd = normalized.PeriodEnd;
                 value.BooleanValue = normalized.BooleanValue;
                 value.DropdownOption = normalized.DropdownOption;
-                value.ImageUrl = normalized.ImageUrl;
+                value.ImageObjectKey = normalized.ImageObjectKey;
             }
         }
 
@@ -202,15 +205,6 @@ public sealed class ProfileService(IAppDbContextFactory factory) : IProfileServi
             cv.SearchText = CvSearchTextBuilder.Build(cv);
 
         await db.SaveChangesAsync(ct);
-    }
-
-    private static bool IsOwnedCloudinaryImage(string imageUrl, Guid userId)
-    {
-        if (!Uri.TryCreate(imageUrl, UriKind.Absolute, out var uri))
-            return false;
-
-        return uri.AbsolutePath.Contains(
-            $"/{userId:D}/profile/", StringComparison.OrdinalIgnoreCase);
     }
 
     public Task<Result<IReadOnlyList<AttributeCategoryDto>>> GetCatalogAsync(CancellationToken ct = default) =>

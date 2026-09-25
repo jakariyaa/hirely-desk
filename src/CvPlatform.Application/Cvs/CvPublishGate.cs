@@ -40,7 +40,7 @@ public static class CvPublishGate
         AttributeDataType.Period => value?.PeriodStart is not null,
         AttributeDataType.Boolean => value?.BooleanValue is not null,   // false counts as filled
         AttributeDataType.Dropdown => value?.DropdownOption is not null,
-        AttributeDataType.Image => value?.ImageUrl is not null,
+        AttributeDataType.Image => value?.ImageObjectKey is not null,
         _ => false,
     };
 }

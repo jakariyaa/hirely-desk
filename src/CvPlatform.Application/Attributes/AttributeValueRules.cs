@@ -24,17 +24,17 @@ public static class AttributeValueRules
             StringValue = NullIfBlank(input.StringValue),
             TextValue = NullIfBlank(input.TextValue),
             DropdownOption = NullIfBlank(input.DropdownOption),
-            ImageUrl = NullIfBlank(input.ImageUrl),
+            ImageObjectKey = NullIfBlank(input.ImageObjectKey),
         };
 
         return dataType switch
         {
-            AttributeDataType.String => normalized with { TextValue = null, ImageUrl = null },
-            AttributeDataType.Text => normalized with { StringValue = null, ImageUrl = null },
+            AttributeDataType.String => normalized with { TextValue = null, ImageObjectKey = null },
+            AttributeDataType.Text => normalized with { StringValue = null, ImageObjectKey = null },
             AttributeDataType.Date => normalized with { PeriodStart = null, PeriodEnd = null },
             AttributeDataType.Period => normalized with { DateValue = null },
             AttributeDataType.Boolean => normalized with { PeriodStart = null, PeriodEnd = null },
-            AttributeDataType.Dropdown => normalized with { ImageUrl = null },
+            AttributeDataType.Dropdown => normalized with { ImageObjectKey = null },
             AttributeDataType.Image => normalized with { StringValue = null, TextValue = null },
             _ => normalized,
         };
@@ -96,13 +96,12 @@ public static class AttributeValueRules
             }
         }
 
-        if (input.ImageUrl is not null)
+        if (input.ImageObjectKey is not null)
         {
-            if (!Uri.TryCreate(input.ImageUrl, UriKind.Absolute, out var uri) ||
-                uri.Scheme != Uri.UriSchemeHttps)
-                return "Image URL must use HTTPS.";
-            if (!IsCloudinaryDeliveryUrl(uri))
-                return "Image must be uploaded through Cloudinary.";
+            if (input.ImageObjectKey.Length > 512 ||
+                input.ImageObjectKey.StartsWith('/') ||
+                input.ImageObjectKey.Contains("..", StringComparison.Ordinal))
+                return "Image object key is invalid.";
         }
 
         return null;
@@ -204,7 +203,7 @@ public static class AttributeValueRules
             (AttributeDataType.Period, input.PeriodStart is not null || input.PeriodEnd is not null),
             (AttributeDataType.Boolean, input.BooleanValue is not null),
             (AttributeDataType.Dropdown, input.DropdownOption is not null),
-            (AttributeDataType.Image, input.ImageUrl is not null),
+            (AttributeDataType.Image, input.ImageObjectKey is not null),
         };
 
         return populated.All(value => !value.Item2 || value.Item1 == dataType);
@@ -212,11 +211,6 @@ public static class AttributeValueRules
 
     private static string? NullIfBlank(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-
-    private static bool IsCloudinaryDeliveryUrl(Uri uri) =>
-        (uri.Host.Equals("res.cloudinary.com", StringComparison.OrdinalIgnoreCase) ||
-         uri.Host.EndsWith(".cloudinary.com", StringComparison.OrdinalIgnoreCase)) &&
-        uri.AbsolutePath.Contains("/image/upload/", StringComparison.OrdinalIgnoreCase);
 
     private static bool IsDropdownChoice(string? optionsJson, string value)
     {

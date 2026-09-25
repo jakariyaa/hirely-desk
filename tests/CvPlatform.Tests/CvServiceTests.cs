@@ -8,10 +8,12 @@ using CvPlatform.Core.Data;
 using CvPlatform.Core.Entities;
 using CvPlatform.Core.Enums;
 using CvPlatform.Infrastructure.Data;
+using CvPlatform.Infrastructure.Storage;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace CvPlatform.Tests;
 
@@ -246,7 +248,9 @@ public class CvServiceTests : IDisposable
         var version = await GetVersionAsync(cvId);
         (await Service(_factory).PublishAsync(actor, cvId, new CvStatusInput(version))).Succeeded.Should().BeTrue();
 
-        var profileService = new CvPlatform.Application.Profiles.ProfileService(_factory);
+        var profileService = new CvPlatform.Application.Profiles.ProfileService(
+            _factory,
+            new B2ImageStorage(Options.Create(new B2Options())));
         var profile = await profileService.GetForUserAsync(actor, candidateId);
         var existing = profile.Value!.Values.Single(v => v.AttributeDefinitionId == defId);
         var save = await profileService.SaveAttributeValueAsync(actor, candidateId,

@@ -35,7 +35,10 @@ public sealed class ExportService(
         var detail = rendered.Value;
         var qr = PngByteQRCodeHelper.GetQRCode(
             $"{publicBaseUrl.TrimEnd('/')}/cvs/{cvId}", QRCodeGenerator.ECCLevel.Q, 8);
-        var photo = await imageFetcher.FetchAsync(detail.ProfilePhotoUrl, ct);
+        var photoObjectKey = detail.Rows
+            .FirstOrDefault(row => row.Name == ProfileAttributeNames.Photo)
+            ?.ImageObjectKey;
+        var photo = await imageFetcher.FetchAsync(photoObjectKey, ct);
 
         try
         {
@@ -345,7 +348,7 @@ public sealed class ExportService(
         { PeriodEnd: { } end } => $"… – {end:yyyy/MM}",
         { BooleanValue: { } b } => b ? "Yes" : "No",
         { DropdownOption: { } dd } => dd,
-        { ImageUrl: { } img } => img,
+        { ImageObjectKey: not null } => "Image",
         _ => "—",
     };
 

@@ -37,7 +37,7 @@ public static class CvSearchTextBuilder
         AttributeDataType.Period => string.Join(" ", new[] { value.PeriodStart?.ToString("yyyy-MM-dd"), value.PeriodEnd?.ToString("yyyy-MM-dd") }.Where(v => v is not null)),
         AttributeDataType.Boolean => value.BooleanValue?.ToString(),
         AttributeDataType.Dropdown => value.DropdownOption,
-        AttributeDataType.Image => value.ImageUrl,
+        AttributeDataType.Image => null,
         _ => null,
     };
 }

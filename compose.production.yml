@@ -24,7 +24,7 @@ services:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_HTTP_PORTS: 8080
       ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
-      AllowedHosts: hirelydesk.jakariya.eu.org
+      AllowedHosts: ${ALLOWED_HOST:?ALLOWED_HOST must be set}
       ConnectionStrings__Default: "Host=db;Port=5432;Database=hirelydesk;Username=hirelydesk;Password=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}"
       Seed__AdminPassword: ${ADMIN_PASSWORD:?ADMIN_PASSWORD must be set}
       Seed__DemoPassword: ${DEMO_PASSWORD:?DEMO_PASSWORD must be set}
@@ -33,11 +33,14 @@ services:
       Authentication__Google__ClientSecret: ${GOOGLE_CLIENT_SECRET:-}
       Authentication__Facebook__AppId: ${FACEBOOK_APP_ID:-}
       Authentication__Facebook__AppSecret: ${FACEBOOK_APP_SECRET:-}
-      Cloudinary__CloudName: ${CLOUDINARY_CLOUD_NAME:-}
-      Cloudinary__UploadPreset: ${CLOUDINARY_UPLOAD_PRESET:-}
-      Cloudinary__ApiKey: ${CLOUDINARY_API_KEY:-}
-      Cloudinary__ApiSecret: ${CLOUDINARY_API_SECRET:-}
-      Cloudinary__Folder: ${CLOUDINARY_FOLDER:-cvplatform}
+      B2__Region: ${B2_REGION:?B2_REGION must be set}
+      B2__BucketName: ${B2_BUCKET_NAME:?B2_BUCKET_NAME must be set}
+      B2__ApplicationKeyId: ${B2_APPLICATION_KEY_ID:?B2_APPLICATION_KEY_ID must be set}
+      B2__ApplicationKey: ${B2_APPLICATION_KEY:?B2_APPLICATION_KEY must be set}
+      B2__KeyPrefix: ${B2_KEY_PREFIX:-users}
+      B2__PresignedUrlLifetimeSeconds: ${B2_PRESIGNED_URL_LIFETIME_SECONDS:-300}
+      B2__DownloadUrlLifetimeSeconds: ${B2_DOWNLOAD_URL_LIFETIME_SECONDS:-60}
+      B2__MaxUploadBytes: ${B2_MAX_UPLOAD_BYTES:-5242880}
       Gmail__Address: ${GMAIL_ADDRESS:-}
       Gmail__AppPassword: ${GMAIL_APP_PASSWORD:-}
       Gmail__FromName: ${GMAIL_FROM_NAME:-Hirely Desk}
@@ -49,7 +52,9 @@ services:
         condition: service_healthy
     volumes:
       - application_logs:/app/logs
+      - application_dataprotection:/home/app/.aspnet/DataProtection-Keys
 
 volumes:
   postgres_data:
   application_logs:
+  application_dataprotection:

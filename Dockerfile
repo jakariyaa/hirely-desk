@@ -2,14 +2,9 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 
 WORKDIR /src
 
-COPY src/CvPlatform.Core/CvPlatform.Core.csproj src/CvPlatform.Core/
-COPY src/CvPlatform.Application/CvPlatform.Application.csproj src/CvPlatform.Application/
-COPY src/CvPlatform.Infrastructure/CvPlatform.Infrastructure.csproj src/CvPlatform.Infrastructure/
-COPY src/CvPlatform.Web/CvPlatform.Web.csproj src/CvPlatform.Web/
+COPY . .
 
 RUN dotnet restore src/CvPlatform.Web/CvPlatform.Web.csproj
-
-COPY . .
 
 RUN dotnet publish src/CvPlatform.Web/CvPlatform.Web.csproj \
     --configuration Release \
@@ -22,7 +17,8 @@ WORKDIR /app
 
 COPY --from=build /app/publish .
 
-RUN mkdir -p /app/logs && chown -R 1654:1654 /app
+RUN mkdir -p /app/logs /home/app/.aspnet/DataProtection-Keys \
+    && chown -R 1654:1654 /app /home/app/.aspnet
 
 USER 1654
 

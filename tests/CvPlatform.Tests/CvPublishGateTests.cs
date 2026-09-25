@@ -139,7 +139,7 @@ public class CvPublishGateTests
         IsFilled(AttributeDataType.Numeric, v => v.NumericValue = 1.5m).Should().BeTrue();
         IsFilled(AttributeDataType.Date, v => v.DateValue = new DateOnly(2024, 1, 1)).Should().BeTrue();
         IsFilled(AttributeDataType.Dropdown, v => v.DropdownOption = "A").Should().BeTrue();
-        IsFilled(AttributeDataType.Image, v => v.ImageUrl = "https://x/y.png").Should().BeTrue();
+        IsFilled(AttributeDataType.Image, v => v.ImageObjectKey = "users/user/profile/image.png").Should().BeTrue();
     }
 
     private static bool IsFilled(AttributeDataType type, Action<ProfileAttributeValue> set)

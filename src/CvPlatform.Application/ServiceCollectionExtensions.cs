@@ -16,6 +16,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<IAttributeCatalog, AttributeCatalogService>();
         services.AddTransient<IAttributeDefinitionService, AttributeDefinitionService>();
         services.AddTransient<IProfileService, ProfileService>();
+        services.AddTransient<Profiles.IProfileImageService, Profiles.ProfileImageService>();
         services.AddTransient<IProjectService, ProjectService>();
         services.AddTransient<IPositionService, PositionService>();
         services.AddTransient<PositionTemplates.IPositionTemplateService, PositionTemplates.PositionTemplateService>();

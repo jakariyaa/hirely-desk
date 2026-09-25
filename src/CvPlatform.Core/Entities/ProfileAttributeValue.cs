@@ -14,7 +14,7 @@ public class ProfileAttributeValue : IVersioned
     public DateOnly? PeriodEnd { get; set; }
     public bool? BooleanValue { get; set; }
     public string? DropdownOption { get; set; }
-    public string? ImageUrl { get; set; }
+    public string? ImageObjectKey { get; set; }
 
     public long Version { get; set; }
 

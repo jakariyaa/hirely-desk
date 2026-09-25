@@ -190,7 +190,6 @@ public class GapClosureTests
         var refs = asm.GetReferencedAssemblies().Select(a => a.Name).ToList();
         refs.Should().NotContain("Npgsql");
         Xunit.Assert.Same(asm, typeof(IFullTextMatcher).Assembly);
-        CvPlatform.Infrastructure.Search.PostgresFullTextMatcher _ = null!;
         typeof(CvPlatform.Infrastructure.Search.PostgresFullTextMatcher).Assembly.GetName().Name
             .Should().Contain("Infrastructure");
     }

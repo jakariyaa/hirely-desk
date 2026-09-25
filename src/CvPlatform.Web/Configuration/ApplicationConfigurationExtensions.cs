@@ -38,10 +38,10 @@ public static class ApplicationConfigurationExtensions
             configuration,
             SeedOptions.SectionName,
             new SeedOptionsValidator());
-        services.AddValidatedOptions<CloudinaryOptions>(
+        services.AddValidatedOptions<B2Options>(
             configuration,
-            CloudinaryOptions.SectionName,
-            new CloudinaryOptionsValidator());
+            B2Options.SectionName,
+            new B2OptionsValidator());
         services.AddValidatedOptions<GmailOptions>(
             configuration,
             GmailOptions.SectionName,

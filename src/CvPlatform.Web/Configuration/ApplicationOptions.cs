@@ -9,7 +9,7 @@ public sealed class ApplicationConfiguration
     public DatabaseOptions Database { get; set; } = new();
     public ExternalAuthenticationOptions Authentication { get; set; } = new();
     public SeedOptions Seed { get; set; } = new();
-    public CloudinaryOptions Cloudinary { get; set; } = new();
+    public B2Options B2 { get; set; } = new();
     public GmailOptions Gmail { get; set; } = new();
 }
 

@@ -10,11 +10,13 @@ using CvPlatform.Core.Entities;
 using CvPlatform.Core.Enums;
 using CvPlatform.Infrastructure.Data;
 using CvPlatform.Infrastructure.Exports;
+using CvPlatform.Infrastructure.Storage;
 using ClosedXML.Excel;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace CvPlatform.Tests;
 
@@ -52,7 +54,8 @@ public class ExportServiceTests : IDisposable
         var access = new PositionAccessService(_factory, new AccessRuleEngine());
         return new ExportService(
             new CvService(_factory, access), access,
-            imageFetcher ?? new ProfileImageFetcher(new HttpClient()));
+            imageFetcher ?? new ProfileImageFetcher(
+                new B2ImageStorage(Options.Create(new B2Options()))));
     }
 
     [Fact]
@@ -153,7 +156,7 @@ public class ExportServiceTests : IDisposable
         await SeedDefinitionAsync(photoDefinitionId, "Me.Photo", AttributeDataType.Image);
         var positionId = await SeedPositionAsync("Engineer");
         var candidateId = await SeedCandidateAsync();
-        await SeedImageValueAsync(candidateId, photoDefinitionId, "https://res.cloudinary.com/demo/image/upload/photo.png");
+        await SeedImageValueAsync(candidateId, photoDefinitionId, $"users/{candidateId:D}/profile/{Guid.NewGuid():N}.png");
         await CreatePublishedCvAsync(candidateId, positionId);
 
         var fetcher = new FixedImageFetcher();
@@ -215,7 +218,7 @@ public class ExportServiceTests : IDisposable
             .Select(cv => cv.Id).SingleAsync();
     }
 
-    private async Task SeedImageValueAsync(Guid userId, Guid definitionId, string url)
+    private async Task SeedImageValueAsync(Guid userId, Guid definitionId, string objectKey)
     {
         await using var db = _factory.CreateDbContext();
         var profileId = await db.Profiles.Where(profile => profile.UserId == userId)
@@ -225,7 +228,7 @@ public class ExportServiceTests : IDisposable
             Id = Guid.NewGuid(),
             ProfileId = profileId,
             AttributeDefinitionId = definitionId,
-            ImageUrl = url,
+            ImageObjectKey = objectKey,
         });
         await db.SaveChangesAsync();
     }

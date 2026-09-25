@@ -5,7 +5,7 @@ namespace CvPlatform.Application.Profiles;
 /// <summary>A candidate profile with its current attribute values.</summary>
 public sealed record ProfileDto(Guid ProfileId, Guid UserId, IReadOnlyList<AttributeValueDto> Values);
 
-public sealed record ProfileSummaryDto(string? Name, string? ImageUrl);
+public sealed record ProfileSummaryDto(string? Name, Guid? ImageValueId);
 
 public static class ProfileAttributeNames
 {
@@ -15,6 +15,7 @@ public static class ProfileAttributeNames
 
 /// <summary>One attribute value on a profile.</summary>
 public sealed record AttributeValueDto(
+    Guid ValueId,
     Guid AttributeDefinitionId,
     string AttributeName,
     AttributeDataType DataType,
@@ -26,10 +27,11 @@ public sealed record AttributeValueDto(
     DateOnly? PeriodEnd,
     bool? BooleanValue,
     string? DropdownOption,
-    string? ImageUrl,
+    string? ImageObjectKey,
     long Version)
 {
     public static AttributeValueDto FromEntity(CvPlatform.Core.Entities.ProfileAttributeValue v) => new(
+        v.Id,
         v.AttributeDefinitionId,
         v.AttributeDefinition.Name,
         v.AttributeDefinition.DataType,
@@ -41,7 +43,7 @@ public sealed record AttributeValueDto(
         v.PeriodEnd,
         v.BooleanValue,
         v.DropdownOption,
-        v.ImageUrl,
+        v.ImageObjectKey,
         v.Version);
 }
 
@@ -56,5 +58,5 @@ public sealed record AttributeValueInput(
     DateOnly? PeriodEnd = null,
     bool? BooleanValue = null,
     string? DropdownOption = null,
-    string? ImageUrl = null,
+    string? ImageObjectKey = null,
     long? ExpectedVersion = null);

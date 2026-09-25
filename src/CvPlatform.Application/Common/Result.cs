@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace CvPlatform.Application.Common;
 
 /// <summary>A domain error: a stable code plus a non-localized developer message.</summary>
@@ -26,6 +28,7 @@ public class Result<T>
 {
     private Result(T value)
     {
+        ArgumentNullException.ThrowIfNull(value);
         Succeeded = true;
         Value = value;
         Error = default;
@@ -38,6 +41,7 @@ public class Result<T>
         Error = error;
     }
 
+    [MemberNotNullWhen(true, nameof(Value))]
     public bool Succeeded { get; }
 
     public T? Value { get; }

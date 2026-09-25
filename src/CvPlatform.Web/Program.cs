@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Threading.RateLimiting;
+using CvPlatform.Core.Storage;
 using Blazored.LocalStorage;
 using CvPlatform.Application;
 using CvPlatform.Application.Markdown;
@@ -14,6 +15,7 @@ using CvPlatform.Web.Configuration;
 using CvPlatform.Web.Storage;
 using CvPlatform.Application.Authorization;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using MudBlazor.Services;
@@ -34,21 +36,12 @@ builder.Services.AddCvPlatformDatabase(applicationConfiguration.ConnectionString
 builder.Services.AddCvPlatformApplication();
 builder.Services.AddSingleton<IMarkdownRenderer, MarkdownRenderer>();
 builder.Services.AddTransient<IExportService, ExportService>();
-builder.Services.AddHttpClient<CvPlatform.Infrastructure.Exports.IProfileImageFetcher,
-    CvPlatform.Infrastructure.Exports.ProfileImageFetcher>(client =>
-{
-    client.Timeout = TimeSpan.FromSeconds(10);
-    client.DefaultRequestHeaders.UserAgent.ParseAdd("CvPlatform-PdfExporter/1.0");
-}).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
-{
-    AllowAutoRedirect = false,
-});
+builder.Services.AddTransient<CvPlatform.Infrastructure.Exports.IProfileImageFetcher,
+    CvPlatform.Infrastructure.Exports.ProfileImageFetcher>();
 builder.Services.AddTransient<CvPlatform.Application.Users.IUserAdministrationService,
     CvPlatform.Web.Users.UserAdministrationService>();
-builder.Services.AddTransient<CvPlatform.Core.Storage.ICloudinaryClientConfiguration,
-    CvPlatform.Infrastructure.Storage.CloudinaryImageService>();
-builder.Services.AddSingleton<CvPlatform.Infrastructure.Storage.ICloudinaryUploadSigner,
-    CvPlatform.Infrastructure.Storage.CloudinaryUploadSigner>();
+builder.Services.AddSingleton<IImageStorage, CvPlatform.Infrastructure.Storage.B2ImageStorage>();
+builder.Services.AddAntiforgery(options => options.HeaderName = "X-XSRF-TOKEN");
 
 var gmail = applicationConfiguration.Gmail;
 if (gmail.IsConfigured)
@@ -119,6 +112,15 @@ builder.Services.AddRateLimiter(o =>
             QueueLimit = 0,
             AutoReplenishment = true
         }));
+    o.AddPolicy("image-downloads", context => RateLimitPartition.GetFixedWindowLimiter(
+        $"image-download:{context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? context.Connection.RemoteIpAddress?.ToString() ?? "anonymous"}",
+        _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 120,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0,
+            AutoReplenishment = true
+        }));
 });
 builder.Services.Configure<RequestLocalizationOptions>(o =>
 {
@@ -146,7 +148,8 @@ app.UseSerilogRequestLogging();
 
 app.MapStaticAssets();
 app.MapAuthEndpoints();
-app.MapCloudinaryUploadEndpoints();
+app.MapB2ImageUploadEndpoints();
+app.MapProfileImageEndpoints();
 app.MapExportEndpoints();
 app.MapRazorComponents<CvPlatform.Web.Components.App>()
     .AddInteractiveServerRenderMode();

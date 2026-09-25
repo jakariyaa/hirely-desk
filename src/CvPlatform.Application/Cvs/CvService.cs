@@ -414,9 +414,9 @@ public sealed class CvService(
         var displayName = cv.Profile.AttributeValues
             .FirstOrDefault(v => v.AttributeDefinition.Name == ProfileAttributeNames.Name)
             ?.StringValue;
-        var profilePhotoUrl = cv.Profile.AttributeValues
+        var profilePhotoValueId = cv.Profile.AttributeValues
             .FirstOrDefault(v => v.AttributeDefinition.Name == ProfileAttributeNames.Photo)
-            ?.ImageUrl;
+            ?.Id;
 
         var dto = await LoadDtoAsync(db, cv.Id, ct) ?? new CvDto(
             cv.Id, cv.ProfileId, candidateId,
@@ -426,7 +426,7 @@ public sealed class CvService(
 
         return new CvDetailDto(
             dto, rows, projects, canEdit, missing.Count == 0, missing,
-            displayName, profilePhotoUrl);
+            displayName, profilePhotoValueId);
     }
 
     private static CvFieldRowDto ToFieldRow(
@@ -444,10 +444,11 @@ public sealed class CvService(
             value?.PeriodEnd,
             value?.BooleanValue,
             value?.DropdownOption,
-            value?.ImageUrl,
+            value?.ImageObjectKey,
             value?.Version ?? 0,
             ParseChoices(attribute.AttributeDefinition.DataType, attribute.AttributeDefinition.OptionsJson),
-            attribute.AttributeDefinition.Category.Name);
+            attribute.AttributeDefinition.Category.Name,
+            value?.Id);
 
     private static IReadOnlyList<string> ParseChoices(AttributeDataType dataType, string? optionsJson)
     {

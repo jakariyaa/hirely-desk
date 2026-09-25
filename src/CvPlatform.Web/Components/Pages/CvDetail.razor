@@ -209,7 +209,8 @@ else if (_detail is not null)
         PeriodEnd = row.PeriodEnd,
         Boolean = row.BooleanValue,
         Dropdown = row.DropdownOption,
-        ImageUrl = row.ImageUrl,
+        ImageValueId = row.ValueId,
+        ImageObjectKey = row.ImageObjectKey,
         Version = row.ValueVersion,
     };
 
@@ -240,7 +241,7 @@ else if (_detail is not null)
                 draft.PeriodEnd,
                 draft.Boolean,
                 draft.Dropdown,
-                draft.ImageUrl,
+                draft.ImageObjectKey,
                 draft.Version);
 
             var actor = await GetActorAsync();
@@ -259,7 +260,8 @@ else if (_detail is not null)
                         PeriodEnd = updated.PeriodEnd,
                         Boolean = updated.BooleanValue,
                         Dropdown = updated.DropdownOption,
-                        ImageUrl = updated.ImageUrl,
+                         ImageValueId = updated.ValueId,
+                         ImageObjectKey = updated.ImageObjectKey,
                         Version = updated.Version,
                     };
                 Snackbar.Add(L["Saved"], Severity.Success);
@@ -421,9 +423,9 @@ else if (_detail is not null)
                 var html = Markdown.ToSafeHtml(row.TextValue);
                 builder.AddContent(0, (MarkupString)html);
                 break;
-            case AttributeDataType.Image when row.ImageUrl is not null:
+            case AttributeDataType.Image when row.ImageObjectKey is not null && row.ValueId is not null:
                 builder.OpenElement(0, "img");
-                builder.AddAttribute(1, "src", row.ImageUrl);
+                builder.AddAttribute(1, "src", ImageContentUrl(row.ValueId.Value, Id));
                 builder.AddAttribute(2, "alt", AttributeLabels.Localize(L, row.Name));
                 builder.AddAttribute(3, "class", "cv-field-image");
                 builder.AddAttribute(4, "loading", "lazy");
@@ -449,9 +451,12 @@ else if (_detail is not null)
         { PeriodEnd: { } end } => $"… – {end:yyyy/MM}",
         { BooleanValue: { } b } => b ? "✓" : "✗",
         { DropdownOption: { } dd } => dd,
-        { ImageUrl: { } img } => img,
+        { ImageObjectKey: not null } => "Image",
         _ => "—",
     };
+
+    private static string ImageContentUrl(Guid valueId, Guid cvId) =>
+        $"/api/profile-images/{valueId:D}/content?cvId={cvId:D}";
 
     private async Task<ActorContext> GetActorAsync()
     {

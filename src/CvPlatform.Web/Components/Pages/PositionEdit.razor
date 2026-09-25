@@ -50,7 +50,7 @@ else
 {
     <MudPaper Class="cv-panel pa-4 mb-4">
         <MudText Typo="Typo.h6" Class="mb-3">@L["GeneralInfo"]</MudText>
-        <MudForm @ref="_form" Validations="@(new Dictionary<string, Func<object, string?>>())">
+        <MudForm @ref="_form">
             <MudGrid Spacing="3">
                 <MudItem xs="12" md="6">
                     <MudTextField @bind-Value="_title" Label="@L["PositionTitle"]" Variant="Variant.Outlined"
@@ -300,6 +300,13 @@ else
 
     private async Task SaveGeneralAsync()
     {
+        if (_form is not null)
+        {
+            await _form.ValidateAsync();
+            if (!_form.IsValid)
+                return;
+        }
+
         if (string.IsNullOrWhiteSpace(_title))
             return;
 

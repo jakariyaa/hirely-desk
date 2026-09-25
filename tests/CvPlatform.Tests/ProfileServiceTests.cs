@@ -5,6 +5,7 @@ using CvPlatform.Application.Profiles;
 using CvPlatform.Core.Data;
 using CvPlatform.Core.Entities;
 using CvPlatform.Core.Enums;
+using CvPlatform.Core.Storage;
 using CvPlatform.Infrastructure.Data;
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
@@ -15,6 +16,38 @@ namespace CvPlatform.Tests;
 public class ProfileServiceTests
 {
     private static ActorContext Actor(Guid userId) => new(userId, false);
+    private sealed class TestImageStorage : IImageStorage
+    {
+        public bool IsConfigured => true;
+        public long MaxUploadBytes => 5 * 1024 * 1024;
+
+        public bool IsAllowedContentType(string contentType) =>
+            contentType is "image/jpeg" or "image/png" or "image/webp";
+
+        public ImageUploadTicket? CreateUploadTicket(Guid userId, string contentType, long size) => null;
+
+        public ImageDownloadTicket? CreateDownloadTicket(string objectKey) =>
+            new("https://storage.example.test/download", DateTimeOffset.UtcNow.AddMinutes(1));
+
+        public Task<string?> CompleteUploadAsync(
+            Guid userId,
+            string objectKey,
+            string contentType,
+            long size,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<string?>(null);
+
+        public Task<StoredImage?> OpenObjectAsync(
+            string objectKey,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<StoredImage?>(null);
+
+        public bool IsOwnedObjectKey(string objectKey, Guid userId) =>
+            objectKey.StartsWith($"users/{userId:D}/profile/", StringComparison.Ordinal);
+    }
+
+    private static ProfileService Service(IAppDbContextFactory factory) =>
+        new(factory, new TestImageStorage());
     private sealed class TestFactory(IDbContextFactory<AppDbContext> factory) : IAppDbContextFactory
     {
         public IAppDbContext CreateDbContext() => factory.CreateDbContext();
@@ -61,7 +94,7 @@ public class ProfileServiceTests
     public async Task GetForUserAsync_creates_profile_on_first_access()
     {
         var factory = CreateFactory(out var db);
-        var service = new ProfileService(factory);
+        var service = Service(factory);
         var userId = Guid.NewGuid();
 
         var result = await service.GetForUserAsync(Actor(userId), userId);
@@ -74,7 +107,7 @@ public class ProfileServiceTests
     public async Task GetSummaryForUserAsync_returns_name_and_photo()
     {
         var factory = CreateFactory(out var db);
-        var service = new ProfileService(factory);
+        var service = Service(factory);
         var userId = Guid.NewGuid();
         var profile = new Profile { Id = Guid.NewGuid(), UserId = userId };
         db.Profiles.Add(profile);
@@ -91,7 +124,8 @@ public class ProfileServiceTests
             {
                 ProfileId = profile.Id,
                 AttributeDefinitionId = photo.Id,
-                ImageUrl = "https://cdn.example.test/ada.jpg",
+                Id = Guid.NewGuid(),
+                ImageObjectKey = $"users/{userId:D}/profile/{Guid.NewGuid():N}.jpg",
             });
         await db.SaveChangesAsync();
 
@@ -99,14 +133,14 @@ public class ProfileServiceTests
 
         result.Succeeded.Should().BeTrue();
         result.Value!.Name.Should().Be("Ada Lovelace");
-        result.Value.ImageUrl.Should().Be("https://cdn.example.test/ada.jpg");
+        result.Value.ImageValueId.Should().NotBeNull();
     }
 
     [Fact]
     public async Task GetSummaryForUserAsync_rejects_different_actor()
     {
         var factory = CreateFactory(out _);
-        var service = new ProfileService(factory);
+        var service = Service(factory);
 
         var result = await service.GetSummaryForUserAsync(
             Actor(Guid.NewGuid()), Guid.NewGuid());
@@ -116,10 +150,10 @@ public class ProfileServiceTests
     }
 
     [Fact]
-    public async Task SaveAttributeValueAsync_rejects_cloudinary_image_outside_user_folder()
+    public async Task SaveAttributeValueAsync_rejects_b2_image_outside_user_folder()
     {
         var factory = CreateFactory(out var db);
-        var service = new ProfileService(factory);
+        var service = Service(factory);
         var userId = Guid.NewGuid();
         db.Profiles.Add(new Profile { Id = Guid.NewGuid(), UserId = userId });
         var photo = await SeedDefinitionAsync(db, ProfileAttributeNames.Photo, AttributeDataType.Image);
@@ -129,7 +163,7 @@ public class ProfileServiceTests
             userId,
             new AttributeValueInput(
                 photo.Id,
-                ImageUrl: "https://res.cloudinary.com/demo/image/upload/cvplatform/another-user/profile/photo.jpg"));
+                ImageObjectKey: $"users/{Guid.NewGuid():D}/profile/{Guid.NewGuid():N}.jpg"));
 
         result.Succeeded.Should().BeFalse();
         result.Error.Code.Should().Be(ErrorCodes.ValidationFailed);
@@ -139,7 +173,7 @@ public class ProfileServiceTests
     public async Task SaveAttributeValueAsync_creates_then_updates_value()
     {
         var factory = CreateFactory(out var db);
-        var service = new ProfileService(factory);
+        var service = Service(factory);
         var userId = Guid.NewGuid();
         var definition = await SeedDefinitionAsync(db, "Me.Phone", AttributeDataType.String);
 
@@ -162,7 +196,7 @@ public class ProfileServiceTests
     public async Task SaveAttributeValueAsync_rejects_dropdown_option_outside_choices()
     {
         var factory = CreateFactory(out var db);
-        var service = new ProfileService(factory);
+        var service = Service(factory);
         var definition = await SeedDefinitionAsync(
             db, "IELTS Band", AttributeDataType.Dropdown, """{"choices":["6","7","8"]}""");
 
@@ -177,7 +211,7 @@ public class ProfileServiceTests
     public async Task SaveAttributeValueAsync_accepts_dropdown_option_within_choices()
     {
         var factory = CreateFactory(out var db);
-        var service = new ProfileService(factory);
+        var service = Service(factory);
         var definition = await SeedDefinitionAsync(
             db, "IELTS Band", AttributeDataType.Dropdown, """{"choices":["6","7","8"]}""");
 
@@ -192,7 +226,7 @@ public class ProfileServiceTests
     public async Task SaveAttributeValueAsync_unknown_definition_fails()
     {
         var factory = CreateFactory(out var db);
-        var service = new ProfileService(factory);
+        var service = Service(factory);
 
         var result = await service.SaveAttributeValueAsync(
             Actor(Guid.Empty), Guid.Empty, new AttributeValueInput(Guid.NewGuid(), StringValue: "x"));
@@ -205,7 +239,7 @@ public class ProfileServiceTests
     public async Task SaveAttributeValueAsync_rejects_stale_version()
     {
         var factory = CreateFactory(out var db);
-        var service = new ProfileService(factory);
+        var service = Service(factory);
         var userId = Guid.NewGuid();
         var definition = await SeedDefinitionAsync(db, "Me.Phone", AttributeDataType.String);
 
@@ -225,7 +259,7 @@ public class ProfileServiceTests
     public async Task GetForUserAsync_rejects_different_actor()
     {
         var factory = CreateFactory(out _);
-        var service = new ProfileService(factory);
+        var service = Service(factory);
 
         var result = await service.GetForUserAsync(
             Actor(Guid.NewGuid()), Guid.NewGuid());
@@ -238,7 +272,7 @@ public class ProfileServiceTests
     public async Task SaveAttributeValueAsync_rejects_value_for_wrong_data_type()
     {
         var factory = CreateFactory(out var db);
-        var service = new ProfileService(factory);
+        var service = Service(factory);
         var definition = await SeedDefinitionAsync(db, "Me.BirthDate", AttributeDataType.Date);
 
         var result = await service.SaveAttributeValueAsync(
@@ -253,7 +287,7 @@ public class ProfileServiceTests
     public async Task SaveAttributeValueAsync_enforces_numeric_options()
     {
         var factory = CreateFactory(out var db);
-        var service = new ProfileService(factory);
+        var service = Service(factory);
         var definition = await SeedDefinitionAsync(
             db, "Me.Score", AttributeDataType.Numeric, """{"min":1,"max":10}""");
 

@@ -21,6 +21,7 @@ public class UserAdministrationTests : IDisposable
 {
     private readonly SqliteConnection _connection;
     private readonly AppDbContext _db;
+    private readonly ServiceProvider _serviceProvider;
 
     public UserAdministrationTests()
     {
@@ -31,11 +32,13 @@ public class UserAdministrationTests : IDisposable
             .Options;
         _db = new AppDbContext(options);
         _db.Database.EnsureCreated();
+        _serviceProvider = new ServiceCollection().BuildServiceProvider();
     }
 
     public void Dispose()
     {
         _db.Dispose();
+        _serviceProvider.Dispose();
         _connection.Dispose();
     }
 
@@ -50,7 +53,7 @@ public class UserAdministrationTests : IDisposable
             [],
             new UpperInvariantLookupNormalizer(),
             new IdentityErrorDescriber(),
-            null,
+            _serviceProvider,
             NullLogger<UserManager<ApplicationUser>>.Instance);
     }
 

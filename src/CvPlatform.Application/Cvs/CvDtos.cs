@@ -33,15 +33,16 @@ public sealed record CvFieldRowDto(
     DateOnly? PeriodEnd,
     bool? BooleanValue,
     string? DropdownOption,
-    string? ImageUrl,
+    string? ImageObjectKey,
     long ValueVersion,
     IReadOnlyList<string> Choices,
-    string? CategoryName = null)
+    string? CategoryName = null,
+    Guid? ValueId = null)
 {
     public bool IsFilled =>
         StringValue is not null || TextValue is not null || NumericValue is not null ||
         DateValue is not null || PeriodStart is not null || BooleanValue is not null ||
-        DropdownOption is not null || ImageUrl is not null;
+        DropdownOption is not null || ImageObjectKey is not null;
 }
 
 /// <summary>A project the candidate may include in the CV.</summary>
@@ -63,7 +64,7 @@ public sealed record CvDetailDto(
     bool PublishGateSatisfied,
     IReadOnlyList<string> MissingRequired,
     string? DisplayName = null,
-    string? ProfilePhotoUrl = null);
+    Guid? ProfilePhotoValueId = null);
 
 public sealed record CvExportRowDto(
     CvDto Cv,

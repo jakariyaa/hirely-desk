@@ -78,7 +78,7 @@ public class AttributeValueRulesTests
     }
 
     [Fact]
-    public void Validate_rejects_non_cloudinary_image_urls()
+    public void Validate_rejects_invalid_image_object_keys()
     {
         var definition = new AttributeDefinition
         {
@@ -87,12 +87,12 @@ public class AttributeValueRulesTests
         };
 
         AttributeValueRules.Validate(definition, new AttributeValueInput(
-            Guid.NewGuid(), ImageUrl: "https://images.example.test/photo.jpg"))
-            .Should().Be("Image must be uploaded through Cloudinary.");
+            Guid.NewGuid(), ImageObjectKey: "../photo.jpg"))
+            .Should().Be("Image object key is invalid.");
     }
 
     [Fact]
-    public void Validate_accepts_cloudinary_image_urls()
+    public void Validate_accepts_image_object_keys()
     {
         var definition = new AttributeDefinition
         {
@@ -101,7 +101,7 @@ public class AttributeValueRulesTests
         };
 
         AttributeValueRules.Validate(definition, new AttributeValueInput(
-            Guid.NewGuid(), ImageUrl: "https://res.cloudinary.com/demo/image/upload/photo.jpg"))
+            Guid.NewGuid(), ImageObjectKey: "users/user/profile/image.jpg"))
             .Should().BeNull();
     }
 

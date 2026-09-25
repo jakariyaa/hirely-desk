@@ -10,6 +10,7 @@ public sealed class AttributeValueDraft
     public DateOnly? PeriodEnd { get; set; }
     public bool? Boolean { get; set; }
     public string? Dropdown { get; set; }
-    public string? ImageUrl { get; set; }
+    public Guid? ImageValueId { get; set; }
+    public string? ImageObjectKey { get; set; }
     public long Version { get; set; }
 }

@@ -164,7 +164,8 @@
         PeriodEnd = value.PeriodEnd,
         Boolean = value.BooleanValue,
         Dropdown = value.DropdownOption,
-        ImageUrl = value.ImageUrl,
+        ImageValueId = value.ValueId,
+        ImageObjectKey = value.ImageObjectKey,
         Version = value.Version,
     };
 
@@ -178,7 +179,7 @@
         draft.PeriodEnd,
         draft.Boolean,
         draft.Dropdown,
-        draft.ImageUrl,
+        draft.ImageObjectKey,
         draft.Version);
 
     private async Task SaveAsync(AttributeDefinitionDto definition)
