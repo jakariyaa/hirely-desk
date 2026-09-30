@@ -78,7 +78,7 @@ B2_DOWNLOAD_URL_LIFETIME_SECONDS=60
 B2_MAX_UPLOAD_BYTES=5242880
 ```
 
-The optional OAuth and Gmail variables are `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `FACEBOOK_APP_ID`, `FACEBOOK_APP_SECRET`, `GMAIL_ADDRESS`, `GMAIL_APP_PASSWORD`, `GMAIL_FROM_NAME`, and `GMAIL_REQUIRE_CONFIRMED_ACCOUNT`.
+The optional OAuth and Gmail variables are `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `FACEBOOK_APP_ID`, `FACEBOOK_APP_SECRET`, `GMAIL_ADDRESS`, `GMAIL_APP_PASSWORD`, `GMAIL_FROM_NAME`, and `GMAIL_REQUIRE_CONFIRMED_ACCOUNT`, plus `SALESFORCE_INSTANCE_URL`, `SALESFORCE_CLIENT_ID`, and `SALESFORCE_CLIENT_SECRET`.
 
 Start the deployment from the repository root:
 
@@ -114,6 +114,7 @@ Optional integrations are enabled only when fully configured:
 - Google or Facebook authentication
 - Backblaze B2 private image storage: `B2:Region`, `B2:BucketName`, `B2:ApplicationKeyId`, `B2:ApplicationKey`, `B2:KeyPrefix`, `B2:PresignedUrlLifetimeSeconds`, `B2:DownloadUrlLifetimeSeconds`, and `B2:MaxUploadBytes`
 - Gmail confirmation email: `Gmail:Address`, `Gmail:AppPassword`, `Gmail:FromName`, and `Gmail:RequireConfirmedAccount`
+- Salesforce CRM sync: `Salesforce:InstanceUrl`, `Salesforce:ClientId`, `Salesforce:ClientSecret`, and optional `Salesforce:ApiVersion` (default `v61.0`)
 
 Use user secrets locally and an approved production secret-management solution in deployment. Seed passwords are not reset when the configuration changes.
 

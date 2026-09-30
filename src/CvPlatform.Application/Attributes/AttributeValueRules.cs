@@ -40,7 +40,7 @@ public static class AttributeValueRules
         };
     }
 
-    public static string? Validate(AttributeDefinition definition, AttributeValueInput input)
+    public static string? Validate(AttributeDefinition definition, AttributeValueInput input, DateOnly today)
     {
         if (!HasOnlyExpectedValue(definition.DataType, input))
             return $"Value shape does not match '{definition.Name}'.";
@@ -49,17 +49,9 @@ public static class AttributeValueRules
             input.PeriodEnd < input.PeriodStart)
             return "Period end cannot be earlier than period start.";
 
-        AttributeOptions? options;
-        try
-        {
-            options = string.IsNullOrWhiteSpace(definition.OptionsJson)
-                ? null
-                : JsonSerializer.Deserialize<AttributeOptions>(definition.OptionsJson, JsonOptions);
-        }
-        catch (JsonException)
-        {
+        var options = AttributeDateRules.Parse(definition.OptionsJson);
+        if (options is null && !string.IsNullOrWhiteSpace(definition.OptionsJson))
             return "Attribute options are invalid.";
-        }
 
         if (definition.DataType == AttributeDataType.Dropdown && input.DropdownOption is not null &&
             (options?.Choices is null || !options.Choices
@@ -104,7 +96,30 @@ public static class AttributeValueRules
                 return "Image object key is invalid.";
         }
 
-        return null;
+        return ValidateDates(definition.DataType, options, input, today);
+    }
+
+    private static string? ValidateDates(
+        AttributeDataType dataType, AttributeOptions? options, AttributeValueInput input, DateOnly today)
+    {
+        if (dataType == AttributeDataType.Date && input.DateValue is { } date)
+            return AttributeDateRules.ValidateValue(
+                "Date", date, AttributeDateRules.Resolve(options, today), today);
+
+        if (dataType != AttributeDataType.Period)
+            return null;
+
+        var range = AttributeDateRules.Resolve((AttributeOptions?)null, today);
+        if (input.PeriodStart is { } start)
+        {
+            var error = AttributeDateRules.ValidateValue("Period start", start, range, today);
+            if (error is not null)
+                return error;
+        }
+
+        return input.PeriodEnd is { } end
+            ? AttributeDateRules.ValidateValue("Period end", end, range, today)
+            : null;
     }
 
     public static string? ValidateOptions(AttributeDataType dataType, string? optionsJson)
@@ -164,7 +179,7 @@ public static class AttributeValueRules
             }
         }
 
-        return null;
+        return AttributeDateRules.ValidateOptions(dataType, options);
     }
 
     public static string? ValidateComparison(

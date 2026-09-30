@@ -45,6 +45,22 @@
         <MudTextField T="string" Value="@_regex" ValueChanged="SetRegexAsync"
                       Label="@L["RegularExpression"]" Variant="Variant.Outlined" />
     }
+    else if (DataType == AttributeDataType.Date)
+    {
+        <MudText Typo="Typo.caption">@L["DateOptionsHint"]</MudText>
+        <MudStack Row Spacing="2">
+            <MudDatePicker Date="@ToDateTime(_minDate)" DateChanged="SetMinDateAsync"
+                           Label="@L["MinimumDate"]" Variant="Variant.Outlined" Clearable />
+            <MudDatePicker Date="@ToDateTime(_maxDate)" DateChanged="SetMaxDateAsync"
+                           Label="@L["MaximumDate"]" Variant="Variant.Outlined" Clearable />
+        </MudStack>
+        <MudStack Row Spacing="2">
+            <MudNumericField T="int?" Value="@_minAgeDays" ValueChanged="SetMinAgeDaysAsync"
+                             Label="@L["MinimumAgeDays"]" Variant="Variant.Outlined" />
+            <MudNumericField T="int?" Value="@_maxAgeDays" ValueChanged="SetMaxAgeDaysAsync"
+                             Label="@L["MaximumAgeDays"]" Variant="Variant.Outlined" />
+        </MudStack>
+    }
 </MudStack>
 
 @code {
@@ -63,6 +79,10 @@
     private decimal? _max;
     private int? _maxLength;
     private string? _regex;
+    private DateOnly? _minDate;
+    private DateOnly? _maxDate;
+    private int? _minAgeDays;
+    private int? _maxAgeDays;
     private string? _parseError;
     private string? _loadedOptionsJson;
     private AttributeDataType? _loadedDataType;
@@ -82,6 +102,10 @@
         _max = null;
         _maxLength = null;
         _regex = null;
+        _minDate = null;
+        _maxDate = null;
+        _minAgeDays = null;
+        _maxAgeDays = null;
         _parseError = null;
         _loadedDataType = DataType;
         _loadedOptionsJson = OptionsJson;
@@ -103,6 +127,10 @@
             _max = options.Max;
             _maxLength = options.MaxLength;
             _regex = options.Regex;
+            _minDate = options.MinDate;
+            _maxDate = options.MaxDate;
+            _minAgeDays = options.MinAgeDays;
+            _maxAgeDays = options.MaxAgeDays;
         }
         catch (JsonException)
         {
@@ -154,6 +182,33 @@
         await NotifyChangedAsync();
     }
 
+    private async Task SetMinDateAsync(DateTime? value)
+    {
+        _minDate = value is null ? null : DateOnly.FromDateTime(value.Value);
+        await NotifyChangedAsync();
+    }
+
+    private async Task SetMaxDateAsync(DateTime? value)
+    {
+        _maxDate = value is null ? null : DateOnly.FromDateTime(value.Value);
+        await NotifyChangedAsync();
+    }
+
+    private async Task SetMinAgeDaysAsync(int? value)
+    {
+        _minAgeDays = value;
+        await NotifyChangedAsync();
+    }
+
+    private async Task SetMaxAgeDaysAsync(int? value)
+    {
+        _maxAgeDays = value;
+        await NotifyChangedAsync();
+    }
+
+    private static DateTime? ToDateTime(DateOnly? value) =>
+        value?.ToDateTime(TimeOnly.MinValue);
+
     private async Task NotifyChangedAsync()
     {
         var options = new AttributeOptions(
@@ -161,9 +216,15 @@
             DataType == AttributeDataType.Numeric ? _min : null,
             DataType == AttributeDataType.Numeric ? _max : null,
             DataType is AttributeDataType.String or AttributeDataType.Text ? _maxLength : null,
-            DataType is AttributeDataType.String or AttributeDataType.Text ? _regex : null);
+            DataType is AttributeDataType.String or AttributeDataType.Text ? _regex : null,
+            DataType == AttributeDataType.Date ? _minDate : null,
+            DataType == AttributeDataType.Date ? _maxDate : null,
+            DataType == AttributeDataType.Date ? _minAgeDays : null,
+            DataType == AttributeDataType.Date ? _maxAgeDays : null);
         var hasOptions = options.Choices is not null || options.Min is not null || options.Max is not null ||
-                         options.MaxLength is not null || !string.IsNullOrWhiteSpace(options.Regex);
+                         options.MaxLength is not null || !string.IsNullOrWhiteSpace(options.Regex) ||
+                         options.MinDate is not null || options.MaxDate is not null ||
+                         options.MinAgeDays is not null || options.MaxAgeDays is not null;
         var serialized = hasOptions ? JsonSerializer.Serialize(options, JsonOptions) : null;
         _loadedOptionsJson = serialized;
         await OptionsJsonChanged.InvokeAsync(serialized);

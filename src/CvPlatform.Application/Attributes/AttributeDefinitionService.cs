@@ -31,7 +31,7 @@ public sealed class AttributeDefinitionService(
             query = query.Where(d => d.Name.StartsWith(request.Prefix));
 
         var total = await query.CountAsync(ct);
-        var items = await query.OrderBy(d => d.Name).ThenBy(d => d.Id)
+        var items = await ApplySort(query, request.Sort)
             .Skip(page.Skip).Take(page.PageSize)
             .Select(d => new AttributeDefinitionAdminDto(
                 d.Id, d.CategoryId, d.Category.Name, d.Name, d.Description, d.DataType,
@@ -160,31 +160,38 @@ public sealed class AttributeDefinitionService(
         return await GetAsync(db, id, ct);
     }
 
+    public Task<Result<AttributeDeleteImpactDto>> GetDeleteImpactAsync(
+        ActorContext actor, Guid id, CancellationToken ct = default) =>
+        GetDeleteImpactAsync(actor, [id], ct);
+
     public async Task<Result<AttributeDeleteImpactDto>> GetDeleteImpactAsync(
-        ActorContext actor, Guid id, CancellationToken ct = default)
+        ActorContext actor, IReadOnlyList<Guid> ids, CancellationToken ct = default)
     {
         if (!actor.IsAdmin)
             return Result<AttributeDeleteImpactDto>.Failure(ErrorCodes.Forbidden, "Admin access required.");
+        if (ids.Count == 0)
+            return Result<AttributeDeleteImpactDto>.Success(AttributeDeleteImpactDto.Zero);
+
         await using var db = factory.CreateDbContext();
-        if (!await db.AttributeDefinitions.AnyAsync(d => d.Id == id, ct))
+        if (await db.AttributeDefinitions.CountAsync(d => ids.Contains(d.Id), ct) != ids.Count)
             return Result<AttributeDeleteImpactDto>.Failure(ErrorCodes.NotFound, "Attribute definition was not found.");
 
-        var positions = await db.PositionAttributes.Where(a => a.AttributeDefinitionId == id)
+        var positions = await db.PositionAttributes.Where(a => ids.Contains(a.AttributeDefinitionId))
             .Select(a => a.PositionId).Distinct().ToListAsync(ct);
         var restricted = await db.AccessRules
-            .Where(r => !r.Position.IsPublic && r.AttributeDefinitionId == id)
+            .Where(r => !r.Position.IsPublic && ids.Contains(r.AttributeDefinitionId))
             .Select(r => r.PositionId)
             .Distinct()
             .Where(positionId => !db.AccessRules.Any(r =>
-                r.PositionId == positionId && r.AttributeDefinitionId != id))
+                r.PositionId == positionId && !ids.Contains(r.AttributeDefinitionId)))
             .CountAsync(ct);
         var cvCount = await db.Cvs.CountAsync(c =>
             positions.Contains(c.PositionId) || db.ProfileAttributeValues.Any(v =>
-                v.ProfileId == c.ProfileId && v.AttributeDefinitionId == id), ct);
+                v.ProfileId == c.ProfileId && ids.Contains(v.AttributeDefinitionId)), ct);
         return Result<AttributeDeleteImpactDto>.Success(new AttributeDeleteImpactDto(
-            await db.ProfileAttributeValues.CountAsync(v => v.AttributeDefinitionId == id, ct),
+            await db.ProfileAttributeValues.CountAsync(v => ids.Contains(v.AttributeDefinitionId), ct),
             positions.Count,
-            await db.AccessRules.CountAsync(r => r.AttributeDefinitionId == id, ct),
+            await db.AccessRules.CountAsync(r => ids.Contains(r.AttributeDefinitionId), ct),
             cvCount,
             restricted));
     }
@@ -208,17 +215,27 @@ public sealed class AttributeDefinitionService(
         return Result<AttributeOptionImpactDto>.Success(new AttributeOptionImpactDto(removed, values, rules));
     }
 
-    public async Task<Result> DeleteAsync(ActorContext actor, Guid id, long expectedVersion, CancellationToken ct = default)
+    public Task<Result> DeleteAsync(ActorContext actor, Guid id, long expectedVersion, CancellationToken ct = default) =>
+        DeleteManyAsync(actor, [new AttributeDefinitionDeleteInput(id, expectedVersion)], ct);
+
+    public async Task<Result> DeleteManyAsync(
+        ActorContext actor, IReadOnlyList<AttributeDefinitionDeleteInput> items, CancellationToken ct = default)
     {
         if (!actor.IsAdmin)
             return Result.Failure(ErrorCodes.Forbidden, "Admin access required.");
+        if (items.Count == 0)
+            return Result.Success();
+
         await using var db = factory.CreateDbContext();
-        var definition = await db.AttributeDefinitions.SingleOrDefaultAsync(d => d.Id == id, ct);
-        if (definition is null)
+        var ids = items.Select(item => item.Id).Distinct().ToList();
+        var definitions = await db.AttributeDefinitions.Where(d => ids.Contains(d.Id)).ToListAsync(ct);
+        if (definitions.Count != ids.Count)
             return Result.Failure(ErrorCodes.NotFound, "Attribute definition was not found.");
-        if (definition.IsBuiltIn)
+        if (definitions.Any(d => d.IsBuiltIn))
             return Result.Failure(ErrorCodes.Forbidden, "Built-in attributes cannot be deleted.");
-        if (definition.Version != expectedVersion)
+
+        var versions = items.ToDictionary(item => item.Id, item => item.Version);
+        if (definitions.Any(d => d.Version != versions[d.Id]))
             return Result.Failure(ErrorCodes.ConcurrencyConflict, "The attribute was modified by someone else.");
 
         await using var transaction = db.Database.ProviderName != "Microsoft.EntityFrameworkCore.InMemory"
@@ -230,18 +247,37 @@ public sealed class AttributeDefinitionService(
             .Include(c => c.Profile).ThenInclude(p => p.AttributeValues).ThenInclude(v => v.AttributeDefinition)
             .AsSplitQuery()
             .Where(c => c.Status == CvStatus.Published &&
-                (c.Position.Attributes.Any(a => a.AttributeDefinitionId == id) ||
-                 c.Profile.AttributeValues.Any(v => v.AttributeDefinitionId == id)))
+                (c.Position.Attributes.Any(a => ids.Contains(a.AttributeDefinitionId)) ||
+                 c.Profile.AttributeValues.Any(v => ids.Contains(v.AttributeDefinitionId))))
             .ToListAsync(ct);
         foreach (var cv in publishedCvs)
-            cv.SearchText = CvSearchTextBuilder.Build(cv, id);
+            cv.SearchText = CvSearchTextBuilder.Build(cv, ids);
 
-        db.AttributeDefinitions.Remove(definition);
+        db.AttributeDefinitions.RemoveRange(definitions);
         try { await db.SaveChangesAsync(ct); }
         catch (DbUpdateConcurrencyException) { return Result.Failure(ErrorCodes.ConcurrencyConflict, "The attribute was modified by someone else."); }
         if (transaction is not null)
             await transaction.CommitAsync(ct);
         return Result.Success();
+    }
+
+    private static IQueryable<AttributeDefinition> ApplySort(
+        IQueryable<AttributeDefinition> query, AttributeSort? sort)
+    {
+        var order = sort ?? new AttributeSort(AttributeSortField.Name, false);
+        var ordered = order.Field switch
+        {
+            AttributeSortField.Category => order.Descending
+                ? query.OrderByDescending(d => d.Category.Name).ThenByDescending(d => d.Name)
+                : query.OrderBy(d => d.Category.Name).ThenBy(d => d.Name),
+            AttributeSortField.DataType => order.Descending
+                ? query.OrderByDescending(d => d.DataType).ThenByDescending(d => d.Name)
+                : query.OrderBy(d => d.DataType).ThenBy(d => d.Name),
+            _ => order.Descending
+                ? query.OrderByDescending(d => d.Name)
+                : query.OrderBy(d => d.Name)
+        };
+        return ordered.ThenBy(d => d.Id);
     }
 
     private static async Task<Result<AttributeDefinitionAdminDto>> GetAsync(

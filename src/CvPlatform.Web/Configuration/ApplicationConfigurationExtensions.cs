@@ -1,3 +1,4 @@
+using CvPlatform.Infrastructure.Crm;
 using CvPlatform.Infrastructure.Email;
 using CvPlatform.Infrastructure.Storage;
 using Microsoft.Extensions.Configuration;
@@ -46,6 +47,10 @@ public static class ApplicationConfigurationExtensions
             configuration,
             GmailOptions.SectionName,
             new GmailOptionsValidator());
+        services.AddValidatedOptions<SalesforceOptions>(
+            configuration,
+            SalesforceOptions.SectionName,
+            new SalesforceOptionsValidator());
 
         return applicationConfiguration;
     }

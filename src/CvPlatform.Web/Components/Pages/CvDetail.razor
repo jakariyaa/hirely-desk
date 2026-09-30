@@ -18,9 +18,10 @@
 @inject IMarkdownRenderer Markdown
 @inject AuthenticationStateProvider AuthProvider
 @inject IDialogService DialogService
-@inject ISnackbar Snackbar
+@inject IUiErrorReporter Errors
 @inject NavigationManager Navigation
 @inject IStringLocalizer<SharedResource> L
+@inject ISnackbar Snackbar
 
 <PageTitle>@L["CvDetail"]</PageTitle>
 
@@ -181,12 +182,12 @@ else if (_detail is not null)
             }
             else
             {
-                _error = result.Error.Message;
+                _error = Errors.Report(result.Error);
             }
         }
         catch (Exception ex)
         {
-            _error = ex.Message;
+            _error = Errors.Report(ex);
         }
         finally
         {
@@ -219,7 +220,8 @@ else if (_detail is not null)
         row.Name,
         row.DataType,
         false,
-        row.Choices.Select(c => new DropdownChoice(c)).ToList());
+        row.Choices.Select(c => new DropdownChoice(c)).ToList(),
+        row.DateRange);
 
     private bool IsSaving(Guid definitionId) => _saving.Contains(definitionId);
 
@@ -271,13 +273,13 @@ else if (_detail is not null)
             {
                 if (result.Error.Code == ErrorCodes.ConcurrencyConflict)
                 {
-                    var dialog = await DialogService.ShowAsync<ConcurrencyDialog>("Concurrency conflict");
+                    var dialog = await DialogService.ShowAsync<ConcurrencyDialog>(L["ConcurrencyConflictTitle"].Value);
                     if ((await dialog.Result) is { Canceled: false, Data: true })
                         await LoadAsync();
                 }
                 else
                 {
-                    Snackbar.Add(result.Error.Message, Severity.Error);
+                    Errors.Notify(result.Error);
                 }
             }
         }
@@ -300,15 +302,15 @@ else if (_detail is not null)
             {
                 if (result.Error.Code == ErrorCodes.ConcurrencyConflict)
                 {
-                    var dialog = await DialogService.ShowAsync<ConcurrencyDialog>("Concurrency conflict");
+                    var dialog = await DialogService.ShowAsync<ConcurrencyDialog>(L["ConcurrencyConflictTitle"].Value);
                     if ((await dialog.Result) is { Canceled: false, Data: true })
                         await LoadAsync();
                     else
-                        Snackbar.Add(result.Error.Message, Severity.Error);
+                        Errors.Notify(result.Error);
                 }
                 else
                 {
-                    Snackbar.Add(result.Error.Message, Severity.Error);
+                    Errors.Notify(result.Error);
                 }
             }
 
@@ -337,13 +339,13 @@ else if (_detail is not null)
             }
             else if (result.Error.Code == ErrorCodes.ConcurrencyConflict)
             {
-                var dialog = await DialogService.ShowAsync<ConcurrencyDialog>("Concurrency conflict");
+                var dialog = await DialogService.ShowAsync<ConcurrencyDialog>(L["ConcurrencyConflictTitle"].Value);
                 if ((await dialog.Result) is not { Canceled: false, Data: true })
-                    Snackbar.Add(result.Error.Message, Severity.Error);
+                    Errors.Notify(result.Error);
             }
             else
             {
-                Snackbar.Add(result.Error.Message, Severity.Error);
+                Errors.Notify(result.Error);
             }
 
             await LoadAsync();
@@ -366,7 +368,7 @@ else if (_detail is not null)
             if (result.Succeeded)
                 _like = result.Value;
             else
-                Snackbar.Add(result.Error.Message, Severity.Error);
+                Errors.Notify(result.Error);
         }
         finally
         {
@@ -400,7 +402,7 @@ else if (_detail is not null)
             }
             else
             {
-                Snackbar.Add(result.Error.Message, Severity.Error);
+                Errors.Notify(result.Error);
             }
         }
         finally

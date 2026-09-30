@@ -26,7 +26,7 @@ public sealed class ExportService(
     }
 
     public async Task<Result<byte[]>> ExportCvPdfAsync(
-        ActorContext actor, Guid cvId, string publicBaseUrl, CancellationToken ct = default)
+        ActorContext actor, Guid cvId, string appBaseUrl, CancellationToken ct = default)
     {
         var rendered = await cvs.GetRenderedAsync(actor, cvId, ct);
         if (!rendered.Succeeded || rendered.Value is null)
@@ -34,7 +34,7 @@ public sealed class ExportService(
 
         var detail = rendered.Value;
         var qr = PngByteQRCodeHelper.GetQRCode(
-            $"{publicBaseUrl.TrimEnd('/')}/cvs/{cvId}", QRCodeGenerator.ECCLevel.Q, 8);
+            $"{appBaseUrl.TrimEnd('/')}/cvs/{cvId}", QRCodeGenerator.ECCLevel.Q, 8);
         var photoObjectKey = detail.Rows
             .FirstOrDefault(row => row.Name == ProfileAttributeNames.Photo)
             ?.ImageObjectKey;

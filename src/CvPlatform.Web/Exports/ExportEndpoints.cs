@@ -1,8 +1,8 @@
 using System.Security.Claims;
 using CvPlatform.Application.Authorization;
-using CvPlatform.Application.Common;
 using CvPlatform.Application.Exports;
 using CvPlatform.Web.Auth;
+using CvPlatform.Web.ErrorHandling;
 
 namespace CvPlatform.Web.Exports;
 
@@ -23,7 +23,7 @@ public static class ExportEndpoints
             var result = await exports.ExportCvPdfAsync(actor, id, baseUrl, ct);
             return result.Succeeded
                 ? Results.File(result.Value!, "application/pdf", $"cv-{id}.pdf")
-                : Results.NotFound(result.Error.Message);
+                : ProblemResults.From(result.Error);
         }).RequireAuthorization();
 
         app.MapGet("/api/exports/positions/xlsx", async (
@@ -39,7 +39,7 @@ public static class ExportEndpoints
                 ? Results.File(result.Value!,
                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     "positions.xlsx")
-                : Results.BadRequest(result.Error.Message);
+                : ProblemResults.From(result.Error);
         }).RequireAuthorization();
 
         app.MapGet("/api/exports/positions/{positionId:guid}/cvs.xlsx", async (
@@ -56,7 +56,7 @@ public static class ExportEndpoints
                 ? Results.File(result.Value!,
                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     $"position-{positionId}-cvs.xlsx")
-                : ExportError(result.Error);
+                : ProblemResults.From(result.Error);
         }).RequireAuthorization();
 
         app.MapGet("/api/exports/positions/{positionId:guid}/cvs.csv", async (
@@ -71,17 +71,9 @@ public static class ExportEndpoints
             var result = await exports.ExportPositionCvsCsvAsync(actor, positionId, ct);
             return result.Succeeded
                 ? Results.File(result.Value!, "text/csv; charset=utf-8", $"position-{positionId}-cvs.csv")
-                : ExportError(result.Error);
+                : ProblemResults.From(result.Error);
         }).RequireAuthorization();
     }
 
     private static ActorContext? ActorOf(ClaimsPrincipal user) => ActorContexts.TryFromUser(user);
-
-    private static IResult ExportError(Error error) => error.Code switch
-    {
-        ErrorCodes.NotFound => Results.NotFound(error.Message),
-        ErrorCodes.Forbidden => Results.Forbid(),
-        ErrorCodes.ValidationFailed => Results.BadRequest(error.Message),
-        _ => Results.BadRequest(error.Message),
-    };
 }

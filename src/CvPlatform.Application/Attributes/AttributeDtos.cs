@@ -12,7 +12,11 @@ public sealed record AttributeDefinitionDto(
     string Name,
     AttributeDataType DataType,
     bool IsBuiltIn,
-    IReadOnlyList<DropdownChoice> Choices);
+    IReadOnlyList<DropdownChoice> Choices,
+    DateRangeDto? DateRange = null);
+
+/// <summary>Resolved inclusive calendar-day bounds for date and period attributes.</summary>
+public sealed record DateRangeDto(DateOnly? Min, DateOnly? Max);
 
 /// <summary>Attribute definitions grouped by category, ordered for display.</summary>
 public sealed record AttributeCategoryDto(
@@ -20,11 +24,23 @@ public sealed record AttributeCategoryDto(
     string Name,
     IReadOnlyList<AttributeDefinitionDto> Definitions);
 
+/// <summary>Column the attribute catalog is ordered by.</summary>
+public enum AttributeSortField
+{
+    Name,
+    Category,
+    DataType
+}
+
+/// <summary>Server-side ordering for the attribute catalog.</summary>
+public sealed record AttributeSort(AttributeSortField Field, bool Descending);
+
 public sealed record AttributeCatalogQuery(
     Guid? CategoryId = null,
     string? Search = null,
     string? Prefix = null,
-    PageRequest? Page = null);
+    PageRequest? Page = null,
+    AttributeSort? Sort = null);
 
 public sealed record AttributeDefinitionInput(
     Guid CategoryId,
@@ -45,7 +61,11 @@ public sealed record AttributeOptions(
     decimal? Min = null,
     decimal? Max = null,
     int? MaxLength = null,
-    string? Regex = null);
+    string? Regex = null,
+    DateOnly? MinDate = null,
+    DateOnly? MaxDate = null,
+    int? MinAgeDays = null,
+    int? MaxAgeDays = null);
 
 public sealed record AttributeDefinitionAdminDto(
     Guid Id,
@@ -63,7 +83,21 @@ public sealed record AttributeDeleteImpactDto(
     int Positions,
     int AccessRules,
     int Cvs,
-    int RestrictedPositionsLosingGating);
+    int RestrictedPositionsLosingGating)
+{
+    public static AttributeDeleteImpactDto operator +(AttributeDeleteImpactDto left, AttributeDeleteImpactDto right) =>
+        new(
+            left.ProfileValues + right.ProfileValues,
+            left.Positions + right.Positions,
+            left.AccessRules + right.AccessRules,
+            left.Cvs + right.Cvs,
+            left.RestrictedPositionsLosingGating + right.RestrictedPositionsLosingGating);
+
+    public static AttributeDeleteImpactDto Zero { get; } =
+        new(0, 0, 0, 0, 0);
+}
+
+public sealed record AttributeDefinitionDeleteInput(Guid Id, long Version);
 
 public sealed record AttributeOptionImpactDto(
     IReadOnlyList<string> RemovedOptions,

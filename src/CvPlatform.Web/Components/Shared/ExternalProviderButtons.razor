@@ -1,0 +1,50 @@
+@using CvPlatform.Core.Security
+@using CvPlatform.Web.Auth
+@using Microsoft.AspNetCore.Authentication
+
+@if (Providers.Count > 0)
+{
+    <div class="@CssClass">
+        @foreach (var provider in Providers)
+        {
+            <MudButton Href="@BuildUrl(provider)" Variant="@Variant" Color="@Color" Class="cv-oauth-btn"
+                       StartIcon="@ExternalProviderBranding.IconFor(provider.Name)"
+                       aria-label="@Label(provider)">
+                @Label(provider)
+            </MudButton>
+        }
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<AuthenticationScheme> Providers { get; set; } = [];
+
+    [Parameter] public string? ReturnUrl { get; set; }
+
+    [Parameter] public bool LinkMode { get; set; }
+
+    [Parameter] public string CssClass { get; set; } = "cv-oauth-row";
+
+    [Parameter] public Variant Variant { get; set; } = Variant.Outlined;
+
+    [Parameter] public Color Color { get; set; } = Color.Default;
+
+    [Parameter] public Func<AuthenticationScheme, string>? LabelFor { get; set; }
+
+    private string BuildUrl(AuthenticationScheme provider) =>
+        LinkMode
+            ? ExternalProviderBranding.LinkUrl(provider, SafeReturnUrl())
+            : ExternalProviderBranding.LoginUrl(provider, SafeReturnUrl());
+
+    private string SafeReturnUrl() => RedirectUrlHelper.SafeReturnUrl(ReturnUrl);
+
+    private string Label(AuthenticationScheme provider)
+    {
+        var displayName = ExternalProviderBranding.DisplayName(provider);
+        return LabelFor is not null
+            ? LabelFor(provider)
+            : LinkMode
+                ? $"Link {displayName}"
+                : displayName;
+    }
+}

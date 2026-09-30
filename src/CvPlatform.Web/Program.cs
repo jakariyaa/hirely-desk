@@ -14,6 +14,8 @@ using CvPlatform.Web.Auth;
 using CvPlatform.Web.Configuration;
 using CvPlatform.Web.Storage;
 using CvPlatform.Application.Authorization;
+using CvPlatform.Web.ErrorHandling;
+using System.Diagnostics;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.EntityFrameworkCore;
@@ -42,6 +44,15 @@ builder.Services.AddTransient<CvPlatform.Application.Users.IUserAdministrationSe
     CvPlatform.Web.Users.UserAdministrationService>();
 builder.Services.AddSingleton<IImageStorage, CvPlatform.Infrastructure.Storage.B2ImageStorage>();
 builder.Services.AddAntiforgery(options => options.HeaderName = "X-XSRF-TOKEN");
+builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = context =>
+{
+    context.ProblemDetails.Instance =
+        $"{context.HttpContext.Request.Method} {context.HttpContext.Request.Path}";
+    context.ProblemDetails.Extensions["traceId"] = ErrorMapping.TraceIdOf(context.HttpContext);
+});
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddScoped<ErrorMessageLocalizer>();
+builder.Services.AddScoped<IUiErrorReporter, UiErrorReporter>();
 
 var gmail = applicationConfiguration.Gmail;
 if (gmail.IsConfigured)
@@ -50,6 +61,17 @@ if (gmail.IsConfigured)
 else
     builder.Services.AddTransient<CvPlatform.Core.Email.IAppEmailSender,
         CvPlatform.Infrastructure.Email.NoOpEmailSender>();
+
+var salesforce = applicationConfiguration.Salesforce;
+if (salesforce.IsConfigured)
+{
+    builder.Services.AddSingleton<CvPlatform.Infrastructure.Crm.SalesforceTokenProvider>();
+    builder.Services.AddHttpClient<CvPlatform.Core.Crm.ICrmService,
+            CvPlatform.Infrastructure.Crm.SalesforceCrmService>();
+}
+else
+    builder.Services.AddTransient<CvPlatform.Core.Crm.ICrmService,
+        CvPlatform.Infrastructure.Crm.NoOpCrmService>();
 
 builder.Services.AddIdentity<ApplicationUser, IdentityRole<Guid>>(options =>
     {
@@ -132,19 +154,21 @@ builder.Services.Configure<RequestLocalizationOptions>(o =>
 
 var app = builder.Build();
 
+// One exception pipeline in every environment: registered IExceptionHandlers run first, the
+// /Error fallback renders for browser requests. Development adds exception detail (never a raw
+// page) through GlobalExceptionHandler, so diagnostics stay in logs/problem details too.
+app.UseExceptionHandler("/Error", createScopeForErrors: true);
 if (!app.Environment.IsDevelopment())
-{
-    app.UseExceptionHandler("/Error", createScopeForErrors: true);
     app.UseHttpsRedirection();
-}
 
+app.UseMiddleware<CorrelationIdMiddleware>();
+app.UseSerilogRequestLogging();
 app.UseRequestLocalization(app.Services.GetRequiredService<IOptions<RequestLocalizationOptions>>().Value);
-app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
+app.UseStatusCodePages(StatusCodePageWriter.WriteAsync);
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseAntiforgery();
-app.UseSerilogRequestLogging();
 
 app.MapStaticAssets();
 app.MapAuthEndpoints();

@@ -308,7 +308,7 @@ public class ExportServiceTests : IDisposable
 
         public bool WasCalled { get; private set; }
 
-        public Task<byte[]?> FetchAsync(string? imageUrl, CancellationToken ct = default)
+        public Task<byte[]?> FetchAsync(string? objectKey, CancellationToken ct = default)
         {
             WasCalled = true;
             return Task.FromResult<byte[]?>(Image);

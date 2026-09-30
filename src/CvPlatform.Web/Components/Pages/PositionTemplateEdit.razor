@@ -12,8 +12,9 @@
 @inject IPositionTemplateService Templates
 @inject AuthenticationStateProvider AuthProvider
 @inject NavigationManager Navigation
-@inject ISnackbar Snackbar
+@inject IUiErrorReporter Errors
 @inject IStringLocalizer<SharedResource> L
+@inject ISnackbar Snackbar
 
 <PageTitle>@(_isNew ? L["NewTemplate"] : L["EditTemplate"])</PageTitle>
 <PageHeader Title="@(_isNew ? L["NewTemplate"] : L["EditTemplate"])" Subtitle="@L["PositionTemplatesSubtitle"]" />
@@ -126,7 +127,9 @@ else
         var result = await Templates.GetAsync(ActorContexts.FromUser(auth.User), Id!.Value);
         if (!result.Succeeded || result.Value is null)
         {
-            _error = result.Succeeded ? L["NotFoundGeneric"].Value : result.Error.Message;
+            _error = result.Succeeded
+                ? L["NotFoundGeneric"].Value
+                : Errors.Report(result.Error);
         }
         else
         {
@@ -161,7 +164,7 @@ else
                 : await Templates.UpdateAsync(actor, Id!.Value, input);
             if (!result.Succeeded)
             {
-                Snackbar.Add(result.Error.Message, Severity.Error);
+                Errors.Notify(result.Error);
                 return;
             }
             Snackbar.Add(L["TemplateSaved"], Severity.Success);
@@ -182,7 +185,7 @@ else
         if (result.Succeeded)
             Navigation.NavigateTo($"/positions/{result.Value!.Id}");
         else
-            Snackbar.Add(result.Error.Message, Severity.Error);
+            Errors.Notify(result.Error);
     }
 
     private void AddDraftAttribute()

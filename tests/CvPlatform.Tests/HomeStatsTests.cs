@@ -146,6 +146,80 @@ public class HomeStatsTests : IDisposable
         stats.Value.NewPublishedCvsLast24Hours.Should().Be(1);
     }
 
+    [Fact]
+    public async Task Public_stats_expose_latest_cvs_without_account_identifiers()
+    {
+        var recruiter = await SeedUserWithoutProfileAsync(_factory);
+        var publicPosition = await SeedPositionAsync(_factory, "Public", isPublic: true, ownerId: recruiter);
+        var restrictedPosition = await SeedPositionAsync(_factory, "Restricted", isPublic: false, ownerId: recruiter);
+        var defId = Guid.NewGuid();
+        await SeedDefinitionAsync(_factory, defId, "Me.Name", AttributeDataType.String);
+        var candidate = await SeedCandidateAsync(
+            _factory, ("Me.Name", AttributeDataType.String, "Ada Lovelace", defId));
+        var publicCv = await CreatePublishedCvAsync(candidate, publicPosition);
+        await InsertPublishedCvAsync(candidate, restrictedPosition);
+
+        var stats = await Service(_factory).GetPublicAsync();
+
+        var row = stats.Value!.LatestCvs.Should().ContainSingle().Which;
+        row.CvId.Should().Be(publicCv);
+        row.PositionId.Should().Be(publicPosition);
+        row.PositionTitle.Should().Be("Public");
+        row.CandidateName.Should().Be("Ada Lovelace");
+        row.CandidateName.Should().NotContain("@");
+    }
+
+    [Fact]
+    public async Task Public_stats_fall_back_to_blank_candidate_name_when_the_profile_has_none()
+    {
+        var recruiter = await SeedUserWithoutProfileAsync(_factory);
+        var publicPosition = await SeedPositionAsync(_factory, "Public", isPublic: true, ownerId: recruiter);
+        var candidate = await SeedCandidateAsync(_factory);
+        await CreatePublishedCvAsync(candidate, publicPosition);
+
+        var stats = await Service(_factory).GetPublicAsync();
+
+        stats.Value!.LatestCvs.Should().ContainSingle().Which.CandidateName.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Public_stats_rank_popular_positions_by_published_cvs_and_likes()
+    {
+        var recruiter = await SeedUserWithoutProfileAsync(_factory);
+        var alpha = await SeedPositionAsync(_factory, "Alpha", isPublic: true, ownerId: recruiter);
+        var beta = await SeedPositionAsync(_factory, "Beta", isPublic: true, ownerId: recruiter);
+        var hidden = await SeedPositionAsync(_factory, "Hidden", isPublic: false, ownerId: recruiter);
+        var c1 = await SeedCandidateAsync(_factory);
+        var c2 = await SeedCandidateAsync(_factory);
+        var alphaCv = await CreatePublishedCvAsync(c1, alpha);
+        await CreatePublishedCvAsync(c2, alpha);
+        await CreatePublishedCvAsync(c1, beta);
+
+        var likeService = new LikeService(_factory, new PositionAccessService(_factory, new AccessRuleEngine()));
+        await likeService.ToggleAsync(new ActorContext(recruiter, false, true), alphaCv);
+
+        var stats = await Service(_factory).GetPublicAsync();
+
+        stats.Value!.PopularPositions.Select(p => p.PositionId).Should().ContainInOrder(alpha, beta);
+        stats.Value.PopularPositions.Should().HaveCount(2);
+        stats.Value.PopularPositions.Select(p => p.PositionId).Should().NotContain(hidden);
+        stats.Value.PopularPositions.First().CvCount.Should().Be(2);
+        stats.Value.PopularPositions.First().LikeCount.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Public_stats_are_empty_when_nothing_is_public()
+    {
+        await SeedPositionAsync(_factory, "Hidden", isPublic: false);
+
+        var stats = await Service(_factory).GetPublicAsync();
+
+        stats.Succeeded.Should().BeTrue();
+        stats.Value!.LatestCvs.Should().BeEmpty();
+        stats.Value.PopularPositions.Should().BeEmpty();
+        stats.Value.PublicPositionCount.Should().Be(0);
+    }
+
     private async Task<Guid> CreatePublishedCvAsync(Guid candidateId, Guid positionId)
     {
         var created = await Cvs(_factory).CreateAsync(new ActorContext(candidateId, false), positionId);
@@ -156,6 +230,23 @@ public class HomeStatsTests : IDisposable
             new ActorContext(candidateId, false), created.Value!.Id, new CvStatusInput(version));
         published.Succeeded.Should().BeTrue();
         return created.Value!.Id;
+    }
+
+    private async Task<Guid> InsertPublishedCvAsync(Guid candidateId, Guid positionId)
+    {
+        await using var db = _factory.CreateDbContext();
+        var profileId = await db.Profiles.Where(p => p.UserId == candidateId).Select(p => p.Id).SingleAsync();
+        var id = Guid.NewGuid();
+        db.Cvs.Add(new Cv
+        {
+            Id = id,
+            ProfileId = profileId,
+            PositionId = positionId,
+            Status = CvStatus.Published,
+            PublishedAt = DateTime.UtcNow.AddHours(-2),
+        });
+        await db.SaveChangesAsync();
+        return id;
     }
 
     private static async Task<Guid> SeedUserWithoutProfileAsync(IAppDbContextFactory factory)

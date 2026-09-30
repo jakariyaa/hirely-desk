@@ -18,6 +18,8 @@ public static class SeedData
     public const string DemoCandidateEmail = "candidate@cvplatform.local";
     public const string DemoRecruiterEmail = "recruiter@cvplatform.local";
 
+    private const string BirthDateOptions = """{"minAgeDays":0,"maxAgeDays":43800}""";
+
     public static async Task SeedAsync(IServiceProvider services, SeedOptions options)
     {
         using var scope = services.CreateScope();
@@ -107,7 +109,7 @@ public static class SeedData
         var defs = new (string Name, string Category, AttributeDataType Type, bool BuiltIn, string? Options)[]
         {
             (ProfileAttributeNames.Name, "Me", AttributeDataType.String, true, null),
-            ("Me.BirthDate", "Me", AttributeDataType.Date, true, null),
+            ("Me.BirthDate", "Me", AttributeDataType.Date, true, BirthDateOptions),
             ("Me.Phone", "Me", AttributeDataType.String, true, null),
             ("Me.City", "Me", AttributeDataType.String, true, null),
             ("Me.Photo", "Me", AttributeDataType.Image, true, null),
@@ -116,7 +118,10 @@ public static class SeedData
                 """{"choices":["0","0.5","1","1.5","2","2.5","3","3.5","4","4.5","5","5.5","6","6.5","7","7.5","8","8.5","9"]}"""),
         };
         foreach (var (name, category, type, builtIn, options) in defs)
-            if (!await db.AttributeDefinitions.AnyAsync(d => d.Name == name))
+        {
+            var existing = await db.AttributeDefinitions.SingleOrDefaultAsync(d => d.Name == name);
+            if (existing is null)
+            {
                 db.AttributeDefinitions.Add(new AttributeDefinition
                 {
                     Id = Guid.NewGuid(),
@@ -126,6 +131,12 @@ public static class SeedData
                     IsBuiltIn = builtIn,
                     OptionsJson = options,
                 });
+            }
+            else if (builtIn && options is not null && string.IsNullOrWhiteSpace(existing.OptionsJson))
+            {
+                existing.OptionsJson = options;
+            }
+        }
         await db.SaveChangesAsync();
     }
 

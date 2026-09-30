@@ -6,7 +6,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace CvPlatform.Application.Attributes;
 
-public sealed class AttributeCatalogService(IAppDbContextFactory factory) : IAttributeCatalog
+public sealed class AttributeCatalogService(
+    IAppDbContextFactory factory, TimeProvider? timeProvider = null) : IAttributeCatalog
 {
     private static readonly JsonSerializerOptions OptionsJsonOptions = new()
     {
@@ -16,6 +17,7 @@ public sealed class AttributeCatalogService(IAppDbContextFactory factory) : IAtt
     public async Task<Result<IReadOnlyList<AttributeCategoryDto>>> GetCatalogAsync(CancellationToken ct = default)
     {
         await using var db = factory.CreateDbContext();
+        var today = AttributeDateRules.TodayFrom(timeProvider);
         var categories = await db.AttributeCategories
             .AsNoTracking()
             .OrderBy(c => c.Name)
@@ -29,7 +31,8 @@ public sealed class AttributeCatalogService(IAppDbContextFactory factory) : IAtt
                         d.Name,
                         d.DataType,
                         d.IsBuiltIn,
-                        ParseChoices(d.DataType, d.OptionsJson)))
+                        ParseChoices(d.DataType, d.OptionsJson),
+                        ParseDateRange(d.DataType, d.OptionsJson, today)))
                     .ToList()))
             .ToListAsync(ct);
 
@@ -41,6 +44,7 @@ public sealed class AttributeCatalogService(IAppDbContextFactory factory) : IAtt
     {
         var page = request.Page ?? new PageRequest();
         await using var db = factory.CreateDbContext();
+        var today = AttributeDateRules.TodayFrom(timeProvider);
         var query = db.AttributeDefinitions.AsNoTracking().AsQueryable();
         if (request.CategoryId is { } categoryId)
             query = query.Where(d => d.CategoryId == categoryId);
@@ -52,7 +56,8 @@ public sealed class AttributeCatalogService(IAppDbContextFactory factory) : IAtt
         var items = await query.OrderBy(d => d.Name).ThenBy(d => d.Id)
             .Skip(page.Skip).Take(page.PageSize)
             .Select(d => new AttributeDefinitionDto(
-                d.Id, d.Name, d.DataType, d.IsBuiltIn, ParseChoices(d.DataType, d.OptionsJson)))
+                d.Id, d.Name, d.DataType, d.IsBuiltIn, ParseChoices(d.DataType, d.OptionsJson),
+                ParseDateRange(d.DataType, d.OptionsJson, today)))
             .ToListAsync(ct);
         return Result<PagedResult<AttributeDefinitionDto>>.Success(
             new PagedResult<AttributeDefinitionDto>(items, total, page.Page, page.PageSize));
@@ -78,6 +83,16 @@ public sealed class AttributeCatalogService(IAppDbContextFactory factory) : IAtt
         dataType == AttributeDataType.Dropdown && !string.IsNullOrWhiteSpace(optionsJson)
             ? TryParse(optionsJson)
             : [];
+
+    private static DateRangeDto? ParseDateRange(
+        AttributeDataType dataType, string? optionsJson, DateOnly today)
+    {
+        if (dataType is not AttributeDataType.Date and not AttributeDataType.Period)
+            return null;
+
+        var range = AttributeDateRules.Resolve(dataType, optionsJson, today);
+        return new DateRangeDto(range.Min, AttributeDateRules.UpperBound(range, today));
+    }
 
     private static List<DropdownChoice> TryParse(string optionsJson)
     {

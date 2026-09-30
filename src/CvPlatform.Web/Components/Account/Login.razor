@@ -5,6 +5,7 @@
 @layout AuthLayout
 
 @using System.ComponentModel.DataAnnotations
+@using CvPlatform.Web.Components.Shared
 @using CvPlatform.Web.Resources
 @using Microsoft.AspNetCore.Authentication
 
@@ -47,15 +48,7 @@
     {
         <MudDivider Class="my-4" DividerType="DividerType.FullWidth" />
         <MudText Typo="Typo.body2" Class="cv-text-secondary mb-2">@L["ExternalLoginPrompt"]</MudText>
-        <div class="cv-oauth-row">
-            @foreach (var provider in _externalLogins)
-            {
-                var loginUrl = $"/Account/ExternalLogin?provider={Uri.EscapeDataString(provider.Name)}&returnUrl={Uri.EscapeDataString(ReturnUrl ?? "/")}";
-                <MudButton Href="@loginUrl" Variant="Variant.Outlined" Class="cv-oauth-btn">
-                    @provider.DisplayName
-                </MudButton>
-            }
-        </div>
+        <ExternalProviderButtons Providers="_externalLogins" ReturnUrl="@ReturnUrl" />
     }
 
     <MudText Typo="Typo.body2" Class="mt-4">
@@ -77,7 +70,7 @@
     private string? Error { get; set; }
 
     private string? StatusMessage;
-    private IList<AuthenticationScheme> _externalLogins = [];
+    private IReadOnlyList<AuthenticationScheme> _externalLogins = [];
 
     protected override async Task OnInitializedAsync()
     {

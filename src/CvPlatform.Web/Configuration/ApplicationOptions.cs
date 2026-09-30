@@ -1,3 +1,4 @@
+using CvPlatform.Infrastructure.Crm;
 using CvPlatform.Infrastructure.Email;
 using CvPlatform.Infrastructure.Storage;
 
@@ -11,6 +12,7 @@ public sealed class ApplicationConfiguration
     public SeedOptions Seed { get; set; } = new();
     public B2Options B2 { get; set; } = new();
     public GmailOptions Gmail { get; set; } = new();
+    public SalesforceOptions Salesforce { get; set; } = new();
 }
 
 public sealed class ConnectionStringsOptions

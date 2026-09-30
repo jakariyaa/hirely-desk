@@ -18,8 +18,13 @@ public class ProfileServiceTests
     private static ActorContext Actor(Guid userId) => new(userId, false);
     private sealed class TestImageStorage : IImageStorage
     {
+        private static readonly string[] AllowedTypes =
+            ["image/jpeg", "image/png", "image/webp"];
+
         public bool IsConfigured => true;
         public long MaxUploadBytes => 5 * 1024 * 1024;
+
+        public IReadOnlyCollection<string> AllowedContentTypes => AllowedTypes;
 
         public bool IsAllowedContentType(string contentType) =>
             contentType is "image/jpeg" or "image/png" or "image/webp";
@@ -48,6 +53,13 @@ public class ProfileServiceTests
 
     private static ProfileService Service(IAppDbContextFactory factory) =>
         new(factory, new TestImageStorage());
+    private static ProfileService Service(IAppDbContextFactory factory, DateTimeOffset now) =>
+        new(factory, new TestImageStorage(), new FixedTimeProvider(now));
+
+    private sealed class FixedTimeProvider(DateTimeOffset value) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => value;
+    }
     private sealed class TestFactory(IDbContextFactory<AppDbContext> factory) : IAppDbContextFactory
     {
         public IAppDbContext CreateDbContext() => factory.CreateDbContext();
@@ -297,6 +309,58 @@ public class ProfileServiceTests
 
         result.Succeeded.Should().BeFalse();
         result.Error.Code.Should().Be(ErrorCodes.ValidationFailed);
+    }
+
+    [Fact]
+    public async Task SaveAttributeValueAsync_rejects_future_birth_date()
+    {
+        var factory = CreateFactory(out var db);
+        var now = new DateTimeOffset(2026, 6, 15, 0, 0, 0, TimeSpan.Zero);
+        var service = Service(factory, now);
+        var definition = await SeedDefinitionAsync(
+            db, "Me.BirthDate", AttributeDataType.Date, """{"minAgeDays":0,"maxAgeDays":43800}""");
+
+        var future = await service.SaveAttributeValueAsync(
+            Actor(Guid.Empty), Guid.Empty,
+            new AttributeValueInput(definition.Id, DateValue: new DateOnly(2026, 6, 16)));
+
+        future.Succeeded.Should().BeFalse();
+        future.Error.Code.Should().Be(ErrorCodes.ValidationFailed);
+        future.Error.Message.Should().Contain("future");
+    }
+
+    [Fact]
+    public async Task SaveAttributeValueAsync_rejects_birth_date_beyond_the_age_band()
+    {
+        var factory = CreateFactory(out var db);
+        var now = new DateTimeOffset(2026, 6, 15, 0, 0, 0, TimeSpan.Zero);
+        var service = Service(factory, now);
+        var definition = await SeedDefinitionAsync(
+            db, "Me.BirthDate", AttributeDataType.Date, """{"minAgeDays":0,"maxAgeDays":43800}""");
+
+        var tooOld = await service.SaveAttributeValueAsync(
+            Actor(Guid.Empty), Guid.Empty,
+            new AttributeValueInput(definition.Id, DateValue: new DateOnly(1900, 1, 1)));
+
+        tooOld.Succeeded.Should().BeFalse();
+        tooOld.Error.Code.Should().Be(ErrorCodes.ValidationFailed);
+    }
+
+    [Fact]
+    public async Task SaveAttributeValueAsync_persists_a_birth_date_inside_the_age_band()
+    {
+        var factory = CreateFactory(out var db);
+        var now = new DateTimeOffset(2026, 6, 15, 0, 0, 0, TimeSpan.Zero);
+        var service = Service(factory, now);
+        var definition = await SeedDefinitionAsync(
+            db, "Me.BirthDate", AttributeDataType.Date, """{"minAgeDays":0,"maxAgeDays":43800}""");
+
+        var result = await service.SaveAttributeValueAsync(
+            Actor(Guid.Empty), Guid.Empty,
+            new AttributeValueInput(definition.Id, DateValue: new DateOnly(1990, 4, 1)));
+
+        result.Succeeded.Should().BeTrue();
+        result.Value!.Values.Should().ContainSingle(v => v.DateValue == new DateOnly(1990, 4, 1));
     }
 
     [Fact]

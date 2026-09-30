@@ -106,11 +106,11 @@ public sealed class PostgresIntegrationTests : IAsyncLifetime
             await db.SaveChangesAsync();
         }
         var service = new PositionService(_factory);
-        var created = await service.CreateAsync(new ActorContext(ownerId, false),
+        var created = await service.CreateAsync(new ActorContext(ownerId, false, IsRecruiter: true),
             new PositionInput("Lead", "Desc", null, null, true));
         created.Succeeded.Should().BeTrue($"create failed: {created.Error.Code} {created.Error.Message}");
 
-        var stale = await service.UpdateAsync(new ActorContext(ownerId, false), created.Value!.Id,
+        var stale = await service.UpdateAsync(new ActorContext(ownerId, false, IsRecruiter: true), created.Value!.Id,
             new PositionInput("Lead v2", "Desc", null, null, true, ExpectedVersion: created.Value.Version - 1));
 
         stale.Error.Code.Should().Be(ErrorCodes.ConcurrencyConflict);

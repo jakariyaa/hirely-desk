@@ -16,6 +16,8 @@ public sealed class B2ImageStorage : IImageStorage, IDisposable
             ["image/webp"] = "webp",
         };
 
+    private static readonly string[] AllowedTypes = [.. ContentTypeExtensions.Keys];
+
     private readonly B2Options _options;
     private readonly IAmazonS3? _client;
 
@@ -38,6 +40,8 @@ public sealed class B2ImageStorage : IImageStorage, IDisposable
     public bool IsConfigured => _options.IsConfigured && _client is not null;
 
     public long MaxUploadBytes => _options.MaxUploadBytes;
+
+    public IReadOnlyCollection<string> AllowedContentTypes => AllowedTypes;
 
     public bool IsAllowedContentType(string contentType) =>
         ContentTypeExtensions.ContainsKey(contentType);

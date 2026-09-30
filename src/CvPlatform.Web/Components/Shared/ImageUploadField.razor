@@ -1,0 +1,272 @@
+@using CvPlatform.Application.Attributes
+@using CvPlatform.Core.Storage
+@using CvPlatform.Web.ErrorHandling
+@using CvPlatform.Web.Resources
+@using Microsoft.Extensions.Localization
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+@inject IImageStorage Images
+@inject IStringLocalizer<SharedResource> L
+@inject ErrorMessageLocalizer Messages
+@inject IUiErrorReporter Errors
+@inject IJSRuntime Js
+
+<div class="cv-image-field">
+    @if (HasImage)
+    {
+        <div class="cv-image-preview">
+            <MudImage Src="@PreviewUrl" Alt="@L["ImageAlt"]" ObjectFit="ObjectFit.Cover"
+                      FallbackSrc="@PlaceholderUrl" />
+            @if (_busy)
+            {
+                <MudOverlay Visible="true" DarkBackground="true" Absolute="true">
+                    <MudProgressCircular Color="Color.Secondary" Indeterminate="true" Size="Size.Small" />
+                </MudOverlay>
+            }
+            else if (!Disabled && StorageReady)
+            {
+                <button type="button" class="cv-image-preview-edit" title="@L["ImageChange"]"
+                        aria-label="@L["ImageChange"]" @onclick="TriggerFilePicker">
+                    <MudIcon Icon="@Icons.Material.Filled.CameraAlt" Size="Size.Small" />
+                </button>
+            }
+        </div>
+    }
+
+    <div class="cv-image-dropzone-column">
+        <label @ref="_dropZone" class="@DropZoneClass" for="@_inputId">
+            <MudIcon Icon="@Icons.Material.Filled.CloudUpload" Color="Color.Primary" />
+            <MudText Typo="Typo.body2">@(_busy ? L["ImageUploading"] : L["ImageDropHere"])</MudText>
+            <MudText Typo="Typo.caption" Class="cv-text-caption">@FormatHint</MudText>
+            <input @ref="_fileInput"
+                   id="@_inputId"
+                   class="cv-image-sr-only"
+                   type="file"
+                   accept="@Limits.AcceptAttribute"
+                   disabled="@(_busy || Disabled || !StorageReady)"
+                   aria-describedby="@(_error is null ? null : _errorId)" />
+        </label>
+
+        @if (_busy)
+        {
+            <div class="cv-image-progress">
+                <MudProgressLinear Color="Color.Primary" Size="Size.Small" Value="@_progress" />
+                <MudText Typo="Typo.caption" Class="cv-text-caption">
+                    @L["ImageProgress", _progress]
+                </MudText>
+            </div>
+            <MudButton Variant="Variant.Text"
+                       Color="Color.Error"
+                       Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.Close"
+                       OnClick="CancelAsync">
+                @L["Cancel"]
+            </MudButton>
+        }
+        else if (HasImage)
+        {
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Error"
+                       Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.Delete"
+                       OnClick="RemoveAsync">
+                @L["ImageRemove"]
+            </MudButton>
+        }
+
+        @if (_error is not null)
+        {
+            <MudAlert id="@_errorId"
+                      Severity="Severity.Error"
+                      Dense="true"
+                      Variant="Variant.Outlined"
+                      role="alert">
+                @_error
+            </MudAlert>
+        }
+        else if (!StorageReady && !Disabled)
+        {
+            <MudAlert Severity="Severity.Warning" Dense="true" Variant="Variant.Outlined">
+                @L["ImageStorageUnavailable"]
+            </MudAlert>
+        }
+    </div>
+</div>
+
+@code {
+    /// <summary>
+    /// The contract handed to the upload module. camelCased to maxBytes, allowedContentTypes and
+    /// maxEdge on the JavaScript side.
+    /// </summary>
+    private sealed record UploadOptions(
+        long MaxBytes,
+        IReadOnlyCollection<string> AllowedContentTypes,
+        int MaxEdge);
+
+    [Parameter, EditorRequired] public AttributeValueDraft Value { get; set; } = default!;
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private const string PresignEndpoint = "/api/profile-images/presign";
+    private const string CompleteEndpoint = "/api/profile-images/complete";
+    private const string PlaceholderUrl = "/img/image-placeholder.svg";
+    private const int MaxEdge = 1600;
+
+    private readonly string _uploaderId = Guid.NewGuid().ToString("N");
+    private readonly string _inputId = $"cv-image-{Guid.NewGuid():N}";
+    private readonly string _errorId = $"cv-image-error-{Guid.NewGuid():N}";
+
+    private ElementReference _dropZone;
+    private ElementReference _fileInput;
+    private DotNetObjectReference<ImageUploadField>? _selfRef;
+    private IJSObjectReference? _module;
+    private bool _wired;
+    private bool _busy;
+    private bool _dragging;
+    private int _progress;
+    private string? _error;
+    private string? _pendingPreviewUrl;
+
+    private ImageUploadLimits Limits => new(Images.MaxUploadBytes, Images.AllowedContentTypes);
+
+    private bool StorageReady => Images.IsConfigured;
+
+    private bool HasImage => _pendingPreviewUrl is not null || Value.ImageValueId is not null;
+
+    private string PreviewUrl => _pendingPreviewUrl ?? ImageContentUrl(Value.ImageValueId!.Value);
+
+    private string DropZoneClass => _dragging
+        ? "cv-image-dropzone cv-image-dropzone-dragging"
+        : "cv-image-dropzone";
+
+    private string FormatHint => L[
+        "ImageFormatHint",
+        string.Join(", ", Images.AllowedContentTypes),
+        FormatSize(Images.MaxUploadBytes)];
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || _wired || !StorageReady)
+            return;
+
+        try
+        {
+            _module = await Js.InvokeAsync<IJSObjectReference>("import", "./js/directImageUpload.js");
+            _selfRef = DotNetObjectReference.Create(this);
+            await _module.InvokeVoidAsync(
+                "createImageUploader",
+                _uploaderId,
+                _dropZone,
+                _fileInput,
+                PresignEndpoint,
+                CompleteEndpoint,
+                new UploadOptions(Images.MaxUploadBytes, Images.AllowedContentTypes, MaxEdge),
+                _selfRef);
+            _wired = true;
+        }
+        catch (InvalidOperationException)
+        {
+            // Interop is unavailable while prerendering; the interactive instance wires itself up.
+        }
+        catch (JSException ex)
+        {
+            _error = Errors.Report(ex);
+        }
+    }
+
+    [JSInvokable]
+    public Task ReportProgressAsync(int percent)
+    {
+        _progress = Math.Clamp(percent, 0, 100);
+        _busy = true;
+        return InvokeAsync(StateHasChanged);
+    }
+
+    [JSInvokable]
+    public async Task ReportSucceededAsync(string objectKey, string previewUrl)
+    {
+        _pendingPreviewUrl = previewUrl.Length == 0 ? null : previewUrl;
+        _busy = false;
+        _progress = 100;
+        _error = null;
+        Value.ImageObjectKey = objectKey;
+        // The stored value id still points at the previous image until the save round-trips, so
+        // clear it to make sure the freshly uploaded preview is what the user sees.
+        Value.ImageValueId = null;
+        // JavaScript invokes this directly, so the component has to ask for its own re-render.
+        await InvokeAsync(() =>
+        {
+            StateHasChanged();
+            return OnChanged.InvokeAsync();
+        });
+    }
+
+    [JSInvokable]
+    public Task ReportFailedAsync(string code)
+    {
+        _busy = false;
+        _pendingPreviewUrl = null;
+        _error = Messages.DescribeUploadFailure(code);
+        return InvokeAsync(StateHasChanged);
+    }
+
+    [JSInvokable]
+    public Task ReportDragStateAsync(bool dragging)
+    {
+        _dragging = dragging;
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private async Task CancelAsync()
+    {
+        if (_module is not null)
+            await _module.InvokeVoidAsync("cancelUpload", _uploaderId);
+
+        _busy = false;
+        _pendingPreviewUrl = null;
+    }
+
+    private async Task TriggerFilePicker()
+    {
+        if (_module is not null && _wired)
+            await _module.InvokeVoidAsync("openFilePicker", _uploaderId);
+    }
+
+    private async Task RemoveAsync()
+    {
+        _pendingPreviewUrl = null;
+        _error = null;
+        Value.ImageObjectKey = null;
+        Value.ImageValueId = null;
+        await OnChanged.InvokeAsync();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_module is not null)
+        {
+            try
+            {
+                await _module.InvokeVoidAsync("releaseUploader", _uploaderId);
+                await _module.DisposeAsync();
+            }
+            catch (JSDisconnectedException)
+            {
+            }
+            catch (JSException)
+            {
+            }
+            catch (TaskCanceledException)
+            {
+            }
+        }
+
+        _selfRef?.Dispose();
+    }
+
+    private static string ImageContentUrl(Guid valueId) => $"/api/profile-images/{valueId:D}/content";
+
+    private static string FormatSize(long bytes) => bytes >= 1024 * 1024
+        ? $"{bytes / (1024 * 1024)} MB"
+        : $"{Math.Max(1, bytes / 1024)} KB";
+}

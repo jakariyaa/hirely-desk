@@ -1,7 +1,8 @@
 @inject IProjectService ProjectService
-@inject ISnackbar Snackbar
+@inject IUiErrorReporter Errors
 @inject AuthenticationStateProvider AuthProvider
 @inject IStringLocalizer<SharedResource> L
+@inject ISnackbar Snackbar
 @using CvPlatform.Application.Common
 @using CvPlatform.Application.Authorization
 @using CvPlatform.Application.Projects
@@ -166,7 +167,7 @@
             }
             else
             {
-                Snackbar.Add(result.Error.Message, Severity.Error);
+                Errors.Notify(result.Error);
             }
         }
         finally

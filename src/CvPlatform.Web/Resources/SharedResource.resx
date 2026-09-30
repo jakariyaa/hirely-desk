@@ -480,6 +480,9 @@
   <data name="NoResults" xml:space="preserve">
     <value>No results found.</value>
   </data>
+  <data name="ViewAllResults" xml:space="preserve">
+    <value>View all results</value>
+  </data>
   <data name="LatestCvs" xml:space="preserve">
     <value>Latest CVs</value>
   </data>
@@ -555,17 +558,8 @@
   <data name="BadgeRecruiter" xml:space="preserve">
     <value>Recruiter</value>
   </data>
-  <data name="ImageTooLarge" xml:space="preserve">
-    <value>Image cannot exceed 5 MB.</value>
-  </data>
   <data name="ImageUploadFailed" xml:space="preserve">
     <value>Upload failed.</value>
-  </data>
-  <data name="UploadImage" xml:space="preserve">
-    <value>Upload image</value>
-  </data>
-  <data name="Uploading" xml:space="preserve">
-    <value>Uploading…</value>
   </data>
   <data name="ConcurrencyReloadHint" xml:space="preserve">
     <value>This record changed — reload and try again.</value>
@@ -627,6 +621,33 @@
   <data name="AddChoice" xml:space="preserve">
     <value>Add choice</value>
   </data>
+  <data name="DateOptionsHint" xml:space="preserve">
+    <value>Optionally limit which calendar days are accepted. Age limits are relative to today.</value>
+  </data>
+  <data name="MinimumDate" xml:space="preserve">
+    <value>Minimum date</value>
+  </data>
+  <data name="MaximumDate" xml:space="preserve">
+    <value>Maximum date</value>
+  </data>
+  <data name="MinimumAgeDays" xml:space="preserve">
+    <value>Minimum age (days)</value>
+  </data>
+  <data name="MaximumAgeDays" xml:space="preserve">
+    <value>Maximum age (days)</value>
+  </data>
+  <data name="DateOutOfRange" xml:space="preserve">
+    <value>This date is outside the allowed range. Please pick another one.</value>
+  </data>
+  <data name="LatestPublicCvs" xml:space="preserve">
+    <value>Latest public CVs</value>
+  </data>
+  <data name="PopularPublicPositions" xml:space="preserve">
+    <value>Popular public positions</value>
+  </data>
+  <data name="AnonymousCandidate" xml:space="preserve">
+    <value>Candidate</value>
+  </data>
   <data name="NumericOptionsHint" xml:space="preserve">
     <value>Optionally limit the allowed numeric range.</value>
   </data>
@@ -681,4 +702,83 @@
   <data name="DeleteTemplatesConfirm" xml:space="preserve"><value>Delete {0} selected position template(s)?</value></data>
   <data name="TemplatesDeleted" xml:space="preserve"><value>{0} position template(s) deleted.</value></data>
   <data name="TemplateDeleted" xml:space="preserve"><value>Template deleted</value></data>
+  <data name="CategoryHelper" xml:space="preserve"><value>Wspólne atrybuty profilu należą do kategorii.</value></data>
+  <data name="NoAttributeCategories" xml:space="preserve"><value>Brak dostępnych kategorii atrybutów.</value></data>
+  <data name="RemoveOptions" xml:space="preserve"><value>Usuń opcje</value></data>
+  <data name="RemoveOptionsConfirm" xml:space="preserve"><value>Usunięcie tych opcji usunie także wartości profili i reguły dostępu, które ich używają. Kontynuować?</value></data>
+  <data name="EditAttribute" xml:space="preserve"><value>Edytuj atrybut</value></data>
+  <data name="AllCategories" xml:space="preserve"><value>Wszystkie kategorie</value></data>
+  <data name="AttributeCount" xml:space="preserve"><value>Atrybutów: {0}</value></data>
+  <data name="Source" xml:space="preserve"><value>Źródło</value></data>
+  <data name="BuiltIn" xml:space="preserve"><value>Wbudowany</value></data>
+  <data name="NoAttributesHint" xml:space="preserve"><value>Zmień wyszukiwanie lub utwórz nowy atrybut.</value></data>
+  <data name="AttributeDeleteImpact" xml:space="preserve"><value>Usunąć {0} atrybut(ów)? Profile: {1}; stanowiska: {2}; reguły: {3}; CV: {4}; stanowiska ograniczone tracące całe bramkowanie: {5}.</value></data>
+  <data name="DeleteAttribute" xml:space="preserve"><value>Usuń atrybut</value></data>
+  <data name="DeleteAttributes" xml:space="preserve"><value>Usuń atrybuty</value></data>
+  <data name="AttributesDeleted" xml:space="preserve"><value>Usunięto atrybutów: {0}.</value></data>
+  <data name="ErrorPageTitle" xml:space="preserve"><value>Error</value></data>
+  <data name="ErrorPageBody" xml:space="preserve"><value>An error occurred while processing your request.</value></data>
+  <data name="ErrorBoundaryTitle" xml:space="preserve"><value>Something went wrong</value></data>
+  <data name="ErrorBoundaryBody" xml:space="preserve"><value>This part of the page could not be displayed. Try again, and contact support if the problem persists.</value></data>
+  <data name="ErrorReferenceId" xml:space="preserve"><value>Reference</value></data>
+  <data name="ErrorUnexpected" xml:space="preserve"><value>Something went wrong. Please try again.</value></data>
+  <data name="ErrorNotFound" xml:space="preserve"><value>The requested item was not found or is no longer available.</value></data>
+  <data name="ErrorForbidden" xml:space="preserve"><value>You do not have permission to perform this action.</value></data>
+  <data name="ErrorUnauthorized" xml:space="preserve"><value>Please sign in to continue.</value></data>
+  <data name="ErrorValidation" xml:space="preserve"><value>Check the highlighted fields:</value></data>
+  <data name="ErrorConflict" xml:space="preserve"><value>This change conflicts with existing data. Refresh and try again.</value></data>
+  <data name="ErrorConcurrency" xml:space="preserve"><value>Someone else changed this item. Reload it and try again.</value></data>
+  <data name="ErrorRateLimited" xml:space="preserve"><value>Too many attempts. Please wait a moment and try again.</value></data>
+  <data name="ErrorServiceUnavailable" xml:space="preserve"><value>The service is temporarily unavailable. Please try again shortly.</value></data>
+  <data name="ImageUploadTypeInvalid" xml:space="preserve"><value>Only JPEG, PNG, and WebP images up to 5 MB are supported.</value></data>
+  <data name="ImageUploadTicketFailed" xml:space="preserve"><value>The upload could not be started.</value></data>
+  <data name="ImageUploadStorageBlocked" xml:space="preserve"><value>The upload was blocked by the storage service. Check the bucket CORS policy.</value></data>
+  <data name="ImageUploadRejected" xml:space="preserve"><value>The storage service rejected the upload.</value></data>
+  <data name="ImageUploadVerifyFailed" xml:space="preserve"><value>The upload could not be verified.</value></data>
+  <data name="ImageAlt" xml:space="preserve"><value>Profile image</value></data>
+  <data name="ImageDropHere" xml:space="preserve"><value>Drop an image here or click to choose a file</value></data>
+  <data name="ImageChange" xml:space="preserve"><value>Change image</value></data>
+  <data name="ImageUploading" xml:space="preserve"><value>Uploading the image...</value></data>
+  <data name="ImageProgress" xml:space="preserve"><value>Uploading: {0}%</value></data>
+  <data name="ImageRemove" xml:space="preserve"><value>Remove image</value></data>
+  <data name="ImageFormatHint" xml:space="preserve"><value>{0}. Up to {1}; larger photos are scaled down automatically.</value></data>
+  <data name="ImageStorageUnavailable" xml:space="preserve"><value>Image uploads are not available right now.</value></data>
+  <data name="ImageUploadTooLargeToDownscale" xml:space="preserve"><value>This image is too large even after scaling it down. Try a smaller file.</value></data>
+  <data name="ImageUploadDownscaleFailed" xml:space="preserve"><value>This image could not be processed. Try a different file.</value></data>
+  <data name="ErrorNetworkUnavailable" xml:space="preserve"><value>The connection was lost. Check your network and try again.</value></data>
+  <data name="ProfilePhoto" xml:space="preserve"><value>Photo</value></data>
+  <data name="ProfilePhotoHint" xml:space="preserve"><value>Used as your avatar across the platform.</value></data>
+  <data name="ProfileAboutYou" xml:space="preserve"><value>About you</value></data>
+  <data name="ProfileAccount" xml:space="preserve"><value>Account</value></data>
+  <data name="ProfileExternalLogins" xml:space="preserve"><value>External logins</value></data>
+  <data name="ProfileExternalLoginsHint" xml:space="preserve"><value>Sign in faster by linking an external account.</value></data>
+  <data name="ProfileLoading" xml:space="preserve"><value>Loading your profile...</value></data>
+  <data name="ProfileSaving" xml:space="preserve"><value>Saving your changes...</value></data>
+  <data name="ProfileSaved" xml:space="preserve"><value>All changes saved</value></data>
+  <data name="ProfileSaveFailed" xml:space="preserve"><value>Some changes could not be saved</value></data>
+  <data name="ProfileCompletion" xml:space="preserve"><value>Profile completion</value></data>
+  <data name="ProfileUnsavedChangesTitle" xml:space="preserve"><value>Leave without saving?</value></data>
+  <data name="ProfileUnsavedChangesBody" xml:space="preserve"><value>Your most recent edits have not been saved yet. Leaving now discards them.</value></data>
+  <data name="ProfileDiscardChanges" xml:space="preserve"><value>Discard changes</value></data>
+  <data name="ProfileKeepEditing" xml:space="preserve"><value>Keep editing</value></data>
+  <data name="ProfileJumpToSection" xml:space="preserve"><value>Sections</value></data>
+  <data name="ConcurrencyConflictTitle" xml:space="preserve"><value>Someone else changed this profile</value></data>
+  <data name="ProfilePendingSave" xml:space="preserve"><value>Waiting to save</value></data>
+  <data name="CrmSectionTitle" xml:space="preserve"><value>CRM (Salesforce)</value></data>
+  <data name="CrmSectionHint" xml:space="preserve"><value>Export your profile to Salesforce as an Account with a linked Contact.</value></data>
+  <data name="CrmSyncButton" xml:space="preserve"><value>Sync to Salesforce</value></data>
+  <data name="CrmAlreadySynced" xml:space="preserve"><value>This profile has already been synced to Salesforce.</value></data>
+  <data name="CrmNotConfigured" xml:space="preserve"><value>Salesforce integration is not configured.</value></data>
+  <data name="CrmSyncSuccess" xml:space="preserve"><value>Successfully created in Salesforce.</value></data>
+  <data name="CrmAccountName" xml:space="preserve"><value>Account name</value></data>
+  <data name="CrmAccountNameRequired" xml:space="preserve"><value>Account name is required.</value></data>
+  <data name="CrmIndustry" xml:space="preserve"><value>Industry</value></data>
+  <data name="CrmAccountPhone" xml:space="preserve"><value>Account phone</value></data>
+  <data name="CrmWebsite" xml:space="preserve"><value>Website</value></data>
+  <data name="CrmContactTitle" xml:space="preserve"><value>Job title</value></data>
+  <data name="CrmContactMobilePhone" xml:space="preserve"><value>Mobile phone</value></data>
+  <data name="CrmMailingCity" xml:space="preserve"><value>City</value></data>
+  <data name="CrmMailingCountry" xml:space="preserve"><value>Country</value></data>
+  <data name="CrmDescription" xml:space="preserve"><value>Notes</value></data>
+  <data name="CrmContactHint" xml:space="preserve"><value>Your name and email from the profile are used for the Contact record.</value></data>
 </root>

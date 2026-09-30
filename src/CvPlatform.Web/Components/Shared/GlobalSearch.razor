@@ -12,14 +12,18 @@
 <MudAutocomplete T="SearchItem" SearchFunc="SearchAsync" ToStringFunc="@(i => i?.Title ?? "")"
                  ValueChanged="OnSelectedAsync" Placeholder="@L["SearchPlaceholder"]"
                  AdornmentIcon="@Icons.Material.Filled.Search" Adornment="Adornment.Start"
+                 OnAdornmentClick="@(() => GoToSearchAsync())"
                  DebounceInterval="300" MinCharacters="2" Clearable="true" Dense="true"
                  Class="cv-global-search" />
 
 @code {
     public sealed record SearchItem(string Kind, Guid Id, string Title, string Url);
 
+    private string? _lastQuery;
+
     private async Task<IEnumerable<SearchItem>> SearchAsync(string value, CancellationToken ct)
     {
+        _lastQuery = value;
         if (string.IsNullOrWhiteSpace(value) || value.Trim().Length < 2)
             return [];
         var actor = await GetActorAsync();
@@ -31,6 +35,7 @@
             new SearchItem("position", p.Id, p.Title, $"/positions/{p.Id}/apply")));
         items.AddRange(result.Value.Cvs.Items.Select(c =>
             new SearchItem("cv", c.CvId, $"{c.PositionTitle} — {c.CandidateName}", $"/cvs/{c.CvId}")));
+        items.Add(new SearchItem("viewall", Guid.Empty, L["ViewAllResults"], $"/search?Term={Uri.EscapeDataString(value.Trim())}"));
         return items;
     }
 
@@ -38,6 +43,13 @@
     {
         if (item is not null)
             Navigation.NavigateTo(item.Url);
+        return Task.CompletedTask;
+    }
+
+    private Task GoToSearchAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(_lastQuery))
+            Navigation.NavigateTo($"/search?Term={Uri.EscapeDataString(_lastQuery.Trim())}");
         return Task.CompletedTask;
     }
 

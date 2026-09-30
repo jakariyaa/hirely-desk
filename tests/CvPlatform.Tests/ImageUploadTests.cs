@@ -46,6 +46,31 @@ public class ImageUploadTests
     }
 
     [Theory]
+    [InlineData("users/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/profile/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.jpg", true, true)]
+    [InlineData("users/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/profile/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.png", true, true)]
+    [InlineData("users/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/profile/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.webp", true, true)]
+    [InlineData("users/cccccccc-cccc-cccc-cccc-cccccccccccc/profile/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.jpg", false, true)]
+    [InlineData("users/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/avatar/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.jpg", false, false)]
+    [InlineData("users/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/profile/not-a-guid.jpg", false, false)]
+    [InlineData("users/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/profile/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.gif", false, false)]
+    [InlineData("users/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/profile/../photo.jpg", false, false)]
+    [InlineData("https://images.example.test/photo.jpg", false, false)]
+    public void Object_keys_are_strictly_validated(string objectKey, bool expectedOwned, bool expectedValid)
+    {
+        var userId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        var storage = new B2ImageStorage(Options.Create(new B2Options
+        {
+            Region = "us-west-004",
+            BucketName = "images",
+            ApplicationKeyId = "application-key-id",
+            ApplicationKey = "application-key",
+        }));
+
+        storage.IsOwnedObjectKey(objectKey, userId).Should().Be(expectedOwned);
+        (storage.CreateDownloadTicket(objectKey) is not null).Should().Be(expectedValid);
+    }
+
+    [Theory]
     [InlineData("image/gif")]
     [InlineData("text/plain")]
     public void Unsupported_content_types_are_rejected(string contentType)

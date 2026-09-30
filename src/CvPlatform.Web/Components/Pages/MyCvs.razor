@@ -11,9 +11,10 @@
 @inject ICvService CvService
 @inject AuthenticationStateProvider AuthProvider
 @inject IDialogService DialogService
-@inject ISnackbar Snackbar
+@inject IUiErrorReporter Errors
 @inject NavigationManager Navigation
 @inject IStringLocalizer<SharedResource> L
+@inject ISnackbar Snackbar
 
 <PageTitle>@L["MyCvs"]</PageTitle>
 
@@ -83,7 +84,7 @@ else
             var result = await CvService.ListMinePagedAsync(actor, new PageRequest(state.Page + 1, state.PageSize), ct);
             if (!result.Succeeded)
             {
-                _error = result.Error.Message;
+                _error = Errors.Report(result.Error);
                 return new GridData<CvDto>();
             }
 
@@ -139,7 +140,7 @@ else
             {
                 var deleteResult = await CvService.DeleteAsync(actor, cv.Id);
                 if (!deleteResult.Succeeded)
-                    Snackbar.Add(deleteResult.Error.Message, Severity.Error);
+                    Errors.Notify(deleteResult.Error);
             }
 
             Snackbar.Add(L["CvDeleted"], Severity.Success);

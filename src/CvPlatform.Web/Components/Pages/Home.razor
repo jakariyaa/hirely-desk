@@ -14,6 +14,7 @@
 @inject AuthenticationStateProvider AuthProvider
 @inject NavigationManager Navigation
 @inject IStringLocalizer<SharedResource> L
+@inject IUiErrorReporter Errors
 
 <PageTitle>@L["Home"]</PageTitle>
 
@@ -56,6 +57,68 @@ else if (_publicStats is not null)
             @L["BrowsePositions"]
         </MudButton>
     </MudStack>
+    <MudGrid Spacing="4" Class="mt-4">
+        <MudItem xs="12" md="6">
+            <MudPaper Class="cv-panel cv-list-card pa-4">
+                <MudStack Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-2">
+                    <MudText Typo="Typo.h6">@L["LatestPublicCvs"]</MudText>
+                    <MudButton Variant="Variant.Text" Color="Color.Primary"
+                               OnClick="@(() => Navigation.NavigateTo("/positions"))">@L["Open"]</MudButton>
+                </MudStack>
+                @if (_publicStats!.LatestCvs.Count == 0)
+                {
+                    <MudText Typo="Typo.body2">@L["NoResults"]</MudText>
+                }
+                else
+                {
+                    <MudTable Items="_publicStats.LatestCvs" Class="cv-list-table" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm">
+                        <HeaderContent>
+                            <MudTh>@L["Position"]</MudTh>
+                            <MudTh>@L["Candidates"]</MudTh>
+                            <MudTh>@L["PublishedAt"]</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="@L["Position"]">
+                                <MudLink Href="@($"/positions/{context.PositionId:D}/view")">@context.PositionTitle</MudLink>
+                            </MudTd>
+                            <MudTd DataLabel="@L["Candidates"]">@CandidateName(context.CandidateName)</MudTd>
+                            <MudTd DataLabel="@L["PublishedAt"]">@context.PublishedAt?.ToString("yyyy-MM-dd")</MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                }
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="6">
+            <MudPaper Class="cv-panel cv-list-card pa-4">
+                <MudStack Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-2">
+                    <MudText Typo="Typo.h6">@L["PopularPublicPositions"]</MudText>
+                    <MudButton Variant="Variant.Text" Color="Color.Primary"
+                               OnClick="@(() => Navigation.NavigateTo("/positions"))">@L["Open"]</MudButton>
+                </MudStack>
+                @if (_publicStats!.PopularPositions.Count == 0)
+                {
+                    <MudText Typo="Typo.body2">@L["NoResults"]</MudText>
+                }
+                else
+                {
+                    <MudTable Items="_publicStats.PopularPositions" Class="cv-list-table" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm">
+                        <HeaderContent>
+                            <MudTh>@L["Name"]</MudTh>
+                            <MudTh>@L["Cvs"]</MudTh>
+                            <MudTh>@L["Likes"]</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="@L["Name"]">
+                                <MudLink Href="@($"/positions/{context.PositionId:D}/view")">@context.Title</MudLink>
+                            </MudTd>
+                            <MudTd DataLabel="@L["Cvs"]">@string.Format(L["CvCount"].Value, context.CvCount)</MudTd>
+                            <MudTd DataLabel="@L["Likes"]">@string.Format(L["LikeCount"].Value, context.LikeCount)</MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
 }
 else
 {
@@ -167,6 +230,9 @@ else
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
+    private string CandidateName(string? name) =>
+        string.IsNullOrWhiteSpace(name) ? L["AnonymousCandidate"].Value : name;
+
     private async Task LoadAsync()
     {
         _loading = true;
@@ -183,7 +249,7 @@ else
                 if (publicResult.Succeeded)
                     _publicStats = publicResult.Value;
                 else
-                    _error = publicResult.Error.Message;
+                    _error = Errors.Report(publicResult.Error);
             }
             else
             {
@@ -192,7 +258,7 @@ else
                 if (result.Succeeded)
                     _stats = result.Value;
                 else
-                    _error = result.Error.Message;
+                    _error = Errors.Report(result.Error);
                 var badges = await Badges.GetForUserAsync(actor, actor.UserId);
                 if (badges.Succeeded && badges.Value is not null)
                     _badges = badges.Value;
@@ -200,7 +266,7 @@ else
         }
         catch (Exception ex)
         {
-            _error = ex.Message;
+            _error = Errors.Report(ex);
         }
         finally
         {

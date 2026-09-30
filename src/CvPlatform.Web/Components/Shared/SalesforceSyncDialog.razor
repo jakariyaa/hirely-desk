@@ -1,0 +1,91 @@
+@using CvPlatform.Application.Authorization
+@using CvPlatform.Application.Common
+@using CvPlatform.Application.Crm
+@using CvPlatform.Web.Resources
+@using Microsoft.Extensions.Localization
+@inject ICrmSyncService CrmSync
+@inject IStringLocalizer<SharedResource> L
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudTextField T="string" @bind-Value="_accountName" Label="@L["CrmAccountName"]" Required="true" />
+        <MudTextField T="string" @bind-Value="_industry" Label="@L["CrmIndustry"]" Class="mt-2" />
+        <MudTextField T="string" @bind-Value="_accountPhone" Label="@L["CrmAccountPhone"]" Class="mt-2" />
+        <MudTextField T="string" @bind-Value="_website" Label="@L["CrmWebsite"]" Class="mt-2" />
+        <MudTextField T="string" @bind-Value="_contactTitle" Label="@L["CrmContactTitle"]" Class="mt-2" />
+        <MudTextField T="string" @bind-Value="_contactMobilePhone" Label="@L["CrmContactMobilePhone"]" Class="mt-2" />
+        <MudTextField T="string" @bind-Value="_mailingCity" Label="@L["CrmMailingCity"]" Class="mt-2" />
+        <MudTextField T="string" @bind-Value="_mailingCountry" Label="@L["CrmMailingCountry"]" Class="mt-2" />
+        <MudTextField T="string" @bind-Value="_description" Label="@L["CrmDescription"]" Lines="3" Class="mt-2" />
+        <MudText Typo="Typo.caption" Class="mt-2">@L["CrmContactHint"]</MudText>
+        @if (_error is not null)
+        {
+            <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2">@_error</MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Text" OnClick="@(() => MudDialog.Cancel())">@L["Cancel"]</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitAsync" Disabled="_saving">@L["CrmSyncButton"]</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter, EditorRequired] public ActorContext Actor { get; set; } = default!;
+    [Parameter, EditorRequired] public Guid UserId { get; set; }
+
+    private string _accountName = "";
+    private string? _industry;
+    private string? _accountPhone;
+    private string? _website;
+    private string? _contactTitle;
+    private string? _contactMobilePhone;
+    private string? _mailingCity;
+    private string? _mailingCountry;
+    private string? _description;
+    private bool _saving;
+    private string? _error;
+
+    private async Task SubmitAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_accountName))
+        {
+            _error = L["CrmAccountNameRequired"].Value;
+            return;
+        }
+
+        _saving = true;
+        _error = null;
+        try
+        {
+            var result = await CrmSync.SyncAsync(Actor, UserId, new CrmSyncInput(
+                _accountName.Trim(),
+                NullIfEmpty(_industry),
+                NullIfEmpty(_accountPhone),
+                NullIfEmpty(_website),
+                NullIfEmpty(_contactTitle),
+                NullIfEmpty(_contactMobilePhone),
+                NullIfEmpty(_mailingCity),
+                NullIfEmpty(_mailingCountry),
+                NullIfEmpty(_description)));
+
+            if (result.Succeeded)
+            {
+                Snackbar.Add(L["CrmSyncSuccess"].Value, Severity.Success);
+                MudDialog.Close(DialogResult.Ok(result.Value));
+            }
+            else
+            {
+                _error = result.Error.Message;
+            }
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private static string? NullIfEmpty(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+}

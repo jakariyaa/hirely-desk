@@ -4,6 +4,7 @@
 @using CvPlatform.Application.Attributes
 @using CvPlatform.Application.Authorization
 @using CvPlatform.Application.Common
+@using CvPlatform.Application.Crm
 @using CvPlatform.Application.Profiles
 @using CvPlatform.Core.Enums
 @using CvPlatform.Core.Entities
@@ -11,12 +12,15 @@
 @using CvPlatform.Web.Resources
 @using CvPlatform.Web.State
 @using Microsoft.AspNetCore.Authentication
+@using Microsoft.AspNetCore.Components.Routing
 @using Microsoft.AspNetCore.Identity
 @using Microsoft.Extensions.Localization
 @using System.Security.Claims
+@using AppError = CvPlatform.Application.Common.Error
 @inject IProfileService ProfileService
+@inject ICrmSyncService CrmSyncService
 @inject AuthenticationStateProvider AuthProvider
-@inject ISnackbar Snackbar
+@inject IUiErrorReporter Errors
 @inject IDialogService DialogService
 @inject IStringLocalizer<SharedResource> L
 @inject ProfileHeaderState ProfileHeader
@@ -24,81 +28,234 @@
 
 <PageTitle>@L["Profile"]</PageTitle>
 
-<PageHeader Title="@L["Profile"]" Subtitle="@L["ProfileSubtitle"]" Icon="@Icons.Material.Filled.Person">
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Save"
-                   Disabled="@(!HasUnsavedChanges || _savingAll || _loading)" OnClick="SaveAllAsync">
-            @L["SaveAll"]@(_dirty.Count > 0 ? $" ({_dirty.Count})" : "")
-        </MudButton>
-        @foreach (var provider in _externalSchemes)
-        {
-            <MudButton Href="@($"/Account/LinkExternalLogin?provider={Uri.EscapeDataString(provider.Name)}&returnUrl=%2Fprofile")"
-                       Variant="Variant.Outlined" Color="Color.Primary">
-                @L["LinkExternalProvider", provider.DisplayName ?? provider.Name]
-            </MudButton>
-        }
-    </PageHeader>
+<PageHeader Title="@L["Profile"]" Subtitle="@L["ProfileSubtitle"]" Icon="@Icons.Material.Filled.Person" />
+
+<NavigationLock ConfirmExternalNavigation="@HasUnsavedChanges"
+                OnBeforeInternalNavigation="ConfirmLeaveAsync" />
+
+<div class="cv-save-status" role="status" aria-live="polite">
+    @switch (_saveState)
+    {
+        case SaveState.Saving:
+            <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Primary" />
+            <MudText Typo="Typo.body2">@L["ProfileSaving"]</MudText>
+            break;
+        case SaveState.Failed:
+            <MudIcon Icon="@Icons.Material.Filled.ErrorOutline" Size="Size.Small" Color="Color.Error" />
+            <MudText Typo="Typo.body2" Color="Color.Error">@L["ProfileSaveFailed"]</MudText>
+            break;
+        default:
+            <MudIcon Icon="@Icons.Material.Filled.CloudDone" Size="Size.Small" Color="Color.Success" />
+            <MudText Typo="Typo.body2">@L["ProfileSaved"]</MudText>
+            break;
+    }
+</div>
 
 @if (_loading)
 {
     <MudProgressLinear Color="Color.Primary" Indeterminate Class="cv-page-loading" />
 }
 
-@if (_error is not null)
-{
-    <EmptyState Icon="@Icons.Material.Filled.ErrorOutline" Title="@L["LoadFailed"]" Description="@_error">
-        <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="LoadAsync">@L["Retry"]</MudButton>
-    </EmptyState>
-}
 @if (LinkError is not null)
 {
     <MudAlert Severity="Severity.Error" Class="mb-4">@LinkErrorMessage</MudAlert>
 }
 
-@if (_catalog is not null)
+@if (_error is not null && _catalog is null)
 {
-    @foreach (var category in _catalog)
+    <EmptyState Icon="@Icons.Material.Filled.ErrorOutline" Title="@L["LoadFailed"]" Description="@_error">
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="LoadAsync">@L["Retry"]</MudButton>
+    </EmptyState>
+}
+else if (_catalog is null)
+{
+    <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="180px" Class="mb-4" />
+    <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="180px" />
+}
+else
+{
+    @if (_error is not null)
     {
-        <MudPaper Class="cv-panel pa-4 mb-4">
-            <MudText Typo="Typo.h6" Class="mb-3">@category.Name</MudText>
-            @foreach (var definition in category.Definitions
-                .OrderBy(d => d.Name == ProfileAttributeNames.Name ? 0 : 1)
-                .ThenBy(d => d.Name))
-            {
-                <div class="cv-attribute-row">
-                    <MudText Typo="Typo.body2" Class="cv-attribute-label">@AttributeLabels.Localize(L, definition.Name)</MudText>
-                    <AttributeValueEditor Definition="definition" Value="@Draft(definition.Id)"
-                                           Disabled="@IsSaving(definition.Id)"
-                                           OnChanged="@(() => DraftChangedAsync(definition.Id))" />
-                    @if (IsSaving(definition.Id))
-                    {
-                        <MudProgressCircular Size="Size.Small" Indeterminate="true" />
-                    }
-                </div>
-            }
-        </MudPaper>
+        <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-4">@_error</MudAlert>
     }
+
+    <div class="cv-profile-layout">
+        <nav class="cv-profile-nav" aria-label="@L["ProfileJumpToSection"]">
+            <MudText Typo="Typo.overline" Class="cv-text-caption">@L["ProfileJumpToSection"]</MudText>
+            <MudList T="string" Dense="true" Class="pa-0">
+                @foreach (var category in _catalog)
+                {
+                    <MudListItem T="string"
+                                 Text="@category.Name"
+                                 Href="@("#" + AnchorFor(category))"
+                                 Class="@NavItemClass(category.Id)"
+                                 @onclick="@(() => SelectAnchor(AnchorFor(category)))" />
+                }
+                <MudListItem T="string"
+                             Text="@L["ProfileAccount"]"
+                             Href="@("#" + AccountAnchor)"
+                             Class="@NavItemClass(default, AccountAnchor)"
+                             @onclick="@(() => SelectAnchor(AccountAnchor))" />
+            </MudList>
+        </nav>
+
+        <div class="cv-profile-form">
+            <MudPaper Class="cv-panel pa-4 mb-4 cv-profile-header">
+                <div class="cv-profile-header-main">
+                    @if (_headerImageValueId is not null)
+                    {
+                        <MudImage Src="@ImageContentUrl(_headerImageValueId.Value)" Alt="@HeaderName" Class="cv-profile-header-avatar" />
+                    }
+                    else
+                    {
+                        <span class="cv-profile-header-avatar cv-profile-header-initials" aria-hidden="true">@HeaderInitials</span>
+                    }
+                    <div class="cv-profile-header-text">
+                        <MudText Typo="Typo.h5">@HeaderName</MudText>
+                        <MudText Typo="Typo.body2" Class="cv-text-caption">@_email</MudText>
+                    </div>
+                </div>
+                <div class="cv-profile-completion">
+                    <div class="cv-profile-completion-label">
+                        <MudText Typo="Typo.caption">@L["ProfileCompletion"]</MudText>
+                        <MudText Typo="Typo.caption">@CompletionPercent%</MudText>
+                    </div>
+                    <MudProgressLinear Color="Color.Primary" Size="Size.Small" Value="@CompletionPercent" />
+                </div>
+            </MudPaper>
+
+            @if (PhotoDefinition is not null)
+            {
+                <MudPaper Class="cv-panel pa-4 mb-4 cv-profile-section" id="@AnchorFor(PhotoDefinition.Id)">
+                    <div class="cv-profile-section-head">
+                        <div>
+                            <MudText Typo="Typo.h6">@L["ProfilePhoto"]</MudText>
+                            <MudText Typo="Typo.body2" Class="cv-text-caption">@L["ProfilePhotoHint"]</MudText>
+                        </div>
+                    </div>
+                    <AttributeValueEditor Definition="PhotoDefinition"
+                                           Value="@Draft(PhotoDefinition.Id)"
+                                           Disabled="@IsSaving(PhotoDefinition.Id)"
+                                           OnChanged="@(() => DraftChangedAsync(PhotoDefinition.Id))" />
+                </MudPaper>
+            }
+
+            @foreach (var category in _catalog)
+            {
+                var definitions = DefinitionsOf(category);
+                if (definitions.Count == 0)
+                {
+                    continue;
+                }
+
+                <MudPaper Class="cv-panel pa-4 mb-4 cv-profile-section" id="@AnchorFor(category.Id)">
+                    <MudText Typo="Typo.h6" Class="mb-3">@category.Name</MudText>
+                    @foreach (var definition in definitions)
+                    {
+                        <div class="cv-attribute-row">
+                            <MudText Typo="Typo.body2" Class="cv-attribute-label">
+                                @AttributeLabels.Localize(L, definition.Name)
+                            </MudText>
+                            <AttributeValueEditor Definition="definition"
+                                                   Value="@Draft(definition.Id)"
+                                                   Disabled="@IsSaving(definition.Id)"
+                                                   OnChanged="@(() => DraftChangedAsync(definition.Id))" />
+                            <div class="cv-attribute-status">
+                                @if (IsSaving(definition.Id))
+                                {
+                                    <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                                }
+                                else if (_dirty.Contains(definition.Id))
+                                {
+                                    <MudIcon Icon="@Icons.Material.Filled.Schedule"
+                                             Size="Size.Small"
+                                             Color="Color.Warning"
+                                             title="@L["ProfilePendingSave"]" />
+                                }
+                            </div>
+                        </div>
+                    }
+                </MudPaper>
+            }
+
+            <MudPaper Class="cv-panel pa-4 mb-4 cv-profile-section" id="@AccountAnchor">
+                <MudText Typo="Typo.h6" Class="mb-1">@L["ProfileAccount"]</MudText>
+                <MudText Typo="Typo.body2" Class="cv-text-caption mb-3">@L["ProfileExternalLoginsHint"]</MudText>
+                @if (_externalSchemes.Count == 0)
+                {
+                    <MudText Typo="Typo.body2">@L["ExternalLoginUnavailable"]</MudText>
+                }
+                else
+                {
+                    <ExternalProviderButtons Providers="_externalSchemes"
+                                             ReturnUrl="/profile"
+                                             LinkMode="true"
+                                             Color="Color.Primary"
+                                             CssClass="d-flex flex-wrap gap-2"
+                                             LabelFor="@(provider => L["LinkExternalProvider", provider.DisplayName ?? provider.Name])" />
+                }
+            </MudPaper>
+
+            <MudPaper Class="cv-panel pa-4 mb-4 cv-profile-section">
+                <MudText Typo="Typo.h6" Class="mb-1">@L["CrmSectionTitle"]</MudText>
+                <MudText Typo="Typo.body2" Class="cv-text-caption mb-3">@L["CrmSectionHint"]</MudText>
+                @if (_crmSynced)
+                {
+                    <MudAlert Severity="Severity.Success" Dense="true">@L["CrmAlreadySynced"]</MudAlert>
+                }
+                else if (!CrmSyncService.IsConfigured)
+                {
+                    <MudAlert Severity="Severity.Info" Dense="true">@L["CrmNotConfigured"]</MudAlert>
+                }
+                else
+                {
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenCrmSyncAsync">@L["CrmSyncButton"]</MudButton>
+                }
+            </MudPaper>
+        </div>
+    </div>
 }
 
 @code {
+    private enum SaveState
+    {
+        Idle,
+        Saving,
+        Failed
+    }
+
+    private const string AccountAnchor = "profile-section-account";
+    private const int AutosaveDelayMilliseconds = 700;
+
     private IReadOnlyList<AttributeCategoryDto>? _catalog;
     private Dictionary<Guid, AttributeValueDraft> _drafts = [];
     private HashSet<Guid> _saving = [];
     private HashSet<Guid> _dirty = [];
     private readonly Dictionary<Guid, CancellationTokenSource> _autosave = [];
+    private ActorContext? _actor;
+    private IReadOnlyList<AuthenticationScheme> _externalSchemes = [];
     private bool _loading;
-    private bool _savingAll;
+    private SaveState _saveState = SaveState.Idle;
+    private string _activeAnchor = string.Empty;
     private string? _error;
+    private string? _displayName;
+    private string? _email;
+    private bool _crmSynced;
+    private Guid? _headerImageValueId;
+
     [SupplyParameterFromQuery(Name = "error")]
     private string? LinkError { get; set; }
 
     private string LinkErrorMessage => LinkError switch
     {
-        "provideralreadylinked" => L["ExternalProviderAlreadyLinked"],
-        "linkfailed" => L["ExternalProviderLinkFailed"],
-        _ => L["ExternalLoginUnavailable"],
+        "provideralreadylinked" => L["ExternalProviderAlreadyLinked"].Value,
+        "linkfailed" => L["ExternalProviderLinkFailed"].Value,
+        _ => L["ExternalLoginUnavailable"].Value,
     };
 
-    private IReadOnlyList<AuthenticationScheme> _externalSchemes = [];
+    private AttributeDefinitionDto? PhotoDefinition => _catalog?
+        .SelectMany(category => category.Definitions)
+        .FirstOrDefault(definition => definition.Name == ProfileAttributeNames.Photo);
 
     private bool HasUnsavedChanges => _dirty.Count > 0;
 
@@ -110,29 +267,43 @@
 
     private async Task LoadAsync()
     {
-        foreach (var source in _autosave.Values)
-            await source.CancelAsync();
-        _autosave.Clear();
+        await CancelPendingAutosavesAsync();
         _saving.Clear();
         _dirty.Clear();
-        _savingAll = false;
+        _saveState = SaveState.Idle;
         _loading = true;
         _error = null;
         try
         {
-            var actor = await GetActorAsync();
             var catalogResult = await ProfileService.GetCatalogAsync();
             if (!catalogResult.Succeeded)
             {
-                _error = catalogResult.Error.Message;
+                _catalog = null;
+                _error = Errors.Report(catalogResult.Error);
                 return;
             }
 
             _catalog = catalogResult.Value;
+            if (_catalog.Count > 0)
+                _activeAnchor = AnchorFor(_catalog[0].Id);
+
+            var actor = await GetActorAsync();
+            var summary = await ProfileService.GetSummaryForUserAsync(actor, actor.UserId);
+            if (summary.Succeeded)
+            {
+                _displayName = summary.Value?.Name;
+                _headerImageValueId = summary.Value?.ImageValueId;
+            }
+
+            var authState = await AuthProvider.GetAuthenticationStateAsync();
+            var user = await SignIn.UserManager.GetUserAsync(authState.User);
+            _email = user?.Email;
+            _crmSynced = await CrmSyncService.IsSyncedAsync(actor, actor.UserId);
+
             var profileResult = await ProfileService.GetForUserAsync(actor, actor.UserId);
             if (!profileResult.Succeeded)
             {
-                _error = profileResult.Error.Message;
+                _error = Errors.Report(profileResult.Error);
                 return;
             }
 
@@ -140,8 +311,7 @@
                 return;
 
             _drafts = profileResult.Value.Values.ToDictionary(
-                v => v.AttributeDefinitionId, v => ToDraft(v));
-            _dirty.Clear();
+                value => value.AttributeDefinitionId, value => ToDraft(value));
         }
         finally
         {
@@ -149,10 +319,82 @@
         }
     }
 
-    private AttributeValueDraft Draft(Guid definitionId) =>
-        _drafts.TryGetValue(definitionId, out var draft)
-            ? draft
-            : _drafts[definitionId] = new AttributeValueDraft();
+    /// <summary>
+    /// Definitions of a category, minus the photo, which is hoisted into its own card. Ordering
+    /// puts the display name first, which is what people look for.
+    /// </summary>
+    private List<AttributeDefinitionDto> DefinitionsOf(AttributeCategoryDto category) =>
+    [
+        .. category.Definitions
+            .Where(definition => definition.Name != ProfileAttributeNames.Photo)
+            .OrderBy(definition => definition.Name == ProfileAttributeNames.Name ? 0 : 1)
+            .ThenBy(definition => definition.Name)
+    ];
+
+    private static string AnchorFor(Guid id) => $"profile-section-{id:D}";
+
+    private static string ImageContentUrl(Guid valueId) => $"/api/profile-images/{valueId:D}/content";
+
+    private string HeaderName => !string.IsNullOrWhiteSpace(_displayName)
+        ? _displayName
+        : _email ?? L["Profile"].Value;
+
+    private string HeaderInitials => BuildInitials(_displayName, _email);
+
+    private static string BuildInitials(string? name, string? email)
+    {
+        var source = string.IsNullOrWhiteSpace(name) ? email : name;
+        if (string.IsNullOrWhiteSpace(source))
+            return "?";
+
+        var parts = source.Split(new[] { ' ', '.', '_', '-', '@' }, StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length >= 2)
+            return string.Concat(parts[0][0].ToString().ToUpperInvariant(), parts[1][0].ToString().ToUpperInvariant());
+        return source.Substring(0, 1).ToUpperInvariant();
+    }
+
+    private int CompletionPercent
+    {
+        get
+        {
+            if (_catalog is null)
+                return 0;
+
+            var definitions = _catalog.SelectMany(category => category.Definitions).ToList();
+            if (definitions.Count == 0)
+                return 0;
+
+            var filled = definitions.Count(definition =>
+                _drafts.TryGetValue(definition.Id, out var draft) && DraftHasValue(draft));
+            return (int)Math.Round(100.0 * filled / definitions.Count);
+        }
+    }
+
+    private static bool DraftHasValue(AttributeValueDraft draft) =>
+        draft.ImageValueId is not null
+        || draft.ImageObjectKey is not null
+        || !string.IsNullOrWhiteSpace(draft.String)
+        || !string.IsNullOrWhiteSpace(draft.Text)
+        || draft.Numeric is not null
+        || draft.Date is not null
+        || draft.PeriodStart is not null
+        || draft.PeriodEnd is not null
+        || draft.Boolean is not null
+        || !string.IsNullOrWhiteSpace(draft.Dropdown);
+
+    private static string AnchorFor(AttributeCategoryDto category) => AnchorFor(category.Id);
+
+    private void SelectAnchor(string anchor)
+    {
+        _activeAnchor = anchor;
+        StateHasChanged();
+    }
+
+    private string NavItemClass(Guid id, string? anchor = null)
+    {
+        var target = anchor ?? AnchorFor(id);
+        return target == _activeAnchor ? "cv-profile-nav-link cv-profile-nav-link-active" : "cv-profile-nav-link";
+    }
 
     private static AttributeValueDraft ToDraft(AttributeValueDto value) => new()
     {
@@ -182,106 +424,17 @@
         draft.ImageObjectKey,
         draft.Version);
 
-    private async Task SaveAsync(AttributeDefinitionDto definition)
-    {
-        if (!_saving.Add(definition.Id))
-            return;
+    private AttributeValueDraft Draft(Guid definitionId) =>
+        _drafts.TryGetValue(definitionId, out var draft)
+            ? draft
+            : _drafts[definitionId] = new AttributeValueDraft();
 
-        try
-        {
-            if (!_drafts.TryGetValue(definition.Id, out var draft))
-                return;
-            var input = ToInput(definition.Id, draft);
-
-            var actor = await GetActorAsync();
-            var result = await ProfileService.SaveAttributeValueAsync(actor, actor.UserId, input);
-            if (result.Succeeded && result.Value is not null)
-            {
-                Snackbar.Add(L["Saved"], Severity.Success);
-                var updated = result.Value.Values.FirstOrDefault(v => v.AttributeDefinitionId == definition.Id);
-                if (updated is not null)
-                    _drafts[definition.Id] = ToDraft(updated);
-                _dirty.Remove(definition.Id);
-                await ProfileHeader.NotifyChangedAsync();
-            }
-            else if (!result.Succeeded)
-            {
-                if (result.Error.Code == ErrorCodes.ConcurrencyConflict)
-                {
-                    var dialog = await DialogService.ShowAsync<ConcurrencyDialog>("Concurrency conflict");
-                    if ((await dialog.Result) is { Canceled: false, Data: true })
-                        await LoadAsync();
-                }
-                else
-                    Snackbar.Add(result.Error.Message, Severity.Error);
-            }
-        }
-        finally
-        {
-            _saving.Remove(definition.Id);
-        }
-    }
-
-    private async Task SaveAllAsync()
-    {
-        if (_savingAll || _dirty.Count == 0)
-            return;
-
-        foreach (var source in _autosave.Values)
-            await source.CancelAsync();
-        _autosave.Clear();
-
-        var ids = _dirty.Where(id => !_saving.Contains(id)).ToList();
-        if (ids.Count == 0)
-            return;
-
-        _savingAll = true;
-        try
-        {
-            var inputs = ids
-                .Where(id => _drafts.ContainsKey(id))
-                .Select(id => ToInput(id, _drafts[id]))
-                .ToList();
-            if (inputs.Count == 0)
-                return;
-
-            var actor = await GetActorAsync();
-            var result = await ProfileService.SaveAttributeValuesAsync(actor, actor.UserId, inputs);
-            if (result.Succeeded && result.Value is not null)
-            {
-                Snackbar.Add(L["Saved"], Severity.Success);
-                var byId = result.Value.Values.ToDictionary(v => v.AttributeDefinitionId);
-                foreach (var id in ids)
-                {
-                    if (byId.TryGetValue(id, out var updated))
-                        _drafts[id] = ToDraft(updated);
-                    _dirty.Remove(id);
-                }
-                await ProfileHeader.NotifyChangedAsync();
-            }
-            else if (!result.Succeeded)
-            {
-                if (result.Error.Code == ErrorCodes.ConcurrencyConflict)
-                {
-                    var dialog = await DialogService.ShowAsync<ConcurrencyDialog>("Concurrency conflict");
-                    if ((await dialog.Result) is { Canceled: false, Data: true })
-                        await LoadAsync();
-                }
-                else
-                    Snackbar.Add(result.Error.Message, Severity.Error);
-            }
-        }
-        finally
-        {
-            _savingAll = false;
-        }
-    }
-
-    private bool IsSaving(Guid definitionId) => _saving.Contains(definitionId) || _savingAll;
+    private bool IsSaving(Guid definitionId) => _saving.Contains(definitionId);
 
     private async Task DraftChangedAsync(Guid definitionId)
     {
         _dirty.Add(definitionId);
+        _saveState = SaveState.Idle;
         StateHasChanged();
 
         if (_autosave.Remove(definitionId, out var previous))
@@ -291,13 +444,12 @@
         _autosave[definitionId] = current;
         try
         {
-            await Task.Delay(700, current.Token);
+            await Task.Delay(AutosaveDelayMilliseconds, current.Token);
             if (!IsSaving(definitionId) && _catalog is not null)
             {
-                var definition = _catalog.SelectMany(c => c.Definitions)
-                    .Single(d => d.Id == definitionId);
+                var definition = _catalog.SelectMany(category => category.Definitions)
+                    .Single(candidate => candidate.Id == definitionId);
                 await SaveAsync(definition);
-                StateHasChanged();
             }
         }
         catch (OperationCanceledException) when (current.IsCancellationRequested)
@@ -310,18 +462,143 @@
         }
     }
 
+    private async Task SaveAsync(AttributeDefinitionDto definition)
+    {
+        if (!_saving.Add(definition.Id))
+            return;
+
+        _saveState = SaveState.Saving;
+        try
+        {
+            if (!_drafts.TryGetValue(definition.Id, out var draft))
+                return;
+
+            var actor = await GetActorAsync();
+            var result = await ProfileService.SaveAttributeValueAsync(
+                actor, actor.UserId, ToInput(definition.Id, draft));
+
+            if (result.Succeeded)
+            {
+                if (result.Value is not null)
+                {
+                    var updated = result.Value.Values
+                        .FirstOrDefault(value => value.AttributeDefinitionId == definition.Id);
+                    if (updated is not null)
+                        _drafts[definition.Id] = ToDraft(updated);
+                }
+
+                _dirty.Remove(definition.Id);
+                _saveState = SaveState.Idle;
+                await ProfileHeader.NotifyChangedAsync();
+                var refreshed = await ProfileService.GetSummaryForUserAsync(actor, actor.UserId);
+                if (refreshed.Succeeded)
+                {
+                    _displayName = refreshed.Value?.Name ?? _displayName;
+                    _headerImageValueId = refreshed.Value?.ImageValueId;
+                }
+                return;
+            }
+
+            _saveState = SaveState.Failed;
+            await HandleSaveFailureAsync(result.Error);
+        }
+        catch (Exception ex)
+        {
+            _saveState = SaveState.Failed;
+            Errors.Notify(ex);
+        }
+        finally
+        {
+            _saving.Remove(definition.Id);
+        }
+    }
+
+    private async Task HandleSaveFailureAsync(AppError error)
+    {
+        if (error.Code != ErrorCodes.ConcurrencyConflict)
+        {
+            Errors.Notify(error);
+            return;
+        }
+
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>(
+            L["ConcurrencyConflictTitle"].Value,
+            new DialogParameters<ConfirmDialog>
+            {
+                { dialog => dialog.ContentText, L["ProfileUnsavedChangesBody"].Value },
+                { dialog => dialog.YesText, L["Retry"].Value },
+                { dialog => dialog.NoText, L["Cancel"].Value }
+            });
+        if ((await dialog.Result) is { Canceled: false, Data: true })
+            await LoadAsync();
+    }
+
+    private async Task ConfirmLeaveAsync(LocationChangingContext context)
+    {
+        // A pending autosave lands on its own, so only a field that is still waiting needs a prompt.
+        if (!HasUnsavedChanges || _saveState == SaveState.Saving)
+            return;
+
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>(
+            L["ProfileUnsavedChangesTitle"].Value,
+            new DialogParameters<ConfirmDialog>
+            {
+                { dialog => dialog.ContentText, L["ProfileUnsavedChangesBody"].Value },
+                { dialog => dialog.YesText, L["ProfileDiscardChanges"].Value },
+                { dialog => dialog.NoText, L["ProfileKeepEditing"].Value }
+            });
+
+        if ((await dialog.Result) is { Canceled: false, Data: true })
+            await CancelPendingAutosavesAsync();
+        else
+            context.PreventNavigation();
+    }
+
+    private async Task CancelPendingAutosavesAsync()
+    {
+        foreach (var source in _autosave.Values)
+            await source.CancelAsync();
+
+        foreach (var source in _autosave.Values)
+            source.Dispose();
+
+        _autosave.Clear();
+    }
+
+    private async Task OpenCrmSyncAsync()
+    {
+        var actor = await GetActorAsync();
+        var parameters = new DialogParameters<SalesforceSyncDialog>
+        {
+            { x => x.Actor, actor },
+            { x => x.UserId, actor.UserId },
+        };
+        var dialog = await DialogService.ShowAsync<SalesforceSyncDialog>(
+            title: L["CrmSectionTitle"].Value, parameters: parameters);
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+            _crmSynced = true;
+    }
+
     private async Task<ActorContext> GetActorAsync()
     {
+        if (_actor is not null)
+            return _actor;
+
         var authState = await AuthProvider.GetAuthenticationStateAsync();
-        return new ActorContext(Guid.Parse(authState.User.FindFirstValue(ClaimTypes.NameIdentifier)!), authState.User.IsInRole(Roles.Admin), authState.User.IsInRole(Roles.Recruiter) || authState.User.IsInRole(Roles.Admin));
+        var identifier = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!Guid.TryParse(identifier, out var userId))
+            throw new InvalidOperationException("The signed-in user has no usable identifier.");
+
+        return _actor = new ActorContext(
+            userId,
+            authState.User.IsInRole(Roles.Admin),
+            authState.User.IsInRole(Roles.Recruiter) || authState.User.IsInRole(Roles.Admin));
     }
 
     public async ValueTask DisposeAsync()
     {
-        foreach (var source in _autosave.Values)
-            await source.CancelAsync();
-        foreach (var source in _autosave.Values)
-            source.Dispose();
-        _autosave.Clear();
+        await CancelPendingAutosavesAsync();
+        GC.SuppressFinalize(this);
     }
 }

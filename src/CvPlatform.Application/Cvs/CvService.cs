@@ -1,4 +1,5 @@
 using CvPlatform.Application.Access;
+using CvPlatform.Application.Attributes;
 using CvPlatform.Application.Authorization;
 using CvPlatform.Application.Common;
 using CvPlatform.Application.Profiles;
@@ -12,8 +13,10 @@ namespace CvPlatform.Application.Cvs;
 
 public sealed class CvService(
     IAppDbContextFactory factory,
-    IPositionAccessService positionAccess) : ICvService
+    IPositionAccessService positionAccess,
+    TimeProvider? timeProvider = null) : ICvService
 {
+    private DateOnly Today => AttributeDateRules.TodayFrom(timeProvider);
     public async Task<Result<CvDto>> CreateAsync(ActorContext actor, Guid positionId, CancellationToken ct = default)
     {
         await using var db = factory.CreateDbContext();
@@ -188,12 +191,13 @@ public sealed class CvService(
         var result = cvs.Select(cv =>
         {
             var values = cv.Profile.AttributeValues.ToDictionary(v => v.AttributeDefinitionId);
+            var today = Today;
             var rows = cv.Position.Attributes
                 .OrderBy(a => a.SortOrder)
                 .Select(a =>
                 {
                     values.TryGetValue(a.AttributeDefinitionId, out var value);
-                    return ToFieldRow(a, value);
+                    return ToFieldRow(a, value, today);
                 })
                 .ToList();
             var projects = cv.IncludedProjects
@@ -386,12 +390,13 @@ public sealed class CvService(
         }
 
         var values = cv.Profile.AttributeValues.ToDictionary(v => v.AttributeDefinitionId);
+        var today = Today;
         var rows = cv.Position.Attributes
             .OrderBy(a => a.SortOrder)
             .Select(a =>
             {
                 values.TryGetValue(a.AttributeDefinitionId, out var value);
-                return ToFieldRow(a, value);
+                return ToFieldRow(a, value, today);
             })
             .ToList();
 
@@ -414,9 +419,6 @@ public sealed class CvService(
         var displayName = cv.Profile.AttributeValues
             .FirstOrDefault(v => v.AttributeDefinition.Name == ProfileAttributeNames.Name)
             ?.StringValue;
-        var profilePhotoValueId = cv.Profile.AttributeValues
-            .FirstOrDefault(v => v.AttributeDefinition.Name == ProfileAttributeNames.Photo)
-            ?.Id;
 
         var dto = await LoadDtoAsync(db, cv.Id, ct) ?? new CvDto(
             cv.Id, cv.ProfileId, candidateId,
@@ -426,11 +428,11 @@ public sealed class CvService(
 
         return new CvDetailDto(
             dto, rows, projects, canEdit, missing.Count == 0, missing,
-            displayName, profilePhotoValueId);
+            displayName);
     }
 
     private static CvFieldRowDto ToFieldRow(
-        PositionAttribute attribute, ProfileAttributeValue? value) => new(
+        PositionAttribute attribute, ProfileAttributeValue? value, DateOnly today) => new(
             attribute.AttributeDefinitionId,
             attribute.AttributeDefinition.Name,
             attribute.AttributeDefinition.DataType,
@@ -448,7 +450,17 @@ public sealed class CvService(
             value?.Version ?? 0,
             ParseChoices(attribute.AttributeDefinition.DataType, attribute.AttributeDefinition.OptionsJson),
             attribute.AttributeDefinition.Category.Name,
-            value?.Id);
+            value?.Id,
+            ParseDateRange(attribute.AttributeDefinition, today));
+
+    private static DateRangeDto? ParseDateRange(AttributeDefinition definition, DateOnly today)
+    {
+        if (definition.DataType is not AttributeDataType.Date and not AttributeDataType.Period)
+            return null;
+
+        var range = AttributeDateRules.Resolve(definition.DataType, definition.OptionsJson, today);
+        return new DateRangeDto(range.Min, AttributeDateRules.UpperBound(range, today));
+    }
 
     private static IReadOnlyList<string> ParseChoices(AttributeDataType dataType, string? optionsJson)
     {

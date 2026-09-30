@@ -11,9 +11,10 @@
 @inject IPositionAccessService PositionAccess
 @inject ICvService CvService
 @inject AuthenticationStateProvider AuthProvider
-@inject ISnackbar Snackbar
+@inject IUiErrorReporter Errors
 @inject NavigationManager Navigation
 @inject IStringLocalizer<SharedResource> L
+@inject ISnackbar Snackbar
 
 <PageTitle>@L["CreateCv"]</PageTitle>
 
@@ -89,7 +90,7 @@ else if (_position is not null)
             var positionResult = await PositionAccess.GetAccessibleAsync(actor, Id);
             if (!positionResult.Succeeded)
             {
-                _error = positionResult.Error.Message;
+                _error = Errors.Report(positionResult.Error);
                 return;
             }
 
@@ -103,7 +104,7 @@ else if (_position is not null)
         }
         catch (Exception ex)
         {
-            _error = ex.Message;
+            _error = Errors.Report(ex);
         }
         finally
         {
@@ -125,7 +126,7 @@ else if (_position is not null)
             }
             else
             {
-                Snackbar.Add(result.Error.Message, Severity.Error);
+                Errors.Notify(result.Error);
                 await LoadAsync();
             }
         }

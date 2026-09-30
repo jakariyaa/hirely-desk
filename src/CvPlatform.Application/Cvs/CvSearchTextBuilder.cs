@@ -5,7 +5,10 @@ namespace CvPlatform.Application.Cvs;
 
 public static class CvSearchTextBuilder
 {
-    public static string Build(Cv cv, Guid? excludedAttributeId = null)
+    public static string Build(Cv cv, Guid? excludedAttributeId = null) =>
+        Build(cv, excludedAttributeId is { } id ? [id] : []);
+
+    public static string Build(Cv cv, IReadOnlyCollection<Guid> excludedAttributeIds)
     {
         var parts = new List<string>();
         if (!string.IsNullOrWhiteSpace(cv.Profile.User.UserName))
@@ -14,7 +17,7 @@ public static class CvSearchTextBuilder
         var values = cv.Profile.AttributeValues.ToDictionary(v => v.AttributeDefinitionId);
         foreach (var requested in cv.Position.Attributes.OrderBy(a => a.SortOrder))
         {
-            if (requested.AttributeDefinitionId == excludedAttributeId)
+            if (excludedAttributeIds.Contains(requested.AttributeDefinitionId))
                 continue;
             parts.Add(requested.AttributeDefinition.Name);
             if (values.TryGetValue(requested.AttributeDefinitionId, out var value))

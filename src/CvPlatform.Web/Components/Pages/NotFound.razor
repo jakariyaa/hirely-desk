@@ -1,11 +1,15 @@
 ﻿@page "/not-found"
 @layout MainLayout
+@using CvPlatform.Web.Resources
+@using Microsoft.Extensions.Localization
+
+@inject IStringLocalizer<SharedResource> L
 
 <div class="cv-state-page">
     <MudPaper Elevation="1" Class="cv-state-card">
         <MudIcon Icon="@Icons.Material.Filled.SearchOff" Color="Color.Primary" Size="Size.Large" />
         <MudText Typo="Typo.h5">404</MudText>
-        <MudText Typo="Typo.body1" Class="cv-text-secondary">Sorry, the page you are looking for does not exist.</MudText>
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/">Back to home</MudButton>
+        <MudText Typo="Typo.body1" Class="cv-text-secondary">@L["NotFoundGeneric"]</MudText>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/">@L["Home"]</MudButton>
     </MudPaper>
 </div>

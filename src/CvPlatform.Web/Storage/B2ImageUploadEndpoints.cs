@@ -1,5 +1,6 @@
 using CvPlatform.Core.Storage;
 using CvPlatform.Web.Auth;
+using CvPlatform.Web.ErrorHandling;
 using Microsoft.AspNetCore.Antiforgery;
 
 namespace CvPlatform.Web.Storage;
@@ -15,27 +16,25 @@ public static class B2ImageUploadEndpoints
             PresignImageUploadRequest? request) =>
         {
             if (!await IsAntiforgeryValidAsync(context, antiforgery))
-                return Results.BadRequest("Invalid antiforgery token.");
+                return ProblemResults.FromStatus(StatusCodes.Status400BadRequest);
 
             var actor = ActorContexts.TryFromUser(context.User);
             if (actor is null)
                 return Results.Unauthorized();
             if (!imageStorage.IsConfigured)
-                return Results.Problem(
-                    "Image upload is not configured.",
-                    statusCode: StatusCodes.Status503ServiceUnavailable);
+                return ProblemResults.FromStatus(StatusCodes.Status503ServiceUnavailable);
             if (request is null || string.IsNullOrWhiteSpace(request.ContentType) ||
                 request.Size <= 0 || request.Size > imageStorage.MaxUploadBytes)
-                return Results.BadRequest("The image type or size is invalid.");
+                return ProblemResults.FromStatus(StatusCodes.Status400BadRequest);
             if (!imageStorage.IsAllowedContentType(request.ContentType))
-                return Results.BadRequest("Only JPEG, PNG, and WebP images are supported.");
+                return ProblemResults.FromStatus(StatusCodes.Status400BadRequest);
 
             var ticket = imageStorage.CreateUploadTicket(
                 actor.UserId,
                 request.ContentType,
                 request.Size);
             if (ticket is null)
-                return Results.BadRequest("The image upload request is invalid.");
+                return ProblemResults.FromStatus(StatusCodes.Status400BadRequest);
 
             context.Response.Headers.CacheControl = "no-store";
             return Results.Ok(ticket);
@@ -51,14 +50,14 @@ public static class B2ImageUploadEndpoints
             CancellationToken cancellationToken) =>
         {
             if (!await IsAntiforgeryValidAsync(context, antiforgery))
-                return Results.BadRequest("Invalid antiforgery token.");
+                return ProblemResults.FromStatus(StatusCodes.Status400BadRequest);
 
             var actor = ActorContexts.TryFromUser(context.User);
             if (actor is null)
                 return Results.Unauthorized();
             if (request is null || string.IsNullOrWhiteSpace(request.ObjectKey) ||
                 string.IsNullOrWhiteSpace(request.ContentType) || request.Size <= 0)
-                return Results.BadRequest("The image upload request is invalid.");
+                return ProblemResults.FromStatus(StatusCodes.Status400BadRequest);
 
             var objectKey = await imageStorage.CompleteUploadAsync(
                 actor.UserId,
@@ -67,7 +66,7 @@ public static class B2ImageUploadEndpoints
                 request.Size,
                 cancellationToken);
             if (objectKey is null)
-                return Results.BadRequest("The uploaded image could not be verified.");
+                return ProblemResults.FromStatus(StatusCodes.Status400BadRequest);
 
             context.Response.Headers.CacheControl = "no-store";
             return Results.Ok(new CompleteImageUploadResponse(objectKey));

@@ -6,7 +6,7 @@ namespace CvPlatform.Application.Exports;
 public interface IExportService
 {
     Task<Result<byte[]>> ExportCvPdfAsync(
-        ActorContext actor, Guid cvId, string publicBaseUrl, CancellationToken ct = default);
+        ActorContext actor, Guid cvId, string appBaseUrl, CancellationToken ct = default);
     Task<Result<byte[]>> ExportPositionsExcelAsync(
         ActorContext actor, CancellationToken ct = default);
     Task<Result<byte[]>> ExportPositionCvsExcelAsync(

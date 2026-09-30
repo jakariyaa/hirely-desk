@@ -2,6 +2,7 @@ using CvPlatform.Application.Authorization;
 using CvPlatform.Application.Common;
 using CvPlatform.Application.Profiles;
 using CvPlatform.Web.Auth;
+using CvPlatform.Web.ErrorHandling;
 
 namespace CvPlatform.Web.Storage;
 
@@ -25,9 +26,9 @@ public static class ProfileImageEndpoints
             if (!result.Succeeded)
                 return result.Error.Code switch
                 {
-                    ErrorCodes.NotFound => Results.NotFound(),
-                    ErrorCodes.Forbidden => Results.Forbid(),
-                    _ => Results.BadRequest(result.Error.Message),
+                    ErrorCodes.NotFound => ProblemResults.From(result.Error),
+                    ErrorCodes.Forbidden => ProblemResults.FromStatus(StatusCodes.Status404NotFound),
+                    _ => ProblemResults.From(result.Error)
                 };
 
             context.Response.Headers.CacheControl = "private, no-store";
@@ -35,6 +36,7 @@ public static class ProfileImageEndpoints
             return Results.Redirect(result.Value!.DownloadUrl);
         })
         .RequireAuthorization()
+        .DisableCookieRedirect()
         .RequireRateLimiting("image-downloads");
     }
 }

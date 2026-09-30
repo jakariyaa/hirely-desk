@@ -11,131 +11,248 @@
 @inject IAttributeDefinitionService Definitions
 @inject AuthenticationStateProvider AuthProvider
 @inject IDialogService DialogService
-@inject ISnackbar Snackbar
+@inject IUiErrorReporter Errors
 @inject IStringLocalizer<SharedResource> L
+@inject ISnackbar Snackbar
 
 <PageTitle>@L["AttributeCatalog"]</PageTitle>
 <PageHeader Title="@L["AttributeCatalog"]" Subtitle="@L["AttributeCatalogSubtitle"]">
-    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CreateAsync">@L["NewAttribute"]</MudButton>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+               OnClick="CreateAsync">@L["NewAttribute"]</MudButton>
 </PageHeader>
 
-<MudTextField T="string" Value="_search" ValueChanged="SearchChangedAsync" Label="@L["Search"]" Immediate="true" Class="mb-3" />
-@if (_page is null)
-{
-    <MudProgressLinear Indeterminate="true" />
-}
-else
-{
-    <MudTable Items="_page.Items" Class="cv-list-table" Hover="true" Dense="true" TableAttributes="@TableAttributes"
-              MultiSelection="true" @bind-SelectedItems="_selected" SelectOnRowClick="false">
+<MudPaper Class="cv-panel cv-list-card pa-2">
+    <MudStack Row Spacing="2" Class="pa-2" AlignItems="AlignItems.Center">
+        <MudTextField T="string" Value="_search" ValueChanged="SearchChangedAsync" Label="@L["Search"]"
+                      Immediate="true" DebounceInterval="300" Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Search" Clearable="true"
+                      Margin="Margin.Dense" Class="cv-attributes-search" />
+        <MudSelect T="Guid?" Value="_categoryId" ValueChanged="CategoryChangedAsync" Label="@L["Category"]"
+                   Clearable="true" Dense="true" Margin="Margin.Dense" Class="cv-attributes-category">
+            <MudSelectItem T="Guid?" Value="@(null)">@L["AllCategories"]</MudSelectItem>
+            @foreach (var category in _categories)
+            {
+                <MudSelectItem T="Guid?" Value="@category.Id">@category.Name</MudSelectItem>
+            }
+        </MudSelect>
+        <MudSpacer />
+        <MudText Typo="Typo.caption">@L["SelectedCount", _selected.Count]</MudText>
+        @if (_isAdmin)
+        {
+            <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.Delete"
+                       Disabled="@(_loading || _deleting || _selected.Count == 0)" OnClick="DeleteSelectedAsync">
+                @L["DeleteSelected"]
+            </MudButton>
+        }
+    </MudStack>
+
+    <MudDataGrid T="AttributeDefinitionAdminDto" @ref="_grid" ServerData="LoadServerDataAsync"
+                 Class="cv-list-table" MultiSelection="true" @bind-SelectedItems="_selected"
+                 SelectOnRowClick="false" Hover="true" Striped="true" Dense="true"
+                 RowsPerPage="25" Loading="@_loading" TableAttributes="@TableAttributes"
+                 RowClick="@(async (DataGridRowClickEventArgs<AttributeDefinitionAdminDto> e) => await EditAsync(e.Item))">
         <ToolBarContent>
             <MudText Typo="Typo.h6">@L["AttributeCatalog"]</MudText>
             <MudSpacer />
-            <MudText Typo="Typo.caption" Class="mr-2">@L["SelectedCount", _selected.Count]</MudText>
-            @if (_isAdmin)
-            {
-                <MudButton Variant="Variant.Outlined" Color="Color.Error"
-                           Disabled="@(_selected.Count != 1)"
-                           OnClick="DeleteSelectedAsync">@L["DeleteSelected"]</MudButton>
-            }
+            <MudText Typo="Typo.caption">@L["AttributeCount", _totalCount]</MudText>
         </ToolBarContent>
-        <HeaderContent>
-            <MudTHeadRow Checkable="true">
-                <MudTh>@L["Name"]</MudTh>
-                <MudTh>@L["Category"]</MudTh>
-                <MudTh>@L["Type"]</MudTh>
-            </MudTHeadRow>
-        </HeaderContent>
-        <RowTemplate>
-            <MudTd @onclick="@(() => EditAsync(context))">@AttributeLabels.Localize(L, context.Name)</MudTd>
-            <MudTd>@context.CategoryName</MudTd>
-            <MudTd>@context.DataType</MudTd>
-        </RowTemplate>
-    </MudTable>
-    <MudPagination Count="@Math.Max(1, _page.TotalPages)" Selected="@_page.Page"
-                   SelectedChanged="@(async page => await LoadAsync(page))" Class="mt-3" />
-}
+        <Columns>
+            <SelectColumn T="AttributeDefinitionAdminDto" />
+            <PropertyColumn Property="d => d.Name" Title="@L["Name"]">
+                <CellTemplate>
+                    @AttributeLabels.Localize(L, context.Item.Name)
+                </CellTemplate>
+            </PropertyColumn>
+            <PropertyColumn Property="d => d.CategoryName" Title="@L["Category"]" />
+            <PropertyColumn Property="d => d.DataType" Title="@L["DataType"]" />
+            <TemplateColumn T="AttributeDefinitionAdminDto" Title="@L["Source"]">
+                <CellTemplate>
+                    @if (context.Item.IsBuiltIn)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Default" Text="@L["BuiltIn"]" />
+                    }
+                </CellTemplate>
+            </TemplateColumn>
+        </Columns>
+        <NoRecordsContent>
+            <MudStack AlignItems="AlignItems.Center" Spacing="1" Class="pa-6">
+                <MudIcon Icon="@Icons.Material.Filled.Label" Size="Size.Large" />
+                <MudText Typo="Typo.h6">@L["NoAttributes"]</MudText>
+                <MudText Typo="Typo.body2">@L["NoAttributesHint"]</MudText>
+            </MudStack>
+        </NoRecordsContent>
+        <PagerContent>
+            <MudDataGridPager T="AttributeDefinitionAdminDto" />
+        </PagerContent>
+    </MudDataGrid>
+</MudPaper>
 
 @code {
-    private readonly Dictionary<string, object> TableAttributes = new() { ["aria-label"] = "Attribute catalog" };
-    private PagedResult<AttributeDefinitionAdminDto>? _page;
+    private static readonly Dictionary<string, object?> TableAttributes = new() { ["aria-label"] = "Attribute catalog" };
+    private MudDataGrid<AttributeDefinitionAdminDto>? _grid;
     private IReadOnlyList<AttributeCategoryDto> _categories = [];
     private string? _search;
+    private Guid? _categoryId;
     private bool _isAdmin;
+    private bool _loading;
+    private bool _deleting;
+    private int _totalCount;
     private HashSet<AttributeDefinitionAdminDto> _selected = [];
 
     protected override async Task OnInitializedAsync()
     {
+        var auth = await AuthProvider.GetAuthenticationStateAsync();
+        _isAdmin = auth.User.IsInRole(Roles.Admin);
         var catalog = await Catalog.GetCatalogAsync();
         if (catalog.Succeeded)
             _categories = catalog.Value!;
-        await LoadAsync(1);
     }
 
-    private async Task LoadAsync(int page)
+    private async Task<GridData<AttributeDefinitionAdminDto>> LoadServerDataAsync(
+        GridState<AttributeDefinitionAdminDto> state, CancellationToken ct)
     {
-        var actor = await GetActorAsync();
-        _isAdmin = actor.IsAdmin;
-        var result = await Definitions.ListAsync(
-            actor, new AttributeCatalogQuery(Search: _search, Page: new PageRequest(page, 25)));
-        if (result.Succeeded)
-            _page = result.Value;
+        _loading = true;
+        try
+        {
+            var actor = await GetActorAsync();
+            var result = await Definitions.ListAsync(
+                actor,
+                new AttributeCatalogQuery(
+                    CategoryId: _categoryId,
+                    Search: _search?.Trim(),
+                    Page: new PageRequest(state.Page + 1, state.PageSize),
+                    Sort: ToSort(state)),
+                ct);
+            if (result.Succeeded && result.Value is not null)
+            {
+                _totalCount = result.Value.TotalCount;
+                return new GridData<AttributeDefinitionAdminDto>
+                {
+                    TotalItems = result.Value.TotalCount,
+                    Items = result.Value.Items,
+                };
+            }
+            _totalCount = 0;
+            return new GridData<AttributeDefinitionAdminDto>();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private static AttributeSort? ToSort(GridState<AttributeDefinitionAdminDto> state)
+    {
+        var definition = state.SortDefinitions.FirstOrDefault();
+        if (definition?.SortFunc is null)
+            return null;
+        var field = definition.SortBy switch
+        {
+            nameof(AttributeDefinitionAdminDto.CategoryName) => AttributeSortField.Category,
+            nameof(AttributeDefinitionAdminDto.DataType) => AttributeSortField.DataType,
+            _ => AttributeSortField.Name
+        };
+        return new AttributeSort(field, definition.Descending);
     }
 
     private async Task SearchChangedAsync(string? value)
     {
         _search = value;
-        await LoadAsync(1);
+        await ReloadAsync();
     }
 
-    private async Task CreateAsync() => await OpenDialogAsync(null);
+    private async Task CategoryChangedAsync(Guid? value)
+    {
+        _categoryId = value;
+        await ReloadAsync();
+    }
 
-    private async Task EditAsync(AttributeDefinitionAdminDto definition) => await OpenDialogAsync(definition);
+    private async Task ReloadAsync()
+    {
+        if (_grid is not null)
+            await _grid.ReloadServerData();
+    }
+
+    private Task CreateAsync() => OpenDialogAsync(null);
+
+    private Task EditAsync(AttributeDefinitionAdminDto definition) => OpenDialogAsync(definition);
 
     private async Task OpenDialogAsync(AttributeDefinitionAdminDto? editing)
     {
-        var parameters = new DialogParameters { [nameof(AttributeDefinitionDialog.Editing)] = editing, [nameof(AttributeDefinitionDialog.Categories)] = _categories };
-        var dialog = await DialogService.ShowAsync<AttributeDefinitionDialog>(editing is null ? "New attribute" : "Edit attribute", parameters);
-        if ((await dialog.Result) is { Canceled: false })
-            await LoadAsync(_page?.Page ?? 1);
-    }
-
-    private async Task DeleteAsync(AttributeDefinitionAdminDto definition)
-    {
-        var actor = await GetActorAsync();
-        var impact = await Definitions.GetDeleteImpactAsync(actor, definition.Id);
-        if (!impact.Succeeded || impact.Value is null)
-            return;
-        var i = impact.Value;
-        var parameters = new DialogParameters<ConfirmDialog>
+        var parameters = new DialogParameters
         {
-            { dialog => dialog.ContentText, $"Delete {definition.Name}? Profiles: {i.ProfileValues}; positions: {i.Positions}; rules: {i.AccessRules}; CVs: {i.Cvs}; restricted positions losing all gating: {i.RestrictedPositionsLosingGating}." },
-            { dialog => dialog.YesText, "Delete" },
-            { dialog => dialog.NoText, "Cancel" }
+            [nameof(AttributeDefinitionDialog.Editing)] = editing,
+            [nameof(AttributeDefinitionDialog.Categories)] = _categories
         };
-        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Delete attribute", parameters);
-        if ((await dialog.Result) is not { Canceled: false, Data: true })
-            return;
-        var result = await Definitions.DeleteAsync(actor, definition.Id, definition.Version);
-        if (!result.Succeeded && result.Error.Code == ErrorCodes.ConcurrencyConflict)
-            Snackbar.Add(L["ConcurrencyReloadHint"], Severity.Warning);
-        else
-            Snackbar.Add(result.Succeeded ? "Attribute deleted." : result.Error.Message,
-                result.Succeeded ? Severity.Success : Severity.Error);
-        await LoadAsync(_page?.Page ?? 1);
+        var title = editing is null ? L["NewAttribute"].Value : L["EditAttribute"].Value;
+        var dialog = await DialogService.ShowAsync<AttributeDefinitionDialog>(title, parameters);
+        if ((await dialog.Result) is { Canceled: false })
+            await ReloadAsync();
     }
 
     private async Task DeleteSelectedAsync()
     {
-        if (_selected.Count != 1)
+        if (_selected.Count == 0)
             return;
-        await DeleteAsync(_selected.Single());
-        _selected.Clear();
+
+        var actor = await GetActorAsync();
+        var inputs = _selected
+            .Select(definition => new AttributeDefinitionDeleteInput(definition.Id, definition.Version))
+            .ToList();
+        var ids = inputs.Select(input => input.Id).ToList();
+
+        var impact = await Definitions.GetDeleteImpactAsync(actor, ids);
+        if (!impact.Succeeded || impact.Value is null)
+        {
+            Errors.Notify(impact.Error);
+            return;
+        }
+
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { dialog => dialog.ContentText, L["AttributeDeleteImpact", _selected.Count,
+                impact.Value.ProfileValues, impact.Value.Positions, impact.Value.AccessRules,
+                impact.Value.Cvs, impact.Value.RestrictedPositionsLosingGating].Value },
+            { dialog => dialog.YesText, L["Delete"].Value },
+            { dialog => dialog.NoText, L["Cancel"].Value }
+        };
+        var title = _selected.Count == 1 ? L["DeleteAttribute"].Value : L["DeleteAttributes"].Value;
+        var confirm = await DialogService.ShowAsync<ConfirmDialog>(title, parameters);
+        if ((await confirm.Result) is not { Canceled: false, Data: true })
+            return;
+
+        _deleting = true;
+        try
+        {
+            var result = await Definitions.DeleteManyAsync(actor, inputs);
+            if (result.Succeeded)
+            {
+                Snackbar.Add(L["AttributesDeleted", _selected.Count], Severity.Success);
+                _selected.Clear();
+                await ReloadAsync();
+            }
+            else if (result.Error.Code == ErrorCodes.ConcurrencyConflict)
+            {
+                Snackbar.Add(L["ConcurrencyReloadHint"], Severity.Warning);
+                await ReloadAsync();
+            }
+            else
+            {
+                Errors.Notify(result.Error);
+            }
+        }
+        finally
+        {
+            _deleting = false;
+        }
     }
 
     private async Task<ActorContext> GetActorAsync()
     {
         var state = await AuthProvider.GetAuthenticationStateAsync();
-        return new ActorContext(Guid.Parse(state.User.FindFirstValue(ClaimTypes.NameIdentifier)!), state.User.IsInRole(Roles.Admin), state.User.IsInRole(Roles.Recruiter) || state.User.IsInRole(Roles.Admin));
+        return new ActorContext(
+            Guid.Parse(state.User.FindFirstValue(ClaimTypes.NameIdentifier)!),
+            state.User.IsInRole(Roles.Admin),
+            state.User.IsInRole(Roles.Recruiter) || state.User.IsInRole(Roles.Admin));
     }
 }

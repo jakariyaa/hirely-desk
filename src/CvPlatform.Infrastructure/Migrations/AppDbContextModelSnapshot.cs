@@ -138,6 +138,14 @@ namespace CvPlatform.Infrastructure.Migrations
                         .HasColumnType("text")
                         .HasColumnName("preferred_theme");
 
+                    b.Property<string>("SalesforceAccountId")
+                        .HasColumnType("text")
+                        .HasColumnName("salesforce_account_id");
+
+                    b.Property<string>("SalesforceContactId")
+                        .HasColumnType("text")
+                        .HasColumnName("salesforce_contact_id");
+
                     b.Property<string>("SecurityStamp")
                         .HasColumnType("text")
                         .HasColumnName("security_stamp");

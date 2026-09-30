@@ -17,9 +17,10 @@
 @inject IPositionTemplateService Templates
 @inject AuthenticationStateProvider AuthProvider
 @inject IDialogService DialogService
-@inject ISnackbar Snackbar
+@inject IUiErrorReporter Errors
 @inject NavigationManager Navigation
 @inject IStringLocalizer<SharedResource> L
+@inject ISnackbar Snackbar
 
 <PageTitle>@(_isNew ? L["NewPosition"] : L["EditPosition"])</PageTitle>
 
@@ -279,7 +280,9 @@ else
             var result = await PositionService.GetForEditAsync(actor, Id!.Value);
             if (!result.Succeeded || result.Value is null)
             {
-                _error = result.Succeeded ? L["NotFoundGeneric"].Value : result.Error.Message;
+                _error = result.Succeeded
+                    ? L["NotFoundGeneric"].Value
+                    : Errors.Report(result.Error);
                 return;
             }
 
@@ -327,7 +330,7 @@ else
                 var created = await PositionService.CreateAsync(actor, input);
                 if (!created.Succeeded || created.Value is null)
                 {
-                    Snackbar.Add(created.Succeeded ? L["SaveFailed"].Value : created.Error.Message, Severity.Error);
+                    Errors.Notify(created.Error);
                     return;
                 }
 
@@ -348,7 +351,7 @@ else
                 }
                 else
                 {
-                    Snackbar.Add(updated.Error.Message, Severity.Error);
+                    Errors.Notify(updated.Error);
                 }
             }
         }
@@ -367,12 +370,12 @@ else
         if (result.Succeeded)
             Snackbar.Add(L["TemplateSaved"], Severity.Success);
         else
-            Snackbar.Add(result.Error.Message, Severity.Error);
+            Errors.Notify(result.Error);
     }
 
     private async Task ShowConcurrencyDialogAsync()
     {
-        var dialog = await DialogService.ShowAsync<ConcurrencyDialog>("Concurrency conflict");
+        var dialog = await DialogService.ShowAsync<ConcurrencyDialog>(L["ConcurrencyConflictTitle"].Value);
         if ((await dialog.Result) is { Canceled: false, Data: true })
             await LoadAsync();
     }
@@ -412,7 +415,7 @@ else
             }
             else
             {
-                Snackbar.Add(result.Error.Message, Severity.Error);
+                Errors.Notify(result.Error);
             }
         }
         finally
@@ -453,7 +456,7 @@ else
             }
             else
             {
-                Snackbar.Add(result.Error.Message, Severity.Error);
+                Errors.Notify(result.Error);
             }
         }
         finally
@@ -531,7 +534,7 @@ else
             }
             else
             {
-                Snackbar.Add(result.Error.Message, Severity.Error);
+                Errors.Notify(result.Error);
             }
         }
         finally
@@ -581,7 +584,7 @@ else
             }
             else
             {
-                Snackbar.Add(result.Error.Message, Severity.Error);
+                Errors.Notify(result.Error);
             }
         }
         finally
@@ -626,7 +629,7 @@ else
             }
             else
             {
-                Snackbar.Add(result.Error.Message, Severity.Error);
+                Errors.Notify(result.Error);
             }
         }
         finally

@@ -16,6 +16,7 @@
 @inject AuthenticationStateProvider AuthProvider
 @inject NavigationManager Navigation
 @inject IStringLocalizer<SharedResource> L
+@inject IUiErrorReporter Errors
 
 <PageTitle>@L["PositionCvs"]</PageTitle>
 
@@ -97,7 +98,7 @@ else
             var result = await CvService.ListByPositionPagedAsync(actor, Id, page, ct);
             if (!result.Succeeded)
             {
-                _error = result.Error.Message;
+                _error = Errors.Report(result.Error);
                 return new GridData<CvRow>();
             }
 

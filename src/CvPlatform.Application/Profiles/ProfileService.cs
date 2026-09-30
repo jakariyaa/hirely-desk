@@ -10,7 +10,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace CvPlatform.Application.Profiles;
 
-public sealed class ProfileService(IAppDbContextFactory factory, IImageStorage imageStorage) : IProfileService
+public sealed class ProfileService(
+    IAppDbContextFactory factory, IImageStorage imageStorage, TimeProvider? timeProvider = null) : IProfileService
 {
     public async Task<Result<ProfileSummaryDto>> GetSummaryForUserAsync(
         ActorContext actor, Guid userId, CancellationToken ct = default)
@@ -101,11 +102,12 @@ public sealed class ProfileService(IAppDbContextFactory factory, IImageStorage i
                 $"Attribute definition {missing} was not found.");
 
         var normalizedById = new Dictionary<Guid, AttributeValueInput>(ids.Count);
+        var today = AttributeDateRules.TodayFrom(timeProvider);
         foreach (var input in inputs)
         {
             var definition = definitions[input.AttributeDefinitionId];
             var normalized = AttributeValueRules.Normalize(definition.DataType, input);
-            var validationError = AttributeValueRules.Validate(definition, normalized);
+            var validationError = AttributeValueRules.Validate(definition, normalized, today);
             if (validationError is not null)
                 return Result<ProfileDto>.Failure(ErrorCodes.ValidationFailed, validationError);
             if (definition.DataType == AttributeDataType.Image &&
@@ -208,7 +210,7 @@ public sealed class ProfileService(IAppDbContextFactory factory, IImageStorage i
     }
 
     public Task<Result<IReadOnlyList<AttributeCategoryDto>>> GetCatalogAsync(CancellationToken ct = default) =>
-        new AttributeCatalogService(factory).GetCatalogAsync(ct);
+        new AttributeCatalogService(factory, timeProvider).GetCatalogAsync(ct);
 
     private async Task<Result<Profile>> CreateProfileAsync(Guid userId, CancellationToken ct)
     {

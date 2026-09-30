@@ -1,4 +1,5 @@
 using System.Net.Mail;
+using CvPlatform.Infrastructure.Crm;
 using CvPlatform.Infrastructure.Email;
 using CvPlatform.Infrastructure.Storage;
 using Microsoft.Extensions.Options;
@@ -18,7 +19,31 @@ internal static class ApplicationConfigurationValidator
             .. ValidateSeed(configuration.Seed),
             .. ValidateB2(configuration.B2),
             .. ValidateGmail(configuration.Gmail),
+            .. ValidateSalesforce(configuration.Salesforce),
         ];
+    }
+
+    public static IReadOnlyList<string> ValidateSalesforce(SalesforceOptions options)
+    {
+        var hasInstanceUrl = !string.IsNullOrWhiteSpace(options.InstanceUrl);
+        var hasClientId = !string.IsNullOrWhiteSpace(options.ClientId);
+        var hasClientSecret = !string.IsNullOrWhiteSpace(options.ClientSecret);
+
+        if (!hasInstanceUrl && !hasClientId && !hasClientSecret)
+            return [];
+
+        var failures = new List<string>();
+        if (!hasInstanceUrl)
+            failures.Add("Salesforce:InstanceUrl is required when Salesforce is configured.");
+        if (!hasClientId)
+            failures.Add("Salesforce:ClientId is required when Salesforce is configured.");
+        if (!hasClientSecret)
+            failures.Add("Salesforce:ClientSecret is required when Salesforce is configured.");
+        if (hasInstanceUrl &&
+            (!Uri.TryCreate(options.InstanceUrl, UriKind.Absolute, out var uri) ||
+             uri.Scheme != Uri.UriSchemeHttps))
+            failures.Add("Salesforce:InstanceUrl must be an absolute https URL.");
+        return failures;
     }
 
     public static IReadOnlyList<string> ValidateConnectionStrings(ConnectionStringsOptions options)
@@ -183,6 +208,12 @@ internal sealed class GmailOptionsValidator : IValidateOptions<GmailOptions>
 {
     public ValidateOptionsResult Validate(string? name, GmailOptions options) =>
         ValidateOptionsResultFactory.Create(ApplicationConfigurationValidator.ValidateGmail(options));
+}
+
+internal sealed class SalesforceOptionsValidator : IValidateOptions<SalesforceOptions>
+{
+    public ValidateOptionsResult Validate(string? name, SalesforceOptions options) =>
+        ValidateOptionsResultFactory.Create(ApplicationConfigurationValidator.ValidateSalesforce(options));
 }
 
 internal static class ValidateOptionsResultFactory

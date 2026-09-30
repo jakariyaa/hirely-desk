@@ -17,8 +17,14 @@ public interface IAttributeDefinitionService
     Task<Result<AttributeDeleteImpactDto>> GetDeleteImpactAsync(
         ActorContext actor, Guid id, CancellationToken ct = default);
 
+    Task<Result<AttributeDeleteImpactDto>> GetDeleteImpactAsync(
+        ActorContext actor, IReadOnlyList<Guid> ids, CancellationToken ct = default);
+
     Task<Result<AttributeOptionImpactDto>> GetOptionChangeImpactAsync(
         ActorContext actor, Guid id, AttributeDefinitionInput input, CancellationToken ct = default);
 
     Task<Result> DeleteAsync(ActorContext actor, Guid id, long expectedVersion, CancellationToken ct = default);
+
+    Task<Result> DeleteManyAsync(
+        ActorContext actor, IReadOnlyList<AttributeDefinitionDeleteInput> items, CancellationToken ct = default);
 }

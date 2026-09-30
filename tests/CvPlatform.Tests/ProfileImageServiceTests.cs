@@ -18,15 +18,23 @@ public class ProfileImageServiceTests
 {
     private sealed class TestImageStorage : IImageStorage
     {
+        public int DownloadTicketCalls { get; private set; }
+
         public bool IsConfigured => true;
         public long MaxUploadBytes => 5 * 1024 * 1024;
+
+        public IReadOnlyCollection<string> AllowedContentTypes =>
+            ["image/jpeg", "image/png", "image/webp"];
 
         public bool IsAllowedContentType(string contentType) => true;
 
         public ImageUploadTicket? CreateUploadTicket(Guid userId, string contentType, long size) => null;
 
-        public ImageDownloadTicket? CreateDownloadTicket(string objectKey) =>
-            new($"https://s3.example.test/get/{Uri.EscapeDataString(objectKey)}", DateTimeOffset.UtcNow.AddMinutes(1));
+        public ImageDownloadTicket? CreateDownloadTicket(string objectKey)
+        {
+            DownloadTicketCalls++;
+            return new($"https://s3.example.test/get/{Uri.EscapeDataString(objectKey)}", DateTimeOffset.UtcNow.AddMinutes(1));
+        }
 
         public Task<string?> CompleteUploadAsync(
             Guid userId,
@@ -86,15 +94,17 @@ public class ProfileImageServiceTests
         db.AddRange(profile, category, definition, value);
         await db.SaveChangesAsync();
 
+        var storage = new TestImageStorage();
         var service = new ProfileImageService(
             factory,
             new PositionAccessService(factory, new AccessRuleEngine()),
-            new TestImageStorage());
+            storage);
 
         var result = await service.CreateDownloadTicketAsync(new ActorContext(userId, false), value.Id);
 
         result.Succeeded.Should().BeTrue();
         result.Value!.DownloadUrl.Should().Contain("users%2F");
+        storage.DownloadTicketCalls.Should().Be(1);
     }
 
     [Fact]
@@ -122,16 +132,18 @@ public class ProfileImageServiceTests
         db.AddRange(profile, category, definition, value);
         await db.SaveChangesAsync();
 
+        var storage = new TestImageStorage();
         var service = new ProfileImageService(
             factory,
             new PositionAccessService(factory, new AccessRuleEngine()),
-            new TestImageStorage());
+            storage);
 
         var result = await service.CreateDownloadTicketAsync(
             new ActorContext(Guid.NewGuid(), false), value.Id);
 
         result.Succeeded.Should().BeFalse();
-        result.Error.Code.Should().Be(ErrorCodes.Forbidden);
+        result.Error.Code.Should().Be(ErrorCodes.NotFound);
+        storage.DownloadTicketCalls.Should().Be(0);
     }
 
     [Fact]
@@ -174,14 +186,68 @@ public class ProfileImageServiceTests
         db.AddRange(profile, category, definition, value, position, cv);
         await db.SaveChangesAsync();
 
+        var storage = new TestImageStorage();
         var service = new ProfileImageService(
             factory,
             new PositionAccessService(factory, new AccessRuleEngine()),
-            new TestImageStorage());
+            storage);
 
         var result = await service.CreateDownloadTicketAsync(
             new ActorContext(Guid.NewGuid(), false, true), value.Id, cv.Id);
 
         result.Succeeded.Should().BeTrue();
+        storage.DownloadTicketCalls.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Viewer_cannot_obtain_a_download_ticket_for_a_draft_cv()
+    {
+        var (factory, db) = CreateFactory();
+        var ownerId = Guid.NewGuid();
+        var profile = new Profile { Id = Guid.NewGuid(), UserId = ownerId };
+        var category = new AttributeCategory { Id = Guid.NewGuid(), Name = "Me" };
+        var definition = new AttributeDefinition
+        {
+            Id = Guid.NewGuid(),
+            CategoryId = category.Id,
+            Name = ProfileAttributeNames.Photo,
+            DataType = AttributeDataType.Image,
+            IsBuiltIn = true,
+        };
+        var value = new ProfileAttributeValue
+        {
+            Id = Guid.NewGuid(),
+            ProfileId = profile.Id,
+            AttributeDefinitionId = definition.Id,
+            ImageObjectKey = $"users/{ownerId:D}/profile/{Guid.NewGuid():N}.png",
+        };
+        var position = new Position
+        {
+            Id = Guid.NewGuid(),
+            Title = "Private position",
+        };
+        var cv = new Cv
+        {
+            Id = Guid.NewGuid(),
+            ProfileId = profile.Id,
+            PositionId = position.Id,
+            CreatedAt = DateTime.UtcNow,
+            Status = CvStatus.Draft,
+        };
+        db.AddRange(profile, category, definition, value, position, cv);
+        await db.SaveChangesAsync();
+
+        var storage = new TestImageStorage();
+        var service = new ProfileImageService(
+            factory,
+            new PositionAccessService(factory, new AccessRuleEngine()),
+            storage);
+
+        var result = await service.CreateDownloadTicketAsync(
+            new ActorContext(Guid.NewGuid(), false, true), value.Id, cv.Id);
+
+        result.Succeeded.Should().BeFalse();
+        result.Error.Code.Should().Be(ErrorCodes.NotFound);
+        storage.DownloadTicketCalls.Should().Be(0);
     }
 }

@@ -10,7 +10,7 @@
 @inject IDiscussionNotifier Notifier
 @inject IMarkdownRenderer Markdown
 @inject AuthenticationStateProvider AuthProvider
-@inject ISnackbar Snackbar
+@inject IUiErrorReporter Errors
 @inject IStringLocalizer<SharedResource> L
 @implements IDisposable
 
@@ -96,11 +96,11 @@
             if (result.Succeeded)
                 _posts = result.Value!.Items.OrderBy(p => p.CreatedAt).ToList();
             else
-                _error = result.Error.Message;
+                _error = Errors.Report(result.Error);
         }
         catch (Exception ex)
         {
-            _error = ex.Message;
+            _error = Errors.Report(ex);
         }
         finally
         {
@@ -125,7 +125,7 @@
             }
             else
             {
-                Snackbar.Add(result.Error.Message, Severity.Error);
+                Errors.Notify(result.Error);
             }
         }
         finally

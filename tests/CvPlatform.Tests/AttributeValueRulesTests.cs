@@ -8,6 +8,8 @@ namespace CvPlatform.Tests;
 
 public class AttributeValueRulesTests
 {
+    private static readonly DateOnly Today = new(2026, 6, 15);
+
     [Fact]
     public void ValidateOptions_accepts_type_specific_tuning()
     {
@@ -44,7 +46,7 @@ public class AttributeValueRulesTests
         };
 
         AttributeValueRules.Validate(definition, new AttributeValueInput(
-            Guid.NewGuid(), DropdownOption: "A"))
+            Guid.NewGuid(), DropdownOption: "A"), Today)
             .Should().BeNull();
     }
 
@@ -59,7 +61,7 @@ public class AttributeValueRulesTests
         };
 
         AttributeValueRules.Validate(definition, new AttributeValueInput(
-            Guid.NewGuid(), StringValue: "value"))
+            Guid.NewGuid(), StringValue: "value"), Today)
             .Should().Be("Attribute options are invalid.");
     }
 
@@ -73,7 +75,7 @@ public class AttributeValueRulesTests
         };
 
         AttributeValueRules.Validate(definition, new AttributeValueInput(
-            Guid.NewGuid(), BooleanValue: false))
+            Guid.NewGuid(), BooleanValue: false), Today)
             .Should().BeNull();
     }
 
@@ -87,7 +89,7 @@ public class AttributeValueRulesTests
         };
 
         AttributeValueRules.Validate(definition, new AttributeValueInput(
-            Guid.NewGuid(), ImageObjectKey: "../photo.jpg"))
+            Guid.NewGuid(), ImageObjectKey: "../photo.jpg"), Today)
             .Should().Be("Image object key is invalid.");
     }
 
@@ -101,7 +103,123 @@ public class AttributeValueRulesTests
         };
 
         AttributeValueRules.Validate(definition, new AttributeValueInput(
-            Guid.NewGuid(), ImageObjectKey: "users/user/profile/image.jpg"))
+            Guid.NewGuid(), ImageObjectKey: "users/user/profile/image.jpg"), Today)
+            .Should().BeNull();
+    }
+
+    [Fact]
+    public void ValidateOptions_accepts_date_bounds_for_date_attributes()
+    {
+        AttributeValueRules.ValidateOptions(
+            AttributeDataType.Date, "{\"minDate\":\"2000-01-01\",\"maxDate\":\"2030-12-31\"}")
+            .Should().BeNull();
+        AttributeValueRules.ValidateOptions(AttributeDataType.Date, "{\"minAgeDays\":0,\"maxAgeDays\":43800}")
+            .Should().BeNull();
+    }
+
+    [Fact]
+    public void ValidateOptions_rejects_misplaced_or_inconsistent_date_bounds()
+    {
+        AttributeValueRules.ValidateOptions(AttributeDataType.String, "{\"maxDate\":\"2030-01-01\"}")
+            .Should().NotBeNull();
+        AttributeValueRules.ValidateOptions(AttributeDataType.Period, "{\"maxAgeDays\":10}")
+            .Should().NotBeNull();
+        AttributeValueRules.ValidateOptions(AttributeDataType.Date, "{\"minDate\":\"2030-01-01\",\"maxDate\":\"2020-01-01\"}")
+            .Should().NotBeNull();
+        AttributeValueRules.ValidateOptions(AttributeDataType.Date, "{\"minAgeDays\":-1}")
+            .Should().NotBeNull();
+        AttributeValueRules.ValidateOptions(AttributeDataType.Date, "{\"maxAgeDays\":10,\"minAgeDays\":20}")
+            .Should().NotBeNull();
+    }
+
+    [Fact]
+    public void Validate_rejects_dates_in_the_future()
+    {
+        var definition = new AttributeDefinition
+        {
+            Name = "Me.BirthDate",
+            DataType = AttributeDataType.Date,
+        };
+
+        AttributeValueRules.Validate(definition, new AttributeValueInput(
+            Guid.NewGuid(), DateValue: Today.AddDays(1)), Today)
+            .Should().Be("Date cannot be in the future.");
+    }
+
+    [Fact]
+    public void Validate_accepts_today_and_rejects_dates_beyond_the_age_band()
+    {
+        var definition = new AttributeDefinition
+        {
+            Name = "Me.BirthDate",
+            DataType = AttributeDataType.Date,
+            OptionsJson = "{\"minAgeDays\":0,\"maxAgeDays\":43830}",
+        };
+
+        AttributeValueRules.Validate(definition, new AttributeValueInput(
+            Guid.NewGuid(), DateValue: Today), Today)
+            .Should().BeNull();
+        AttributeValueRules.Validate(definition, new AttributeValueInput(
+            Guid.NewGuid(), DateValue: Today.AddYears(-30)), Today)
+            .Should().BeNull();
+        AttributeValueRules.Validate(definition, new AttributeValueInput(
+            Guid.NewGuid(), DateValue: Today.AddYears(-121)), Today)
+            .Should().NotBeNull();
+    }
+
+    [Fact]
+    public void Validate_honours_absolute_date_bounds()
+    {
+        var definition = new AttributeDefinition
+        {
+            Name = "GraduationYear",
+            DataType = AttributeDataType.Date,
+            OptionsJson = "{\"minDate\":\"2015-01-01\"}",
+        };
+
+        AttributeValueRules.Validate(definition, new AttributeValueInput(
+            Guid.NewGuid(), DateValue: new DateOnly(2014, 12, 31)), Today)
+            .Should().NotBeNull();
+        AttributeValueRules.Validate(definition, new AttributeValueInput(
+            Guid.NewGuid(), DateValue: new DateOnly(2016, 1, 1)), Today)
+            .Should().BeNull();
+    }
+
+    [Fact]
+    public void Validate_allows_future_dates_when_the_maximum_is_explicitly_widened()
+    {
+        var definition = new AttributeDefinition
+        {
+            Name = "AvailableFrom",
+            DataType = AttributeDataType.Date,
+            OptionsJson = "{\"maxDate\":\"2030-12-31\"}",
+        };
+
+        AttributeValueRules.Validate(definition, new AttributeValueInput(
+            Guid.NewGuid(), DateValue: new DateOnly(2027, 1, 1)), Today)
+            .Should().BeNull();
+        AttributeValueRules.Validate(definition, new AttributeValueInput(
+            Guid.NewGuid(), DateValue: new DateOnly(2031, 1, 1)), Today)
+            .Should().NotBeNull();
+    }
+
+    [Fact]
+    public void Validate_rejects_future_period_bounds()
+    {
+        var definition = new AttributeDefinition
+        {
+            Name = "Experience",
+            DataType = AttributeDataType.Period,
+        };
+
+        AttributeValueRules.Validate(definition, new AttributeValueInput(
+            Guid.NewGuid(), PeriodStart: Today.AddMonths(-6), PeriodEnd: Today.AddMonths(6)), Today)
+            .Should().Be("Period end cannot be in the future.");
+        AttributeValueRules.Validate(definition, new AttributeValueInput(
+            Guid.NewGuid(), PeriodStart: Today.AddMonths(1)), Today)
+            .Should().Be("Period start cannot be in the future.");
+        AttributeValueRules.Validate(definition, new AttributeValueInput(
+            Guid.NewGuid(), PeriodStart: Today.AddMonths(-6)), Today)
             .Should().BeNull();
     }
 

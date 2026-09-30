@@ -1,6 +1,7 @@
 using CvPlatform.Application.Access;
 using CvPlatform.Application.Authorization;
 using CvPlatform.Application.Common;
+using CvPlatform.Application.Profiles;
 using CvPlatform.Core.Data;
 using CvPlatform.Core.Enums;
 using Microsoft.EntityFrameworkCore;
@@ -12,6 +13,8 @@ public sealed class HomeStatsService(
     IPositionAccessService positionAccess,
     TimeProvider? timeProvider = null) : IHomeStatsService
 {
+    private const int PublicListSize = 5;
+
     public async Task<Result<PublicHomeStatsDto>> GetPublicAsync(CancellationToken ct = default)
     {
         await using var db = factory.CreateDbContext();
@@ -20,11 +23,80 @@ public sealed class HomeStatsService(
             .Where(c => c.Status == CvStatus.Published && c.PublishedAt != null && c.Position.IsPublic);
         var cutoff = (timeProvider ?? TimeProvider.System).GetUtcNow().UtcDateTime.AddHours(-24);
 
+        var latest = await LoadPublicLatestAsync(db, ct);
+        var popular = await LoadPublicPopularAsync(db, ct);
+
         var result = new PublicHomeStatsDto(
             await publicPositions.CountAsync(ct),
             await publishedCvs.CountAsync(ct),
-            await publishedCvs.CountAsync(c => c.CreatedAt >= cutoff, ct));
+            await publishedCvs.CountAsync(c => c.CreatedAt >= cutoff, ct),
+            latest,
+            popular);
         return Result<PublicHomeStatsDto>.Success(result);
+    }
+
+    private static async Task<IReadOnlyList<PublicLatestCvDto>> LoadPublicLatestAsync(
+        IAppDbContext db, CancellationToken ct)
+    {
+        var rows = await db.Cvs.AsNoTracking()
+            .Where(c => c.Status == CvStatus.Published && c.PublishedAt != null && c.Position.IsPublic)
+            .OrderByDescending(c => c.PublishedAt).ThenBy(c => c.Id)
+            .Select(c => new
+            {
+                c.Id,
+                c.PositionId,
+                PositionTitle = c.Position.Title,
+                CandidateName = c.Profile.AttributeValues
+                    .Where(v => v.AttributeDefinition.Name == ProfileAttributeNames.Name)
+                    .Select(v => v.StringValue)
+                    .FirstOrDefault(),
+                c.PublishedAt,
+            })
+            .Take(PublicListSize)
+            .ToListAsync(ct);
+
+        if (rows.Count == 0)
+            return [];
+
+        var likeCounts = await db.CvLikes.AsNoTracking()
+            .Where(l => rows.Select(r => r.Id).Contains(l.CvId))
+            .GroupBy(l => l.CvId)
+            .Select(g => new { CvId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.CvId, x => x.Count, ct);
+
+        return rows
+            .Select(r => new PublicLatestCvDto(
+                r.Id,
+                r.PositionId,
+                r.PositionTitle,
+                r.CandidateName ?? string.Empty,
+                r.PublishedAt,
+                likeCounts.GetValueOrDefault(r.Id)))
+            .ToList();
+    }
+
+    private static async Task<IReadOnlyList<PublicPopularPositionDto>> LoadPublicPopularAsync(
+        IAppDbContext db, CancellationToken ct)
+    {
+        var rows = await db.Positions.AsNoTracking()
+            .Where(p => p.IsPublic)
+            .Select(p => new
+            {
+                p.Id,
+                p.Title,
+                p.Company,
+                CvCount = db.Cvs.Count(c => c.PositionId == p.Id && c.Status == CvStatus.Published),
+                LikeCount = db.CvLikes.Count(l => l.Cv.PositionId == p.Id),
+            })
+            .OrderByDescending(v => v.CvCount)
+            .ThenByDescending(v => v.LikeCount)
+            .ThenBy(v => v.Title)
+            .ThenBy(v => v.Id)
+            .Take(PublicListSize)
+            .Select(v => new PublicPopularPositionDto(v.Id, v.Title, v.Company, v.CvCount, v.LikeCount))
+            .ToListAsync(ct);
+
+        return rows;
     }
 
     public async Task<Result<HomeStatsDto>> GetAsync(ActorContext actor, CancellationToken ct = default)

@@ -1,71 +1,77 @@
 @using CvPlatform.Application.Attributes
 @using CvPlatform.Core.Enums
 @using CvPlatform.Web.Resources
-@using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.Extensions.Localization
-@using Microsoft.JSInterop
-@inject IJSRuntime Js
-@inject IStringLocalizer<SharedResource> L
 
-<div class="cv-attribute-editor" @onfocusout="NotifyChangedAsync">
-    @switch (Definition.DataType)
+<div class="cv-attribute-editor">
+    @if (Definition.DataType == AttributeDataType.Image)
     {
-        case AttributeDataType.String:
-            <MudTextField T="string" @bind-Value="Value.String"
-                          Variant="Variant.Outlined" Immediate="false" Disabled="Disabled" />
-            break;
-        case AttributeDataType.Text:
-            <MudTextField T="string" @bind-Value="Value.Text"
-                          Variant="Variant.Outlined" Lines="4" Disabled="Disabled" />
-            break;
-        case AttributeDataType.Numeric:
-            <MudNumericField T="decimal?" @bind-Value="Value.Numeric"
-                             Variant="Variant.Outlined" Disabled="Disabled" />
-            break;
-        case AttributeDataType.Date:
-            <MudDatePicker Date="@ToDateTime(Value.Date)"
-                           DateChanged="@(date => Value.Date = ToDateOnly(date))"
-                           Variant="Variant.Outlined" Disabled="Disabled" />
-            break;
-        case AttributeDataType.Period:
-            <MudStack Row Spacing="2">
-                <MudDatePicker Date="@ToDateTime(Value.PeriodStart)"
-                               DateChanged="@(date => Value.PeriodStart = ToDateOnly(date))"
-                               Label="Start" Variant="Variant.Outlined" Disabled="Disabled" />
-                <MudDatePicker Date="@ToDateTime(Value.PeriodEnd)"
-                               DateChanged="@(date => Value.PeriodEnd = ToDateOnly(date))"
-                               Label="End" Variant="Variant.Outlined" Disabled="Disabled" />
-            </MudStack>
-            break;
-        case AttributeDataType.Boolean:
-            <MudSwitch T="bool?" @bind-Value="Value.Boolean"
-                       Color="Color.Primary" Disabled="Disabled" />
-            break;
-        case AttributeDataType.Dropdown:
-            <MudSelect T="string" @bind-Value="Value.Dropdown"
-                       Variant="Variant.Outlined" Clearable Disabled="Disabled">
-                @if (Value.Dropdown is not null && Definition.Choices.All(c => c.Value != Value.Dropdown))
-                {
-                    <MudSelectItem Value="@Value.Dropdown">@($"{Value.Dropdown} (retired)")</MudSelectItem>
-                }
-                @foreach (var choice in Definition.Choices)
-                {
-                    <MudSelectItem Value="@choice.Value">@choice.Value</MudSelectItem>
-                }
-            </MudSelect>
-            break;
-        case AttributeDataType.Image:
-            @if (Value.ImageValueId is not null)
+        <ImageUploadField Value="Value" Disabled="Disabled" OnChanged="OnChanged" />
+    }
+    else
+    {
+        <div @onfocusout="NotifyChangedAsync">
+            @switch (Definition.DataType)
             {
-                <MudImage Src="@ImageContentUrl(Value.ImageValueId.Value)" Alt="Uploaded image" Width="120" Height="120" ObjectFit="ObjectFit.Cover" Class="mb-2" />
+                case AttributeDataType.String:
+                    <MudTextField T="string" Value="Value.String"
+                                  ValueChanged="@(v => HandleChange(v, s => Value.String = s))"
+                                  Variant="Variant.Outlined" Immediate="false" Disabled="Disabled" />
+                    break;
+                case AttributeDataType.Text:
+                    <MudTextField T="string" Value="Value.Text"
+                                  ValueChanged="@(v => HandleChange(v, s => Value.Text = s))"
+                                  Lines="4"
+                                  Variant="Variant.Outlined" Disabled="Disabled" />
+                    break;
+                case AttributeDataType.Numeric:
+                    <MudNumericField T="decimal?" Value="Value.Numeric"
+                                     ValueChanged="@(v => HandleChange(v, s => Value.Numeric = s))"
+                                     Variant="Variant.Outlined" Disabled="Disabled" />
+                    break;
+                case AttributeDataType.Date:
+                    <MudDatePicker Date="@ToDateTime(Value.Date)"
+                                   DateChanged="@(date => HandleChange(date, d => Value.Date = ToDateOnly(d)))"
+                                   MinDate="@ToDateTime(MinDate)" MaxDate="@ToDateTime(MaxDate)"
+                                   Variant="Variant.Outlined" Disabled="Disabled" />
+                    break;
+                case AttributeDataType.Period:
+                    <MudStack Row Spacing="2">
+                        <MudDatePicker Date="@ToDateTime(Value.PeriodStart)"
+                                       DateChanged="@(date => HandleChange(date, d => Value.PeriodStart = ToDateOnly(d)))"
+                                       MinDate="@ToDateTime(MinDate)" MaxDate="@ToDateTime(MaxDate)"
+                                       Label="@L["PeriodStart"]" Variant="Variant.Outlined" Disabled="Disabled" />
+                        <MudDatePicker Date="@ToDateTime(Value.PeriodEnd)"
+                                       DateChanged="@(date => HandleChange(date, d => Value.PeriodEnd = ToDateOnly(d)))"
+                                       MinDate="@ToDateTime(MinDate)" MaxDate="@ToDateTime(MaxDate)"
+                                       Label="@L["PeriodEnd"]" Variant="Variant.Outlined" Disabled="Disabled" />
+                    </MudStack>
+                    break;
+                case AttributeDataType.Boolean:
+                    <MudSwitch T="bool?" Value="Value.Boolean"
+                               ValueChanged="@(v => HandleChange(v, s => Value.Boolean = s))"
+                               Color="Color.Primary" Disabled="Disabled" />
+                    break;
+                case AttributeDataType.Dropdown:
+                    <MudSelect T="string" Value="Value.Dropdown"
+                               ValueChanged="@(v => HandleChange(v, s => Value.Dropdown = s))"
+                               Variant="Variant.Outlined" Clearable Disabled="Disabled">
+                        @if (Value.Dropdown is not null && Definition.Choices.All(c => c.Value != Value.Dropdown))
+                        {
+                            <MudSelectItem Value="@Value.Dropdown">@($"{Value.Dropdown} (retired)")</MudSelectItem>
+                        }
+                        @foreach (var choice in Definition.Choices)
+                        {
+                            <MudSelectItem Value="@choice.Value">@choice.Value</MudSelectItem>
+                        }
+                    </MudSelect>
+                    break;
             }
-            <input @ref="_fileInput" type="file" accept="image/jpeg,image/png,image/webp"
-                   disabled="@(Disabled || _uploading)" @onchange="UploadImageAsync" />
-            @if (!string.IsNullOrEmpty(_uploadError))
-            {
-                <MudText Typo="Typo.caption" Color="Color.Error">@_uploadError</MudText>
-            }
-            break;
+        </div>
+    }
+    @if (OutOfRangeMessage is not null)
+    {
+        <MudText Typo="Typo.caption" Color="Color.Error">@OutOfRangeMessage</MudText>
     }
 </div>
 
@@ -75,42 +81,48 @@
     [Parameter] public bool Disabled { get; set; }
     [Parameter] public EventCallback OnChanged { get; set; }
 
-    private string? _uploadError;
-    private bool _uploading;
-    private ElementReference _fileInput;
-    private const string PresignEndpoint = "/api/profile-images/presign";
-    private const string CompleteEndpoint = "/api/profile-images/complete";
+    [Inject] private IStringLocalizer<SharedResource> L { get; set; } = default!;
+
+    private DateOnly? MinDate => Definition.DateRange?.Min;
+
+    private DateOnly? MaxDate => Definition.DateRange?.Max ?? Today;
+
+    private DateOnly Today => AttributeDateRules.TodayFrom(null);
+
+    private string? OutOfRangeMessage
+    {
+        get
+        {
+            if (Definition.DateRange is null)
+                return null;
+
+            var range = new AttributeDateRules.DateRange(MinDate, MaxDate);
+            foreach (var date in Dates)
+            {
+                if (date is null)
+                    continue;
+                if (date.Value > AttributeDateRules.UpperBound(range, Today) ||
+                    (range.Min is { } min && date.Value < min))
+                    return L["DateOutOfRange"].Value;
+            }
+
+            return null;
+        }
+    }
+
+    private IEnumerable<DateOnly?> Dates => Definition.DataType switch
+    {
+        AttributeDataType.Date => [Value.Date],
+        AttributeDataType.Period => [Value.PeriodStart, Value.PeriodEnd],
+        _ => [],
+    };
 
     private Task NotifyChangedAsync(FocusEventArgs _) => OnChanged.InvokeAsync();
 
-    private async Task UploadImageAsync(ChangeEventArgs _)
+    private Task HandleChange<T>(T value, Action<T> set)
     {
-        if (_uploading || Disabled)
-            return;
-        _uploadError = null;
-        _uploading = true;
-        try
-        {
-            await using var module = await Js.InvokeAsync<IJSObjectReference>(
-                "import", "./js/directImageUpload.js");
-            var objectKey = await module.InvokeAsync<string?>(
-                "uploadImage", _fileInput, PresignEndpoint, CompleteEndpoint);
-            if (!string.IsNullOrWhiteSpace(objectKey))
-            {
-                Value.ImageObjectKey = objectKey;
-                await OnChanged.InvokeAsync();
-            }
-        }
-        catch (JSException ex)
-        {
-            _uploadError = string.IsNullOrWhiteSpace(ex.Message)
-                ? L["ImageUploadFailed"]
-                : $"{L["ImageUploadFailed"]} ({ex.Message})";
-        }
-        finally
-        {
-            _uploading = false;
-        }
+        set(value);
+        return OnChanged.InvokeAsync();
     }
 
     private static DateTime? ToDateTime(DateOnly? date) =>
@@ -118,7 +130,4 @@
 
     private static DateOnly? ToDateOnly(DateTime? dateTime) =>
         dateTime.HasValue ? DateOnly.FromDateTime(dateTime.Value) : null;
-
-    private static string ImageContentUrl(Guid valueId) =>
-        $"/api/profile-images/{valueId:D}/content";
 }

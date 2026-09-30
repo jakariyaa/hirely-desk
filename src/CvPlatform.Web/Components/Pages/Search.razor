@@ -22,8 +22,8 @@
                   TextChanged="@(async _ => await ReloadAsync())" Class="cv-search-box" />
 </PageHeader>
 
-<MudGrid>
-    <MudItem xs="12" md="6">
+<MudTabs Elevation="0" KeepPanelsAlive="true">
+    <MudTabPanel Text="@($"{L["Positions"]} ({_positionTotal})")">
         <MudPaper Class="cv-panel cv-list-card pa-2">
             <MudStack Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="pa-2">
                 <MudText Typo="Typo.h6">@L["Positions"]</MudText>
@@ -42,8 +42,8 @@
                 <PagerContent><MudDataGridPager T="PositionDto" /></PagerContent>
             </MudDataGrid>
         </MudPaper>
-    </MudItem>
-    <MudItem xs="12" md="6">
+    </MudTabPanel>
+    <MudTabPanel Text="@($"{L["Cvs"]} ({_cvTotal})")">
         <MudPaper Class="cv-panel cv-list-card pa-2">
             <MudStack Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="pa-2">
                 <MudText Typo="Typo.h6">@L["Cvs"]</MudText>
@@ -62,8 +62,8 @@
                 <PagerContent><MudDataGridPager T="CvSearchHitDto" /></PagerContent>
             </MudDataGrid>
         </MudPaper>
-    </MudItem>
-</MudGrid>
+    </MudTabPanel>
+</MudTabs>
 
 @code {
     [SupplyParameterFromQuery] public string? Term { get; set; }
@@ -73,6 +73,8 @@
     private HashSet<PositionDto> _selectedPositions = [];
     private HashSet<CvSearchHitDto> _selectedCvs = [];
     private string _term = "";
+    private int _positionTotal;
+    private int _cvTotal;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -93,12 +95,20 @@
     private async Task<GridData<PositionDto>> LoadPositionsAsync(GridState<PositionDto> state, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(_term))
+        {
+            _positionTotal = 0;
             return new GridData<PositionDto>();
+        }
         var actor = await GetActorAsync();
         var result = await SearchService.SearchPositionsAsync(
             actor, _term.Trim(), new PageRequest(state.Page + 1, state.PageSize), ct);
         if (!result.Succeeded)
+        {
+            _positionTotal = 0;
             return new GridData<PositionDto>();
+        }
+        _positionTotal = result.Value.TotalCount;
+        await InvokeAsync(StateHasChanged);
         return new GridData<PositionDto>
         {
             TotalItems = result.Value.TotalCount,
@@ -109,12 +119,20 @@
     private async Task<GridData<CvSearchHitDto>> LoadCvsAsync(GridState<CvSearchHitDto> state, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(_term))
+        {
+            _cvTotal = 0;
             return new GridData<CvSearchHitDto>();
+        }
         var actor = await GetActorAsync();
         var result = await SearchService.SearchCvsAsync(
             actor, _term.Trim(), new PageRequest(state.Page + 1, state.PageSize), ct);
         if (!result.Succeeded)
+        {
+            _cvTotal = 0;
             return new GridData<CvSearchHitDto>();
+        }
+        _cvTotal = result.Value.TotalCount;
+        await InvokeAsync(StateHasChanged);
         return new GridData<CvSearchHitDto>
         {
             TotalItems = result.Value.TotalCount,

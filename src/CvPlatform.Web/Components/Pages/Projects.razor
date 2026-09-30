@@ -10,8 +10,9 @@
 @inject IProjectService ProjectService
 @inject AuthenticationStateProvider AuthProvider
 @inject IDialogService DialogService
-@inject ISnackbar Snackbar
+@inject IUiErrorReporter Errors
 @inject IStringLocalizer<SharedResource> L
+@inject ISnackbar Snackbar
 
 <PageTitle>@L["Projects"]</PageTitle>
 
@@ -103,7 +104,7 @@ else
                 actor, actor.UserId, new PageRequest(state.Page + 1, state.PageSize), ct);
             if (!result.Succeeded)
             {
-                _error = result.Error.Message;
+                _error = Errors.Report(result.Error);
                 return new GridData<ProjectDto>();
             }
 
@@ -162,7 +163,7 @@ else
         }
         else
         {
-            Snackbar.Add(deleteResult.Error.Message, Severity.Error);
+            Errors.Notify(deleteResult.Error);
         }
     }
 

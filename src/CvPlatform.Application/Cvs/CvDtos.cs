@@ -1,3 +1,4 @@
+using CvPlatform.Application.Attributes;
 using CvPlatform.Application.Common;
 using CvPlatform.Core.Entities;
 using CvPlatform.Core.Enums;
@@ -37,7 +38,8 @@ public sealed record CvFieldRowDto(
     long ValueVersion,
     IReadOnlyList<string> Choices,
     string? CategoryName = null,
-    Guid? ValueId = null)
+    Guid? ValueId = null,
+    DateRangeDto? DateRange = null)
 {
     public bool IsFilled =>
         StringValue is not null || TextValue is not null || NumericValue is not null ||
@@ -63,8 +65,7 @@ public sealed record CvDetailDto(
     bool CanEdit,
     bool PublishGateSatisfied,
     IReadOnlyList<string> MissingRequired,
-    string? DisplayName = null,
-    Guid? ProfilePhotoValueId = null);
+    string? DisplayName = null);
 
 public sealed record CvExportRowDto(
     CvDto Cv,

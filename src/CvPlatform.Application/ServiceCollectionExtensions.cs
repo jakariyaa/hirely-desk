@@ -28,12 +28,14 @@ public static class ServiceCollectionExtensions
         services.AddTransient<CvPlatform.Application.Search.ISearchService, CvPlatform.Application.Search.SearchService>();
         services.AddTransient<CvPlatform.Application.Home.IHomeStatsService, CvPlatform.Application.Home.HomeStatsService>();
         services.AddTransient<CvPlatform.Application.Badges.IBadgeService, CvPlatform.Application.Badges.BadgeService>();
+        services.AddTransient<Crm.ICrmSyncService, Crm.CrmSyncService>();
         services.AddSingleton<CvPlatform.Application.Discussions.IDiscussionNotifier, CvPlatform.Application.Discussions.DiscussionNotifier>();
         services.AddSingleton<IAccessRuleEngine, AccessRuleEngine>();
         services.AddTransient<IValidator<AttributeDefinitionInput>, AttributeDefinitionInputValidator>();
         services.AddTransient<IValidator<PositionInput>, PositionInputValidator>();
         services.AddTransient<IValidator<ProjectInput>, ProjectInputValidator>();
         services.AddTransient<IValidator<CvPlatform.Application.Discussions.DiscussionPostInput>, DiscussionPostInputValidator>();
+        services.AddTransient<IValidator<Crm.CrmSyncInput>, Validation.CrmSyncInputValidator>();
         return services;
     }
 }

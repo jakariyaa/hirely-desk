@@ -8,12 +8,21 @@
 @inject IAttributeDefinitionService Definitions
 @inject AuthenticationStateProvider AuthProvider
 @inject IDialogService DialogService
-@inject ISnackbar Snackbar
+@inject IUiErrorReporter Errors
 @inject IStringLocalizer<SharedResource> L
+@inject ISnackbar Snackbar
 
 <MudForm @ref="_form">
     <MudDialog>
         <DialogContent>
+            <MudSelect T="Guid" Value="_categoryId" ValueChanged="OnCategoryChanged"
+                       Label="@L["Category"]" Required="true" Disabled="@(Categories.Count == 0)"
+                       HelperText="@L["CategoryHelper"]">
+                @foreach (var category in Categories)
+                {
+                    <MudSelectItem T="Guid" Value="@category.Id">@category.Name</MudSelectItem>
+                }
+            </MudSelect>
             <MudTextField T="string" @bind-Value="_name" Label="@L["Name"]" Required="true" />
             <MudTextField T="string" @bind-Value="_description" Label="@L["Description"]" />
             <MudSelect T="AttributeDataType" Value="_dataType" ValueChanged="OnDataTypeChanged" Label="@L["DataType"]" Required="true">
@@ -26,14 +35,15 @@
             {
                 <AttributeOptionsEditor DataType="_dataType" @bind-OptionsJson="_optionsJson" />
             }
-            else if (_dataType is AttributeDataType.Numeric or AttributeDataType.String or AttributeDataType.Text)
+            else if (_dataType is AttributeDataType.Numeric or AttributeDataType.String or AttributeDataType.Text
+                or AttributeDataType.Date)
             {
                 <AttributeOptionsEditor DataType="_dataType" @bind-OptionsJson="_optionsJson" />
             }
         </DialogContent>
         <DialogActions>
-            <MudButton OnClick="MudDialog.Cancel">Cancel</MudButton>
-            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync" Disabled="_saving">Save</MudButton>
+            <MudButton OnClick="MudDialog.Cancel">@L["Cancel"]</MudButton>
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync" Disabled="_saving">@L["Save"]</MudButton>
         </DialogActions>
     </MudDialog>
 </MudForm>
@@ -50,6 +60,12 @@
     private AttributeDataType _dataType;
     private string? _optionsJson;
     private bool _saving;
+
+    private Task OnCategoryChanged(Guid value)
+    {
+        _categoryId = value;
+        return Task.CompletedTask;
+    }
 
     private Task OnDataTypeChanged(AttributeDataType value)
     {
@@ -76,6 +92,12 @@
 
     private async Task SaveAsync()
     {
+        if (Categories.Count == 0)
+        {
+            Snackbar.Add(L["NoAttributeCategories"].Value, Severity.Error);
+            return;
+        }
+
         await _form!.ValidateAsync();
         if (!_form.IsValid || _categoryId == Guid.Empty || string.IsNullOrWhiteSpace(_name))
             return;
@@ -102,13 +124,13 @@
                 var impact = await Definitions.GetOptionChangeImpactAsync(actor, Editing.Id, input);
                 if (impact.Succeeded && impact.Value is not null)
                 {
-                        var parameters = new DialogParameters<ConfirmDialog>
-                        {
-                            { dialog => dialog.ContentText, $"{result.Error.Message} Proceed?" },
-                            { dialog => dialog.YesText, "Remove" },
-                            { dialog => dialog.NoText, "Cancel" },
+                    var parameters = new DialogParameters<ConfirmDialog>
+                    {
+                            { dialog => dialog.ContentText, L["RemoveOptionsConfirm"].Value },
+                            { dialog => dialog.YesText, L["Remove"].Value },
+                            { dialog => dialog.NoText, L["Cancel"].Value },
                         };
-                    var confirm = await DialogService.ShowAsync<ConfirmDialog>("Remove options", parameters);
+                    var confirm = await DialogService.ShowAsync<ConfirmDialog>(L["RemoveOptions"].Value, parameters);
                     if ((await confirm.Result) is { Canceled: false, Data: true })
                     {
                         var forced = await Definitions.UpdateAsync(actor, Editing.Id, input with { ForceOptionRemoval = true });
@@ -117,13 +139,13 @@
                             MudDialog.Close(DialogResult.Ok(forced.Value));
                             return;
                         }
-                        Snackbar.Add(forced.Error.Message, Severity.Error);
+                        Errors.Notify(forced.Error);
                         return;
                     }
                     return;
                 }
             }
-            Snackbar.Add(result.Error.Message, Severity.Error);
+            Errors.Notify(result.Error);
         }
         finally
         {

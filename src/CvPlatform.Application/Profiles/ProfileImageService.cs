@@ -64,19 +64,19 @@ public sealed class ProfileImageService(
             {
                 if (cv.Status != CvStatus.Published)
                     return Result<ImageDownloadTicket>.Failure(
-                        ErrorCodes.Forbidden, "You do not have access to this image.");
+                        ErrorCodes.NotFound, "Image was not found.");
 
                 var access = await positionAccess.CanAccessAsync(
                     actor, cv.UserId, cv.PositionId, cancellationToken);
                 if (!access.Succeeded || access.Value != true)
                     return Result<ImageDownloadTicket>.Failure(
-                        ErrorCodes.Forbidden, "You do not have access to this image.");
+                        ErrorCodes.NotFound, "Image was not found.");
             }
         }
         else if (!actor.IsAdmin && image.ProfileUserId != actor.UserId)
         {
             return Result<ImageDownloadTicket>.Failure(
-                ErrorCodes.Forbidden, "You do not have access to this image.");
+                ErrorCodes.NotFound, "Image was not found.");
         }
 
         if (!imageStorage.IsOwnedObjectKey(image.ImageObjectKey, image.ProfileUserId))

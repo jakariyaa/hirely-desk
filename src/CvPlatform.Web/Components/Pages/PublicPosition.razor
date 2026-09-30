@@ -8,6 +8,7 @@
 @inject IPositionAccessService PositionAccess
 @inject NavigationManager Navigation
 @inject IStringLocalizer<SharedResource> L
+@inject IUiErrorReporter Errors
 
 <PageTitle>@(_position?.Title ?? L["Positions"])</PageTitle>
 
@@ -55,7 +56,7 @@ else if (_position is not null)
         if (result.Succeeded)
             _position = result.Value;
         else
-            _error = result.Error.Message;
+            _error = Errors.Report(result.Error);
         _loading = false;
     }
 

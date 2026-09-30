@@ -13,9 +13,10 @@
 @inject IPositionAccessService PositionAccess
 @inject AuthenticationStateProvider AuthProvider
 @inject IDialogService DialogService
-@inject ISnackbar Snackbar
+@inject IUiErrorReporter Errors
 @inject NavigationManager Navigation
 @inject IStringLocalizer<SharedResource> L
+@inject ISnackbar Snackbar
 
 <PageTitle>@L["Positions"]</PageTitle>
 
@@ -115,7 +116,7 @@ else
                     actor, new PageRequest(state.Page + 1, state.PageSize), null, ct);
                 if (!candidateBrowse.Succeeded)
                 {
-                    _error = candidateBrowse.Error.Message;
+                    _error = Errors.Report(candidateBrowse.Error);
                     return new GridData<PositionDto>();
                 }
 
@@ -130,7 +131,7 @@ else
                 actor, new PageRequest(state.Page + 1, state.PageSize), null, ct);
             if (!owned.Succeeded)
             {
-                _error = owned.Error.Message;
+                _error = Errors.Report(owned.Error);
                 return new GridData<PositionDto>();
             }
 
@@ -147,7 +148,7 @@ else
                 actor, new PageRequest(state.Page + 1, state.PageSize), null, ct);
             if (!browsed.Succeeded)
             {
-                _error = browsed.Error.Message;
+                _error = Errors.Report(browsed.Error);
                 return new GridData<PositionDto>();
             }
 
@@ -193,7 +194,7 @@ else
             {
                 var result = await PositionService.DuplicateAsync(actor, position.Id);
                 if (!result.Succeeded)
-                    Snackbar.Add(result.Error.Message, Severity.Error);
+                    Errors.Notify(result.Error);
             }
 
             Snackbar.Add(L["PositionDuplicated"], Severity.Success);
@@ -249,7 +250,7 @@ else
                 {
                     if (deleteResult.Error.Code == ErrorCodes.ConcurrencyConflict)
                         hadConflict = true;
-                    Snackbar.Add(deleteResult.Error.Message, Severity.Error);
+                    Errors.Notify(deleteResult.Error);
                 }
             }
 
