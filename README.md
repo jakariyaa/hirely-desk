@@ -10,6 +10,7 @@ Hirely Desk is a CV management and recruitment platform. Candidates maintain reu
 - Candidate profiles, projects, CV publishing, search, discussions, and likes
 - PDF, XLSX, and CSV exports
 - Backblaze B2 direct image uploads
+- Token-protected aggregated-results API with an Odoo 18 read-only viewer
 - English and Polish localization
 
 ## Technology
@@ -98,6 +99,88 @@ docker compose -f compose.production.yml down
 
 Use `down -v` only when intentionally deleting the production database, logs, and Data Protection keys.
 
+## Odoo integration
+
+The platform exposes a token-protected API with aggregated position results, and ships an Odoo 18 application that imports and displays them. The Odoo app is a read-only viewer of imported data.
+
+### Endpoint and token
+
+- `GET /api/v1/positions/summary` returns the aggregated summary of exactly one position.
+- Authentication: `Authorization: Bearer <token>`.
+- Tokens are generated **per position** on the position form in Hirely Desk. Several tokens can be active for one position; each can be revoked independently. Only the SHA-256 hash of a token is stored, so the token is shown exactly once at generation time.
+- The response contains only aggregate statistics — average/min/max for numeric attributes, most popular values for text-like attributes, true/false counts for booleans, earliest/latest dates, and filled counts. Individual candidate data is never exposed.
+- The endpoint is rate limited to 60 requests per minute per token (partitioned by the token hash, with a remote-IP fallback).
+
+Example:
+
+```bash
+curl -H "Authorization: Bearer cvp_..." \
+  http://localhost:5191/api/v1/positions/summary
+```
+
+### Generate a token
+
+1. Sign in as a Recruiter or Administrator.
+2. Open a position (`/positions/{id}`).
+3. Choose **API token** in the page header.
+4. Optionally name the token, then choose **Generate token** and copy it — it is shown only once.
+5. The dialog also lists existing tokens with created/last-used dates and lets you revoke one.
+
+### Run the Odoo instance
+
+Start the local PostgreSQL and the application (listening on all interfaces so the container can reach it):
+
+```bash
+docker compose up -d db
+dotnet run --project src/CvPlatform.Web --launch-profile http --urls http://0.0.0.0:5191
+```
+
+If the app binds only to loopback, the Odoo container cannot reach `host.docker.internal:5191`; `--urls http://0.0.0.0:5191` avoids that.
+
+Start Odoo (PostgreSQL for Odoo, Odoo 18 LTS, and the custom module mounted from `odoo/addons`):
+
+```bash
+docker compose -f compose.odoo.yml up -d
+docker compose -f compose.odoo.yml ps
+```
+
+Open <http://localhost:8069> and create the first database (any name). The master password is only needed to manage databases.
+
+### Install the Odoo application
+
+1. Open **Apps**, remove the default `Apps` filter, and search for **Hirely Desk Position Viewer**.
+2. Choose **Activate**. From the terminal, the equivalent command routes through the container entrypoint so the database credentials are supplied automatically:
+
+   ```bash
+   docker compose -f compose.odoo.yml run --rm odoo \
+     odoo -d <database> -i hirely_position_viewer --stop-after-init --no-http
+   ```
+
+3. The **Hirely Desk** app appears in the main menu.
+
+The API base URL defaults to `http://host.docker.internal:5191`. Change it in **Settings → Technical → System Parameters → `hirely_position_viewer.api_url`** if the application runs elsewhere.
+
+### Import results
+
+1. Generate a token for a position in Hirely Desk (see above) and copy it.
+2. In Odoo, open **Hirely Desk → Import from Hirely Desk**.
+3. Leave the prefilled URL or enter your Hirely Desk base URL, paste the token, and choose **Import**.
+4. Odoo opens the imported position. **Positions** lists every imported position, and each position's **Attributes** tab shows per-attribute aggregates; open an attribute for its detailed aggregate section and most popular values.
+
+Re-importing with the same token updates the existing position in place (matched by the Hirely Desk position id), so the viewer always shows the freshest aggregates. The same import action is also available from the position list's **Action** menu.
+
+### Read-only guarantees
+
+- Odoo models for imported content reject create/update/delete from the UI with a clear message; only the import wizard writes.
+- The viewer group has read-only access rights for imported models and full access only to the transient import wizard.
+- Tokens stay in the wizard form only; they are never persisted in Odoo.
+
+### Troubleshooting
+
+- **Could not reach the API** — confirm the app is running with `--urls http://0.0.0.0:5191` and that `host.docker.internal` resolves inside the container (`docker compose -f compose.odoo.yml exec odoo getent hosts host.docker.internal`).
+- **The API token was rejected** — the token is invalid or revoked; generate a new one on the position form.
+- **Rate limit reached** — the endpoint allows 60 requests per minute per token; wait a minute and retry.
+
 ## Configuration
 
 Required configuration:
@@ -170,7 +253,9 @@ src/CvPlatform.Application      Use cases, DTOs, validators, and services
 src/CvPlatform.Infrastructure   EF Core, migrations, and integrations
 src/CvPlatform.Web              Blazor UI, Identity, and composition root
 tests/CvPlatform.Tests          Unit, component, and integration tests
+odoo/addons/hirely_position_viewer  Odoo 18 read-only viewer application
 compose.yml                     Local PostgreSQL
+compose.odoo.yml                Local Odoo 18 rollout for the viewer
 compose.production.yml          Production Docker Compose deployment
 Dockerfile                      Production image build
 ```

@@ -729,4 +729,25 @@
   <data name="CrmMailingCountry" xml:space="preserve"><value>Country</value></data>
   <data name="CrmDescription" xml:space="preserve"><value>Notes</value></data>
   <data name="CrmContactHint" xml:space="preserve"><value>Your name and email from the profile are used for the Contact record.</value></data>
+  <data name="ApiTokenButton" xml:space="preserve"><value>API token</value></data>
+  <data name="ApiTokenDialogTitle" xml:space="preserve"><value>Position API tokens</value></data>
+  <data name="ApiTokenHint" xml:space="preserve"><value>External systems (for example Odoo) read this position's aggregated results with a token. Only aggregate statistics, never candidate data, are exposed.</value></data>
+  <data name="ApiTokenEmpty" xml:space="preserve"><value>No API tokens for this position yet.</value></data>
+  <data name="ApiTokenActive" xml:space="preserve"><value>Active</value></data>
+  <data name="ApiTokenStatusRevoked" xml:space="preserve"><value>Revoked</value></data>
+  <data name="ApiTokenCreated" xml:space="preserve"><value>Created</value></data>
+  <data name="ApiTokenLastUsed" xml:space="preserve"><value>Last used</value></data>
+  <data name="ApiTokenNever" xml:space="preserve"><value>never</value></data>
+  <data name="ApiTokenNameLabel" xml:space="preserve"><value>Token name</value></data>
+  <data name="ApiTokenNamePlaceholder" xml:space="preserve"><value>e.g. Odoo production</value></data>
+  <data name="ApiTokenNew" xml:space="preserve"><value>Generate token</value></data>
+  <data name="ApiTokenGeneratedTitle" xml:space="preserve"><value>Generated API token</value></data>
+  <data name="ApiTokenGenerated" xml:space="preserve"><value>Copy this token now. For security it is shown only once and cannot be retrieved later. If it is lost, generate a new one.</value></data>
+  <data name="ApiTokenCopy" xml:space="preserve"><value>Copy to clipboard</value></data>
+  <data name="ApiTokenCopied" xml:space="preserve"><value>Token copied to clipboard.</value></data>
+  <data name="ApiTokenRevoke" xml:space="preserve"><value>Revoke</value></data>
+  <data name="ApiTokenRevoked" xml:space="preserve"><value>API token revoked.</value></data>
+  <data name="ApiTokenRevokeConfirm" xml:space="preserve"><value>Revoke this API token? External systems using it will lose access immediately.</value></data>
+  <data name="ApiTokenDone" xml:space="preserve"><value>Done</value></data>
+  <data name="Close" xml:space="preserve"><value>Close</value></data>
 </root>

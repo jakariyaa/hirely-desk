@@ -30,6 +30,10 @@
     {
         <MudChip T="string" Size="Size.Small" Color="@(_detail?.Position.IsPublic == true ? Color.Success : Color.Warning)"
                  Text="@(_detail?.Position.IsPublic == true ? L["Public"] : L["Restricted"])" />
+        <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.Key"
+                   OnClick="ShowApiTokensAsync">
+            @L["ApiTokenButton"]
+        </MudButton>
         <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="SaveAsTemplateAsync">
             @L["SaveAsTemplate"]
         </MudButton>
@@ -371,6 +375,19 @@ else
             Snackbar.Add(L["TemplateSaved"], Severity.Success);
         else
             Errors.Notify(result.Error);
+    }
+
+    private async Task ShowApiTokensAsync()
+    {
+        if (Id is null)
+            return;
+        var actor = await GetActorAsync();
+        var parameters = new DialogParameters<ApiTokenDialog>
+        {
+            { dialog => dialog.Actor, actor },
+            { dialog => dialog.PositionId, Id.Value },
+        };
+        await DialogService.ShowAsync<ApiTokenDialog>(L["ApiTokenDialogTitle"].Value, parameters);
     }
 
     private async Task ShowConcurrencyDialogAsync()

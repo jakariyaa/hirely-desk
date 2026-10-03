@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_hirely_position_viewer,hirely.position viewer,model_hirely_position,group_hirely_viewer,1,0,0,0
+access_hirely_position_attribute_viewer,hirely.position.attribute viewer,model_hirely_position_attribute,group_hirely_viewer,1,0,0,0
+access_hirely_position_attribute_value_viewer,hirely.position.attribute.value viewer,model_hirely_position_attribute_value,group_hirely_viewer,1,0,0,0
+access_hirely_import_wizard_user,hirely.import.wizard user,model_hirely_import_wizard,group_hirely_viewer,1,1,1,1

@@ -21,6 +21,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<PositionTemplateAttribute> PositionTemplateAttributes => Set<PositionTemplateAttribute>();
     public DbSet<PositionTemplateAccessRule> PositionTemplateAccessRules => Set<PositionTemplateAccessRule>();
     public DbSet<PositionAttribute> PositionAttributes => Set<PositionAttribute>();
+    public DbSet<PositionApiToken> PositionApiTokens => Set<PositionApiToken>();
     public DbSet<AccessRule> AccessRules => Set<AccessRule>();
     public DbSet<Cv> Cvs => Set<Cv>();
     public DbSet<CvProject> CvProjects => Set<CvProject>();

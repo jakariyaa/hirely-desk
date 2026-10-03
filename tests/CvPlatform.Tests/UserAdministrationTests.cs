@@ -81,6 +81,7 @@ public class UserAdministrationTests : IDisposable
         public DbSet<PositionTemplateAttribute> PositionTemplateAttributes => db.PositionTemplateAttributes;
         public DbSet<PositionTemplateAccessRule> PositionTemplateAccessRules => db.PositionTemplateAccessRules;
         public DbSet<PositionAttribute> PositionAttributes => db.PositionAttributes;
+        public DbSet<PositionApiToken> PositionApiTokens => db.PositionApiTokens;
         public DbSet<AccessRule> AccessRules => db.AccessRules;
         public DbSet<Cv> Cvs => db.Cvs;
         public DbSet<CvProject> CvProjects => db.CvProjects;

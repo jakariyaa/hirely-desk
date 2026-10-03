@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hirely_position_list" model="ir.ui.view">
+        <field name="name">hirely.position.list</field>
+        <field name="model">hirely.position</field>
+        <field name="arch" type="xml">
+            <list string="Hirely Desk Positions" create="false" edit="false" delete="false">
+                <field name="name"/>
+                <field name="company"/>
+                <field name="level"/>
+                <field name="cv_count"/>
+                <field name="attribute_count"/>
+                <field name="last_imported_at"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_hirely_position_form" model="ir.ui.view">
+        <field name="name">hirely.position.form</field>
+        <field name="model">hirely.position</field>
+        <field name="arch" type="xml">
+            <form string="Hirely Desk Position" create="false" edit="false" delete="false">
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="%(action_hirely_import_wizard)d" type="action"
+                                string="Re-import" class="oe_stat_button" icon="fa-refresh"/>
+                    </div>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="company" readonly="1"/>
+                            <field name="level" readonly="1"/>
+                            <field name="cv_count" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="source_position_id" readonly="1"/>
+                            <field name="imported_at" readonly="1"/>
+                            <field name="last_imported_at" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Attributes" name="attributes">
+                            <field name="attribute_ids" readonly="1">
+                                <list create="false" edit="false" delete="false">
+                                    <field name="sequence" column_invisible="True"/>
+                                    <field name="name"/>
+                                    <field name="category"/>
+                                    <field name="data_type"/>
+                                    <field name="filled_count"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Description" name="description">
+                            <field name="short_description" readonly="1"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_hirely_position_search" model="ir.ui.view">
+        <field name="name">hirely.position.search</field>
+        <field name="model">hirely.position</field>
+        <field name="arch" type="xml">
+            <search string="Hirely Desk Positions">
+                <field name="name"/>
+                <field name="company"/>
+                <field name="level"/>
+                <filter name="has_cvs" string="With CVs" domain="[('cv_count', '&gt;', 0)]"/>
+                <group expand="0" string="Group By">
+                    <filter name="group_company" string="Company" context="{'group_by': 'company'}"/>
+                    <filter name="group_level" string="Level" context="{'group_by': 'level'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_hirely_position_attribute_form" model="ir.ui.view">
+        <field name="name">hirely.position.attribute.form</field>
+        <field name="model">hirely.position.attribute</field>
+        <field name="arch" type="xml">
+            <form string="Attribute" create="false" edit="false" delete="false">
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="position_id" readonly="1"/>
+                            <field name="category" readonly="1"/>
+                            <field name="data_type" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="filled_count" readonly="1"/>
+                            <field name="sequence" readonly="1"/>
+                            <field name="distinct_value_count" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Numeric summary" invisible="data_type != 'Numeric' or numeric_count == 0">
+                        <group>
+                            <field name="numeric_count" readonly="1"/>
+                            <field name="numeric_average" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="numeric_min" readonly="1"/>
+                            <field name="numeric_max" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Boolean summary" invisible="data_type != 'Boolean' or filled_count == 0">
+                        <group>
+                            <field name="boolean_true_count" readonly="1"/>
+                            <field name="boolean_false_count" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Date summary" invisible="data_type != 'Date'">
+                        <group>
+                            <field name="date_earliest" readonly="1"/>
+                            <field name="date_latest" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Period summary" invisible="data_type != 'Period'">
+                        <group>
+                            <field name="period_earliest_start" readonly="1"/>
+                            <field name="period_latest_end" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook invisible="data_type not in ('String', 'Text', 'Dropdown')">
+                        <page string="Most popular values" name="values">
+                            <field name="value_ids" readonly="1">
+                                <list create="false" edit="false" delete="false">
+                                    <field name="rank" column_invisible="True"/>
+                                    <field name="value"/>
+                                    <field name="occurrence_count" string="Candidates"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+</odoo>

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="module_category_hirely" model="ir.module.category">
+        <field name="name">Hirely Desk</field>
+        <field name="description">Read-only viewer for Hirely Desk positions.</field>
+        <field name="sequence">90</field>
+    </record>
+
+    <record id="group_hirely_viewer" model="res.groups">
+        <field name="name">Viewer</field>
+        <field name="category_id" ref="module_category_hirely"/>
+        <field name="comment">Can view positions and aggregated results imported from Hirely Desk.</field>
+    </record>
+
+    <!-- Every internal user may read the imported positions. -->
+    <record id="base.group_user" model="res.groups">
+        <field name="implied_ids" eval="[(4, ref('group_hirely_viewer'))]"/>
+    </record>
+</odoo>

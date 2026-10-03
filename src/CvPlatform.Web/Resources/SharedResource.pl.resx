@@ -781,4 +781,25 @@
   <data name="CrmMailingCountry" xml:space="preserve"><value>Kraj</value></data>
   <data name="CrmDescription" xml:space="preserve"><value>Notatki</value></data>
   <data name="CrmContactHint" xml:space="preserve"><value>Imię, nazwisko i e-mail z profilu zostaną użyte w rekordzie Kontaktu.</value></data>
+  <data name="ApiTokenButton" xml:space="preserve"><value>Token API</value></data>
+  <data name="ApiTokenDialogTitle" xml:space="preserve"><value>Tokeny API stanowiska</value></data>
+  <data name="ApiTokenHint" xml:space="preserve"><value>Systemy zewnętrzne (np. Odoo) odczytują zagregowane wyniki tego stanowiska za pomocą tokenu. Udostępniane są wyłącznie statystyki zbiorcze, nigdy dane kandydatów.</value></data>
+  <data name="ApiTokenEmpty" xml:space="preserve"><value>To stanowisko nie ma jeszcze tokenów API.</value></data>
+  <data name="ApiTokenActive" xml:space="preserve"><value>Aktywny</value></data>
+  <data name="ApiTokenStatusRevoked" xml:space="preserve"><value>Unieważniony</value></data>
+  <data name="ApiTokenCreated" xml:space="preserve"><value>Utworzono</value></data>
+  <data name="ApiTokenLastUsed" xml:space="preserve"><value>Ostatnio użyto</value></data>
+  <data name="ApiTokenNever" xml:space="preserve"><value>nigdy</value></data>
+  <data name="ApiTokenNameLabel" xml:space="preserve"><value>Nazwa tokenu</value></data>
+  <data name="ApiTokenNamePlaceholder" xml:space="preserve"><value>np. Odoo produkcja</value></data>
+  <data name="ApiTokenNew" xml:space="preserve"><value>Wygeneruj token</value></data>
+  <data name="ApiTokenGeneratedTitle" xml:space="preserve"><value>Wygenerowany token API</value></data>
+  <data name="ApiTokenGenerated" xml:space="preserve"><value>Skopiuj ten token teraz. Ze względów bezpieczeństwa jest pokazywany tylko raz i nie można go później odzyskać. W razie utraty wygeneruj nowy.</value></data>
+  <data name="ApiTokenCopy" xml:space="preserve"><value>Kopiuj do schowka</value></data>
+  <data name="ApiTokenCopied" xml:space="preserve"><value>Token skopiowany do schowka.</value></data>
+  <data name="ApiTokenRevoke" xml:space="preserve"><value>Unieważnij</value></data>
+  <data name="ApiTokenRevoked" xml:space="preserve"><value>Token API unieważniony.</value></data>
+  <data name="ApiTokenRevokeConfirm" xml:space="preserve"><value>Unieważnić ten token API? Systemy zewnętrzne korzystające z niego natychmiast stracą dostęp.</value></data>
+  <data name="ApiTokenDone" xml:space="preserve"><value>Gotowe</value></data>
+  <data name="Close" xml:space="preserve"><value>Zamknij</value></data>
 </root>

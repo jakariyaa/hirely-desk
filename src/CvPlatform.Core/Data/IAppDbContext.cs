@@ -22,6 +22,7 @@ public interface IAppDbContext : IDisposable, IAsyncDisposable
     DbSet<PositionTemplateAttribute> PositionTemplateAttributes { get; }
     DbSet<PositionTemplateAccessRule> PositionTemplateAccessRules { get; }
     DbSet<PositionAttribute> PositionAttributes { get; }
+    DbSet<PositionApiToken> PositionApiTokens { get; }
     DbSet<AccessRule> AccessRules { get; }
     DbSet<Cv> Cvs { get; }
     DbSet<CvProject> CvProjects { get; }

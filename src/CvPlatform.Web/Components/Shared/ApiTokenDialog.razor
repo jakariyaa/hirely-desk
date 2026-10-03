@@ -1,0 +1,194 @@
+@using CvPlatform.Application.Authorization
+@using CvPlatform.Application.Common
+@using CvPlatform.Application.Integration
+@using CvPlatform.Web.Components.Shared
+@using CvPlatform.Web.Resources
+@using Microsoft.Extensions.Localization
+@using Microsoft.JSInterop
+@inject IPositionApiTokenService Tokens
+@inject IDialogService DialogService
+@inject IUiErrorReporter Errors
+@inject IStringLocalizer<SharedResource> L
+@inject ISnackbar Snackbar
+@inject IJSRuntime Js
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">@L["ApiTokenDialogTitle"]</MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (_created is not null)
+        {
+            <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3">@L["ApiTokenGenerated"]</MudAlert>
+            <MudStack Row AlignItems="AlignItems.Center" Spacing="2" Class="mb-3">
+                <MudTextField T="string" Value="_created.Token" ReadOnly="true" Variant="Variant.Outlined"
+                              Class="cv-picker-wide" aria-label="@L["ApiTokenGeneratedTitle"]" />
+                <MudIconButton Icon="@Icons.Material.Filled.ContentCopy" Color="Color.Primary"
+                               title="@L["ApiTokenCopy"]" aria-label="@L["ApiTokenCopy"]" OnClick="CopyAsync" />
+            </MudStack>
+            <MudText Typo="Typo.caption">@_created.Name</MudText>
+        }
+        else
+        {
+            <MudText Typo="Typo.body2" Class="mb-3">@L["ApiTokenHint"]</MudText>
+            @if (_tokens.Count == 0)
+            {
+                <MudText Typo="Typo.body2" Class="mb-3">@L["ApiTokenEmpty"]</MudText>
+            }
+            else
+            {
+                @foreach (var token in _tokens)
+                {
+                    <div class="cv-attribute-row">
+                        <MudStack Spacing="0">
+                            <MudStack Row Spacing="2" AlignItems="AlignItems.Center">
+                                <MudText Typo="Typo.body2">@token.Name</MudText>
+                                <MudChip T="string" Size="Size.Small"
+                                         Color="@(token.IsActive ? Color.Success : Color.Default)"
+                                         Text="@(token.IsActive ? L["ApiTokenActive"] : L["ApiTokenStatusRevoked"])" />
+                            </MudStack>
+                            <MudText Typo="Typo.caption">
+                                @L["ApiTokenCreated"]: @token.CreatedAt.ToLocalTime().ToString("g")
+                            </MudText>
+                            <MudText Typo="Typo.caption">
+                                @L["ApiTokenLastUsed"]: @(token.LastUsedAt is { } used
+                                    ? used.ToLocalTime().ToString("g")
+                                    : L["ApiTokenNever"].Value)
+                            </MudText>
+                        </MudStack>
+                        @if (token.IsActive)
+                        {
+                            <MudIconButton Icon="@Icons.Material.Filled.Block" Size="Size.Small" Color="Color.Error"
+                                           Disabled="_busy" title="@L["ApiTokenRevoke"]" aria-label="@L["ApiTokenRevoke"]"
+                                           OnClick="@(() => RevokeAsync(token))" />
+                        }
+                    </div>
+                }
+            }
+
+            <MudStack Row AlignItems="AlignItems.End" Spacing="2" Class="mt-3">
+                <MudTextField T="string" @bind-Value="_newTokenName" Label="@L["ApiTokenNameLabel"]"
+                              Placeholder="@L["ApiTokenNamePlaceholder"]" Variant="Variant.Outlined"
+                              MaxLength="200" Class="cv-picker-wide" />
+                <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Key" Disabled="_busy" OnClick="GenerateAsync">
+                    @L["ApiTokenNew"]
+                </MudButton>
+            </MudStack>
+        }
+    </DialogContent>
+    <DialogActions>
+        @if (_created is not null)
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => MudDialog.Close())">
+                @L["ApiTokenDone"]
+            </MudButton>
+        }
+        else
+        {
+            <MudButton Variant="Variant.Text" OnClick="@(() => MudDialog.Cancel())">@L["Close"]</MudButton>
+        }
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter, EditorRequired] public ActorContext Actor { get; set; } = default!;
+    [Parameter, EditorRequired] public Guid PositionId { get; set; }
+
+    private IReadOnlyList<PositionApiTokenDto> _tokens = [];
+    private PositionApiTokenCreatedDto? _created;
+    private string? _newTokenName;
+    private bool _busy;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        var result = await Tokens.ListAsync(Actor, PositionId);
+        if (result.Succeeded)
+            _tokens = result.Value!;
+        else
+            Errors.Notify(result.Error);
+    }
+
+    private async Task GenerateAsync()
+    {
+        if (_busy)
+            return;
+
+        _busy = true;
+        try
+        {
+            var result = await Tokens.GenerateAsync(Actor, PositionId, _newTokenName);
+            if (!result.Succeeded)
+            {
+                Errors.Notify(result.Error);
+                return;
+            }
+
+            _created = result.Value;
+            _newTokenName = null;
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task RevokeAsync(PositionApiTokenDto token)
+    {
+        if (_busy)
+            return;
+
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { dialog => dialog.ContentText, L["ApiTokenRevokeConfirm"].Value },
+            { dialog => dialog.YesText, L["ApiTokenRevoke"].Value },
+            { dialog => dialog.NoText, L["Cancel"].Value },
+        };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>(L["ApiTokenRevoke"].Value, parameters);
+        if (await dialog.Result is { Canceled: true } or { Data: not true })
+            return;
+
+        _busy = true;
+        try
+        {
+            var result = await Tokens.RevokeAsync(Actor, PositionId, token.Id);
+            if (result.Succeeded)
+            {
+                Snackbar.Add(L["ApiTokenRevoked"], Severity.Success);
+                await LoadAsync();
+            }
+            else
+            {
+                Errors.Notify(result.Error);
+            }
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task CopyAsync()
+    {
+        if (_created is null)
+            return;
+
+        try
+        {
+            await Js.InvokeVoidAsync("navigator.clipboard.writeText", _created.Token);
+            Snackbar.Add(L["ApiTokenCopied"], Severity.Success);
+        }
+        catch (JSException exception)
+        {
+            Errors.Notify(exception);
+        }
+        catch (InvalidOperationException exception)
+        {
+            Errors.Notify(exception);
+        }
+    }
+}

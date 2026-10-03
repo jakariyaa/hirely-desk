@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="action_hirely_position" model="ir.actions.act_window">
+        <field name="name">Positions</field>
+        <field name="res_model">hirely.position</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_hirely_position_search"/>
+    </record>
+
+    <menuitem id="menu_hirely_root" name="Hirely Desk" web_icon="base,static/description/icon.png"
+              sequence="95"/>
+
+    <menuitem id="menu_hirely_positions" name="Positions"
+              parent="menu_hirely_root" action="action_hirely_position" sequence="10"/>
+
+    <menuitem id="menu_hirely_import" name="Import from Hirely Desk"
+              parent="menu_hirely_root" action="action_hirely_import_wizard" sequence="20"
+              groups="group_hirely_viewer"/>
+</odoo>

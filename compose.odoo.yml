@@ -1,0 +1,47 @@
+# Odoo 18 LTS rollout for the Hirely Desk position viewer.
+#
+#   docker compose -f compose.odoo.yml up -d
+#
+# The Hirely Desk web application runs on the host (http://localhost:5191 by
+# default); the Odoo container reaches it through host.docker.internal, which
+# is mapped to the host gateway below. The demo custom module is mounted from
+# odoo/addons into the container addons path.
+services:
+  odoo-db:
+    image: docker.io/library/postgres:16-alpine
+    container_name: hirely-odoo-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: odoo
+      POSTGRES_PASSWORD: odoo
+    volumes:
+      - odoo_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U odoo -d postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  odoo:
+    image: docker.io/odoo:18.0
+    container_name: hirely-odoo
+    restart: unless-stopped
+    depends_on:
+      odoo-db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8069:8069"
+    environment:
+      HOST: odoo-db
+      USER: odoo
+      PASSWORD: odoo
+    volumes:
+      - ./odoo/addons:/mnt/extra-addons
+      - odoo_data:/var/lib/odoo
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  odoo_pgdata:
+  odoo_data:

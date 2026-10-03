@@ -3,6 +3,7 @@ using System.Threading.RateLimiting;
 using CvPlatform.Core.Storage;
 using Blazored.LocalStorage;
 using CvPlatform.Application;
+using CvPlatform.Application.Integration;
 using CvPlatform.Application.Markdown;
 using CvPlatform.Core.Entities;
 using CvPlatform.Application.Exports;
@@ -12,10 +13,12 @@ using CvPlatform.Infrastructure.Exports;
 using CvPlatform.Web.Exports;
 using CvPlatform.Web.Auth;
 using CvPlatform.Web.Configuration;
+using CvPlatform.Web.Integration;
 using CvPlatform.Web.Storage;
 using CvPlatform.Application.Authorization;
 using CvPlatform.Web.ErrorHandling;
 using System.Diagnostics;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.EntityFrameworkCore;
@@ -88,6 +91,8 @@ var google = applicationConfiguration.Authentication.Google;
 var facebook = applicationConfiguration.Authentication.Facebook;
 
 var authentication = builder.Services.AddAuthentication();
+authentication.AddScheme<AuthenticationSchemeOptions, PositionApiTokenAuthenticationHandler>(
+    PositionApiTokenDefaults.Scheme, displayName: null, configureOptions: null);
 if (google.IsConfigured)
     authentication.AddGoogle(o =>
     {
@@ -108,6 +113,9 @@ builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("Candidate", policy => policy.RequireRole(Roles.Candidate));
     options.AddPolicy("PositionManagement", policy => policy.RequireRole(Roles.Admin, Roles.Recruiter));
+    options.AddPolicy(PositionApiTokenDefaults.Policy, policy => policy
+        .AddAuthenticationSchemes(PositionApiTokenDefaults.Scheme)
+        .RequireAuthenticatedUser());
 });
 builder.Services.AddMudServices();
 builder.Services.AddBlazoredLocalStorage();
@@ -116,6 +124,13 @@ builder.Services.AddLocalization();
 builder.Services.AddRateLimiter(o =>
 {
     o.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    o.OnRejected = (context, _) =>
+    {
+        if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+            context.HttpContext.Response.Headers.RetryAfter =
+                ((int)retryAfter.TotalSeconds).ToString(NumberFormatInfo.InvariantInfo);
+        return ValueTask.CompletedTask;
+    };
     o.AddPolicy("auth", context => RateLimitPartition.GetFixedWindowLimiter(
         context.Connection.RemoteIpAddress?.ToString() ?? "anonymous",
         _ => new FixedWindowRateLimiterOptions
@@ -143,7 +158,28 @@ builder.Services.AddRateLimiter(o =>
             QueueLimit = 0,
             AutoReplenishment = true
         }));
+    o.AddPolicy("position-api", context => RateLimitPartition.GetFixedWindowLimiter(
+        PositionApiPartition(context),
+        _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 60,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0,
+            AutoReplenishment = true
+        }));
 });
+
+static string PositionApiPartition(HttpContext context)
+{
+    // The raw token must not become an in-memory dictionary key or a log-friendly value,
+    // so the partition uses its hash; malformed or missing credentials share the
+    // remote-IP partition instead of creating a new one per arbitrary header value.
+    if (PositionApiTokenDefaults.TryReadBearer(context.Request, out var token) &&
+        PositionApiTokenSecret.HasTokenPrefix(token))
+        return $"position-api:{PositionApiTokenSecret.Hash(token)}";
+
+    return $"position-api:{context.Connection.RemoteIpAddress?.ToString() ?? "anonymous"}";
+}
 builder.Services.Configure<RequestLocalizationOptions>(o =>
 {
     var cultures = new[] { new CultureInfo("en"), new CultureInfo("pl") };
@@ -175,6 +211,7 @@ app.MapAuthEndpoints();
 app.MapB2ImageUploadEndpoints();
 app.MapProfileImageEndpoints();
 app.MapExportEndpoints();
+app.MapPositionSummaryEndpoints();
 app.MapRazorComponents<CvPlatform.Web.Components.App>()
     .AddInteractiveServerRenderMode();
 

@@ -29,6 +29,10 @@ public static class ServiceCollectionExtensions
         services.AddTransient<CvPlatform.Application.Home.IHomeStatsService, CvPlatform.Application.Home.HomeStatsService>();
         services.AddTransient<CvPlatform.Application.Badges.IBadgeService, CvPlatform.Application.Badges.BadgeService>();
         services.AddTransient<Crm.ICrmSyncService, Crm.CrmSyncService>();
+        services.AddTransient<CvPlatform.Application.Integration.IPositionApiTokenService,
+            CvPlatform.Application.Integration.PositionApiTokenService>();
+        services.AddTransient<CvPlatform.Application.Integration.IPositionSummaryService,
+            CvPlatform.Application.Integration.PositionSummaryService>();
         services.AddSingleton<CvPlatform.Application.Discussions.IDiscussionNotifier, CvPlatform.Application.Discussions.DiscussionNotifier>();
         services.AddSingleton<IAccessRuleEngine, AccessRuleEngine>();
         services.AddTransient<IValidator<AttributeDefinitionInput>, AttributeDefinitionInputValidator>();

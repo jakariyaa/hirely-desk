@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hirely_import_wizard_form" model="ir.ui.view">
+        <field name="name">hirely.import.wizard.form</field>
+        <field name="model">hirely.import.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Import from Hirely Desk">
+                <group>
+                    <field name="api_url" placeholder="http://host.docker.internal:5191"/>
+                    <field name="api_token" placeholder="cvp_..." password="True"/>
+                </group>
+                <footer>
+                    <button name="action_import" type="object" string="Import"
+                            class="btn-primary" data-hotkey="q"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"
+                            data-hotkey="x"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_hirely_import_wizard" model="ir.actions.act_window">
+        <field name="name">Import from Hirely Desk</field>
+        <field name="res_model">hirely.import.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="binding_model_id" ref="model_hirely_position"/>
+        <field name="binding_view_types">list,form</field>
+    </record>
+</odoo>

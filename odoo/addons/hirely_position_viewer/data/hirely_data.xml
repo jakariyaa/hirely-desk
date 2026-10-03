@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <record id="config_parameter_api_url" model="ir.config_parameter">
+        <field name="key">hirely_position_viewer.api_url</field>
+        <field name="value">http://host.docker.internal:5191</field>
+    </record>
+</odoo>
