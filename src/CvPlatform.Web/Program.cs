@@ -46,6 +46,11 @@ builder.Services.AddTransient<CvPlatform.Infrastructure.Exports.IProfileImageFet
 builder.Services.AddTransient<CvPlatform.Application.Users.IUserAdministrationService,
     CvPlatform.Web.Users.UserAdministrationService>();
 builder.Services.AddSingleton<IImageStorage, CvPlatform.Infrastructure.Storage.B2ImageStorage>();
+builder.Services.AddSingleton<CvPlatform.Infrastructure.Support.GoogleCredentialFactory>();
+builder.Services.AddTransient<CvPlatform.Core.Support.ISupportTicketUploader,
+    CvPlatform.Infrastructure.Support.GoogleDriveSupportTicketUploader>();
+builder.Services.AddTransient<CvPlatform.Infrastructure.Support.SupportTicketProcessor>();
+builder.Services.AddSingleton<CvPlatform.Infrastructure.Support.DriveWatchRegistration>();
 builder.Services.AddAntiforgery(options => options.HeaderName = "X-XSRF-TOKEN");
 builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = context =>
 {
@@ -212,6 +217,7 @@ app.MapB2ImageUploadEndpoints();
 app.MapProfileImageEndpoints();
 app.MapExportEndpoints();
 app.MapPositionSummaryEndpoints();
+app.MapDriveWebhookEndpoints();
 app.MapRazorComponents<CvPlatform.Web.Components.App>()
     .AddInteractiveServerRenderMode();
 
@@ -225,5 +231,8 @@ if (!skipMigrate)
 }
 
 await CvPlatform.Web.Seed.SeedData.SeedAsync(app.Services, applicationConfiguration.Seed);
+
+var watchRegistration = app.Services.GetRequiredService<CvPlatform.Infrastructure.Support.DriveWatchRegistration>();
+await watchRegistration.EnsureWatchAsync();
 
 app.Run();

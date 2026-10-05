@@ -750,4 +750,15 @@
   <data name="ApiTokenRevokeConfirm" xml:space="preserve"><value>Revoke this API token? External systems using it will lose access immediately.</value></data>
   <data name="ApiTokenDone" xml:space="preserve"><value>Done</value></data>
   <data name="Close" xml:space="preserve"><value>Close</value></data>
+  <data name="TicketSummary" xml:space="preserve"><value>Summary</value></data>
+  <data name="TicketSummaryRequired" xml:space="preserve"><value>Summary is required.</value></data>
+  <data name="TicketSummaryTooLong" xml:space="preserve"><value>Summary must be at most 2000 characters.</value></data>
+  <data name="TicketPriority" xml:space="preserve"><value>Priority</value></data>
+  <data name="TicketPosition" xml:space="preserve"><value>Position</value></data>
+  <data name="TicketSend" xml:space="preserve"><value>Send</value></data>
+  <data name="TicketSent" xml:space="preserve"><value>Support ticket sent.</value></data>
+  <data name="TicketUploadFailed" xml:space="preserve"><value>Could not send the ticket. Try again later.</value></data>
+  <data name="TicketDialogTitle" xml:space="preserve"><value>Create support ticket</value></data>
+  <data name="CreateSupportTicket" xml:space="preserve"><value>Create support ticket</value></data>
+  <data name="Help" xml:space="preserve"><value>Help</value></data>
 </root>

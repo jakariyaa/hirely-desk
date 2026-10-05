@@ -181,6 +181,60 @@ Re-importing with the same token updates the existing position in place (matched
 - **The API token was rejected** — the token is invalid or revoked; generate a new one on the position form.
 - **Rate limit reached** — the endpoint allows 60 requests per minute per token; wait a minute and retry.
 
+## Google Drive / Gmail support-ticket integration
+
+Users can file a support ticket from any page (the Help icon in the header, or "Create support ticket" in the footer). The app writes a JSON file to a Google Drive folder; a Drive change notification pings a webhook in this app, which reads the file and sends a nicely formatted HTML email to the admins via the Gmail API.
+
+### Google Cloud setup
+
+1. Create a project in Google Cloud Console, enable the **Google Drive API** and the **Gmail API**.
+2. OAuth consent screen: External, add your Gmail as a test user.
+3. Credentials → Create OAuth client ID → type **Web application** → note the client ID and secret.
+4. Create a Drive folder `Support Tickets` (and a `Processed` subfolder); copy both folder IDs from their URLs.
+
+### One-time refresh token
+
+Mint a refresh token once and store it as a secret. The quickest way is a tiny throwaway console app (or the OAuth playground at https://developers.google.com/oauthplayground with "Use your own OAuth credentials"):
+
+- Scopes: `https://www.googleapis.com/auth/drive`, `https://www.googleapis.com/auth/gmail.send`
+- Redirect URI `http://localhost`, grant offline access, copy the refresh token.
+
+### Configure the app
+
+```bash
+dotnet user-secrets set "Google:ClientId" "..." --project src/CvPlatform.Web
+dotnet user-secrets set "Google:ClientSecret" "..." --project src/CvPlatform.Web
+dotnet user-secrets set "Google:RefreshToken" "..." --project src/CvPlatform.Web
+dotnet user-secrets set "Google:DriveFolderId" "<Support Tickets folder id>" --project src/CvPlatform.Web
+dotnet user-secrets set "Google:DriveProcessedFolderId" "<Processed folder id>" --project src/CvPlatform.Web
+dotnet user-secrets set "Google:WebhookUrl" "https://<your-public-host>/api/v1/integrations/drive/webhook" --project src/CvPlatform.Web
+dotnet user-secrets set "Google:WebhookToken" "<random shared secret>" --project src/CvPlatform.Web
+dotnet user-secrets set "Support:AdminEmails" "admin@example.com" --project src/CvPlatform.Web
+```
+
+Partial configuration fails startup validation; with nothing set the feature stays disabled (the ticket dialog reports the upload could not be sent, Drive sweep does nothing, no watch is registered).
+
+### Local demo (no public address)
+
+Drive requires an HTTPS webhook, so expose the local app with a tunnel:
+
+```bash
+docker compose up -d db
+ngrok http 5191          # copy the https URL
+dotnet user-secrets set "Google:WebhookUrl" "https://<ngrok-host>/api/v1/integrations/drive/webhook" --project src/CvPlatform.Web
+dotnet run --project src/CvPlatform.Web --launch-profile http
+```
+
+At startup the app registers a Drive `changes.watch` channel against that URL (it logs the channel id and expiry; renew happens on the next restart — channels expire, up to ~7 days).
+
+### Demo walkthrough
+
+1. Sign in, open any page, click the Help icon (or the footer link).
+2. Enter a summary, pick a priority, submit. The dialog fills **Reported by** (user + role), **Position** (position title when invoked from a `/positions/{id}...` page, otherwise empty), **Link** (current page URL), **Priority**, **Summary**, and **Admins** from `Support:AdminEmails`.
+3. A `ticket-*.json` appears in the Drive folder within a second.
+4. Drive notifies `POST /api/v1/integrations/drive/webhook`; the app validates `X-Goog-Channel-Token`, then processes pending files.
+5. Each admin receives a formatted HTML email (subject `[Support] [{Priority}] {Summary}`); the processed file moves to the `Processed` folder so nothing is emailed twice.
+
 ## Configuration
 
 Required configuration:
@@ -198,6 +252,7 @@ Optional integrations are enabled only when fully configured:
 - Backblaze B2 private image storage: `B2:Region`, `B2:BucketName`, `B2:ApplicationKeyId`, `B2:ApplicationKey`, `B2:KeyPrefix`, `B2:PresignedUrlLifetimeSeconds`, `B2:DownloadUrlLifetimeSeconds`, and `B2:MaxUploadBytes`
 - Gmail confirmation email: `Gmail:Address`, `Gmail:AppPassword`, `Gmail:FromName`, and `Gmail:RequireConfirmedAccount`
 - Salesforce CRM sync: `Salesforce:InstanceUrl`, `Salesforce:ClientId`, `Salesforce:ClientSecret`, and optional `Salesforce:ApiVersion` (default `v61.0`)
+- Google Drive ticket upload + Gmail notifications: `Google:ClientId`, `Google:ClientSecret`, `Google:RefreshToken`, `Google:DriveFolderId`, `Google:DriveProcessedFolderId`, `Google:WebhookUrl` (https, public), `Google:WebhookToken`, and `Support:AdminEmails`
 
 Use user secrets locally and an approved production secret-management solution in deployment. Seed passwords are not reset when the configuration changes.
 

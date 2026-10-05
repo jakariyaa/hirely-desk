@@ -19,6 +19,7 @@
 @inject Blazored.LocalStorage.ILocalStorageService Storage
 @inject IJSRuntime JS
 @inject NavigationManager Navigation
+@inject IDialogService DialogService
 @inject IStringLocalizer<SharedResource> L
 
 <MudThemeProvider Theme="@CvPlatformTheme.Instance" @bind-IsDarkMode="_darkMode" />
@@ -42,6 +43,8 @@
         </AuthorizeView>
         <MudIconButton Icon="@(_darkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
                        Color="Color.Inherit" OnClick="ToggleTheme" title="@L["Theme"]" />
+        <MudIconButton Icon="@Icons.Material.Filled.HelpOutline" Color="Color.Inherit"
+                       OnClick="OpenTicketDialogAsync" aria-label="@L["Help"]" title="@L["Help"]" />
         <MudMenu Icon="@Icons.Material.Filled.Translate" Color="Color.Inherit" AriaLabel="@L["Language"]"
                  Class="cv-menu-actions">
             <MudMenuItem OnClick="@(() => SetLanguageAsync("en"))">English</MudMenuItem>
@@ -93,6 +96,9 @@
     <MudMainContent Class="cv-main">
         <MudContainer MaxWidth="MaxWidth.Large" Class="cv-page-container">
             @Body
+            <footer class="cv-footer mt-8 pt-4 pb-6" style="text-align:center">
+                <MudButton Variant="Variant.Text" Size="Size.Small" Color="Color.Inherit" OnClick="OpenTicketDialogAsync">@L["CreateSupportTicket"]</MudButton>
+            </footer>
         </MudContainer>
     </MudMainContent>
 </MudLayout>
@@ -112,6 +118,9 @@
     private Guid? _profileImageValueId;
 
     private void ToggleDrawer() => _drawerOpen = !_drawerOpen;
+
+    private Task OpenTicketDialogAsync() =>
+        DialogService.ShowAsync<SupportTicketDialog>(L["TicketDialogTitle"].Value);
 
     protected override void OnInitialized() => ProfileHeader.Changed += RefreshHeaderAsync;
 

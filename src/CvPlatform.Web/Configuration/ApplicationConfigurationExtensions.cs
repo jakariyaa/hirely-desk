@@ -1,6 +1,7 @@
 using CvPlatform.Infrastructure.Crm;
 using CvPlatform.Infrastructure.Email;
 using CvPlatform.Infrastructure.Storage;
+using CvPlatform.Infrastructure.Support;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -51,6 +52,14 @@ public static class ApplicationConfigurationExtensions
             configuration,
             SalesforceOptions.SectionName,
             new SalesforceOptionsValidator());
+        services.AddValidatedOptions<GoogleOptions>(
+            configuration,
+            GoogleOptions.SectionName,
+            new GoogleOptionsValidator());
+        services.AddValidatedOptions<SupportOptions>(
+            configuration,
+            SupportOptions.SectionName,
+            new SupportOptionsValidator());
 
         return applicationConfiguration;
     }

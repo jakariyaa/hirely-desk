@@ -1,0 +1,127 @@
+@inject AuthenticationStateProvider AuthProvider
+@inject UserManager<ApplicationUser> Users
+@inject NavigationManager Navigation
+@inject IPositionService PositionService
+@inject CvPlatform.Core.Support.ISupportTicketUploader TicketUploader
+@inject IOptions<CvPlatform.Infrastructure.Support.SupportOptions> SupportOptions
+@inject ISnackbar Snackbar
+@inject IStringLocalizer<SharedResource> L
+@using CvPlatform.Application.Authorization
+@using CvPlatform.Application.Positions
+@using CvPlatform.Infrastructure.Support
+@using CvPlatform.Web.Auth
+@using CvPlatform.Web.Resources
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.Extensions.Localization
+@using Microsoft.Extensions.Options
+
+<MudForm @ref="_form">
+    <MudDialog>
+        <DialogContent>
+            <MudTextField T="string" @bind-Value="_summary" Label="@L["TicketSummary"]"
+                          Variant="Variant.Outlined" Lines="4"
+                          Validation="@(new Func<string, IEnumerable<string>>(ValidateSummary))" />
+            <MudSelect T="string" @bind-Value="_priority" Label="@L["TicketPriority"]"
+                       Variant="Variant.Outlined" Class="mt-3">
+                <MudSelectItem Value="@("High")">High</MudSelectItem>
+                <MudSelectItem Value="@("Average")">Average</MudSelectItem>
+                <MudSelectItem Value="@("Low")">Low</MudSelectItem>
+            </MudSelect>
+            @if (_position is not null)
+            {
+                <MudText Typo="Typo.caption" Class="mt-2">@L["TicketPosition"]: @_position</MudText>
+            }
+        </DialogContent>
+        <DialogActions>
+            <MudButton Variant="Variant.Text" OnClick="@(() => MudDialog.Cancel())">@L["Cancel"]</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitAsync"
+                       Disabled="@_sending">@L["TicketSend"]</MudButton>
+        </DialogActions>
+    </MudDialog>
+</MudForm>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    private MudForm? _form;
+    private string _summary = "";
+    private string _priority = "Average";
+    private string? _position;
+    private bool _sending;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _position = await TryResolvePositionAsync();
+    }
+
+    private IEnumerable<string> ValidateSummary(string summary)
+    {
+        if (string.IsNullOrWhiteSpace(summary))
+            yield return L["TicketSummaryRequired"];
+        else if (summary.Length > 2000)
+            yield return L["TicketSummaryTooLong"];
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (_form is null)
+            return;
+        await _form.ValidateAsync();
+        if (!_form.IsValid)
+            return;
+
+        _sending = true;
+        try
+        {
+            var authState = await AuthProvider.GetAuthenticationStateAsync();
+            var user = await Users.GetUserAsync(authState.User);
+            var role = authState.User.IsInRole(Roles.Admin) ? Roles.Admin
+                : authState.User.IsInRole(Roles.Recruiter) ? Roles.Recruiter
+                : authState.User.IsInRole(Roles.Candidate) ? Roles.Candidate : "User";
+            var reportedBy = $"{user?.Email ?? authState.User.Identity?.Name} ({role})";
+            var admins = SupportOptions.Value.AdminEmailList;
+            var ticket = new CvPlatform.Core.Support.SupportTicket(
+                reportedBy, _position, Navigation.Uri, _priority, _summary, admins);
+
+            if (await TicketUploader.UploadAsync(ticket))
+            {
+                Snackbar.Add(L["TicketSent"], Severity.Success);
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                Snackbar.Add(L["TicketUploadFailed"], Severity.Error);
+            }
+        }
+        finally
+        {
+            _sending = false;
+        }
+    }
+
+    private async Task<string?> TryResolvePositionAsync()
+    {
+        try
+        {
+            var path = new Uri(Navigation.Uri).AbsolutePath;
+            var segments = path.Trim('/').Split('/', StringSplitOptions.RemoveEmptyEntries);
+            if (segments.Length >= 2 &&
+                string.Equals(segments[0], "positions", StringComparison.OrdinalIgnoreCase) &&
+                Guid.TryParse(segments[1], out var positionId))
+            {
+                var authState = await AuthProvider.GetAuthenticationStateAsync();
+                var actor = ActorContexts.TryFromUser(authState.User);
+                if (actor is not null)
+                {
+                    var result = await PositionService.GetAsync(actor, positionId);
+                    if (result.Succeeded)
+                        return result.Value?.Title;
+                }
+            }
+        }
+        catch
+        {
+        }
+        return null;
+    }
+}

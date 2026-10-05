@@ -1,0 +1,47 @@
+using System.Text;
+using System.Text.Json;
+using CvPlatform.Core.Support;
+using Google.Apis.Drive.v3;
+using Google.Apis.Services;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+
+namespace CvPlatform.Infrastructure.Support;
+
+public sealed class GoogleDriveSupportTicketUploader(
+    IOptions<GoogleOptions> options,
+    GoogleCredentialFactory credentials,
+    ILogger<GoogleDriveSupportTicketUploader> logger) : ISupportTicketUploader
+{
+    public bool IsConfigured => _options.IsConfigured;
+    private readonly GoogleOptions _options = options.Value;
+
+    public async Task<bool> UploadAsync(SupportTicket ticket, CancellationToken ct = default)
+    {
+        if (!IsConfigured)
+        {
+            logger.LogInformation("Google Drive is not configured; support ticket not uploaded");
+            return false;
+        }
+
+        var json = JsonSerializer.Serialize(ticket, new JsonSerializerOptions { WriteIndented = true });
+
+        var service = new DriveService(new BaseClientService.Initializer
+        {
+            HttpClientInitializer = credentials.Create(),
+            ApplicationName = _options.ApplicationName,
+        });
+        var metadata = new Google.Apis.Drive.v3.Data.File
+        {
+            Name = $"ticket-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}.json",
+            Parents = [_options.DriveFolderId],
+            MimeType = "application/json",
+        };
+        using var stream = new MemoryStream(Encoding.UTF8.GetBytes(json));
+        var request = service.Files.Create(metadata, stream, "application/json");
+        request.Fields = "id";
+        await request.UploadAsync(ct);
+        logger.LogInformation("Support ticket uploaded to Drive as {File}", metadata.Name);
+        return request.ResponseBody is not null;
+    }
+}

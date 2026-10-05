@@ -802,4 +802,15 @@
   <data name="ApiTokenRevokeConfirm" xml:space="preserve"><value>Unieważnić ten token API? Systemy zewnętrzne korzystające z niego natychmiast stracą dostęp.</value></data>
   <data name="ApiTokenDone" xml:space="preserve"><value>Gotowe</value></data>
   <data name="Close" xml:space="preserve"><value>Zamknij</value></data>
+  <data name="TicketSummary" xml:space="preserve"><value>Opis</value></data>
+  <data name="TicketSummaryRequired" xml:space="preserve"><value>Opis jest wymagany.</value></data>
+  <data name="TicketSummaryTooLong" xml:space="preserve"><value>Opis może mieć maksymalnie 2000 znaków.</value></data>
+  <data name="TicketPriority" xml:space="preserve"><value>Priorytet</value></data>
+  <data name="TicketPosition" xml:space="preserve"><value>Stanowisko</value></data>
+  <data name="TicketSend" xml:space="preserve"><value>Wyślij</value></data>
+  <data name="TicketSent" xml:space="preserve"><value>Zgłoszenie wysłane.</value></data>
+  <data name="TicketUploadFailed" xml:space="preserve"><value>Nie udało się wysłać zgłoszenia. Spróbuj ponownie później.</value></data>
+  <data name="TicketDialogTitle" xml:space="preserve"><value>Utwórz zgłoszenie</value></data>
+  <data name="CreateSupportTicket" xml:space="preserve"><value>Utwórz zgłoszenie</value></data>
+  <data name="Help" xml:space="preserve"><value>Pomoc</value></data>
 </root>

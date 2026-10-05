@@ -2,6 +2,7 @@ using System.Net.Mail;
 using CvPlatform.Infrastructure.Crm;
 using CvPlatform.Infrastructure.Email;
 using CvPlatform.Infrastructure.Storage;
+using CvPlatform.Infrastructure.Support;
 using Microsoft.Extensions.Options;
 
 namespace CvPlatform.Web.Configuration;
@@ -20,7 +21,56 @@ internal static class ApplicationConfigurationValidator
             .. ValidateB2(configuration.B2),
             .. ValidateGmail(configuration.Gmail),
             .. ValidateSalesforce(configuration.Salesforce),
+            .. ValidateGoogleIntegration(configuration.Google),
+            .. ValidateSupport(configuration.Support),
         ];
+    }
+
+    public static IReadOnlyList<string> ValidateGoogleIntegration(GoogleOptions options)
+    {
+        var anySet = !string.IsNullOrWhiteSpace(options.ClientId) ||
+            !string.IsNullOrWhiteSpace(options.ClientSecret) ||
+            !string.IsNullOrWhiteSpace(options.RefreshToken) ||
+            !string.IsNullOrWhiteSpace(options.DriveFolderId);
+        if (!anySet)
+            return [];
+
+        var failures = new List<string>();
+        if (string.IsNullOrWhiteSpace(options.ClientId))
+            failures.Add("Google:ClientId is required when Google is configured.");
+        if (string.IsNullOrWhiteSpace(options.ClientSecret))
+            failures.Add("Google:ClientSecret is required when Google is configured.");
+        if (string.IsNullOrWhiteSpace(options.RefreshToken))
+            failures.Add("Google:RefreshToken is required when Google is configured.");
+        if (string.IsNullOrWhiteSpace(options.DriveFolderId))
+            failures.Add("Google:DriveFolderId is required when Google is configured.");
+        if (!string.IsNullOrWhiteSpace(options.WebhookUrl) &&
+            (!Uri.TryCreate(options.WebhookUrl, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps))
+            failures.Add("Google:WebhookUrl must be an absolute https URL.");
+        if (!string.IsNullOrWhiteSpace(options.WebhookUrl) && string.IsNullOrWhiteSpace(options.WebhookToken))
+            failures.Add("Google:WebhookToken is required when Google:WebhookUrl is set.");
+        if (!string.IsNullOrWhiteSpace(options.WebhookUrl) && string.IsNullOrWhiteSpace(options.DriveProcessedFolderId))
+            failures.Add("Google:DriveProcessedFolderId is required when Google:WebhookUrl is set.");
+        return failures;
+    }
+
+    public static IReadOnlyList<string> ValidateSupport(SupportOptions options)
+    {
+        if (string.IsNullOrWhiteSpace(options.AdminEmails))
+            return [];
+        var failures = new List<string>();
+        foreach (var email in options.AdminEmails.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+        {
+            try
+            {
+                _ = new MailAddress(email);
+            }
+            catch (FormatException)
+            {
+                failures.Add($"Support:AdminEmails contains an invalid address '{email}'.");
+            }
+        }
+        return failures;
     }
 
     public static IReadOnlyList<string> ValidateSalesforce(SalesforceOptions options)
@@ -214,6 +264,18 @@ internal sealed class SalesforceOptionsValidator : IValidateOptions<SalesforceOp
 {
     public ValidateOptionsResult Validate(string? name, SalesforceOptions options) =>
         ValidateOptionsResultFactory.Create(ApplicationConfigurationValidator.ValidateSalesforce(options));
+}
+
+internal sealed class GoogleOptionsValidator : IValidateOptions<GoogleOptions>
+{
+    public ValidateOptionsResult Validate(string? name, GoogleOptions options) =>
+        ValidateOptionsResultFactory.Create(ApplicationConfigurationValidator.ValidateGoogleIntegration(options));
+}
+
+internal sealed class SupportOptionsValidator : IValidateOptions<SupportOptions>
+{
+    public ValidateOptionsResult Validate(string? name, SupportOptions options) =>
+        ValidateOptionsResultFactory.Create(ApplicationConfigurationValidator.ValidateSupport(options));
 }
 
 internal static class ValidateOptionsResultFactory
