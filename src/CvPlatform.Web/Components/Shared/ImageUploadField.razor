@@ -175,7 +175,7 @@
         }
     }
 
-    [JSInvokable]
+    [JSInvokable("reportProgressAsync")]
     public Task ReportProgressAsync(int percent)
     {
         _progress = Math.Clamp(percent, 0, 100);
@@ -183,7 +183,7 @@
         return InvokeAsync(StateHasChanged);
     }
 
-    [JSInvokable]
+    [JSInvokable("reportSucceededAsync")]
     public async Task ReportSucceededAsync(string objectKey, string previewUrl)
     {
         _pendingPreviewUrl = previewUrl.Length == 0 ? null : previewUrl;
@@ -202,7 +202,7 @@
         });
     }
 
-    [JSInvokable]
+    [JSInvokable("reportFailedAsync")]
     public Task ReportFailedAsync(string code)
     {
         _busy = false;
@@ -211,7 +211,7 @@
         return InvokeAsync(StateHasChanged);
     }
 
-    [JSInvokable]
+    [JSInvokable("reportDragStateAsync")]
     public Task ReportDragStateAsync(bool dragging)
     {
         _dragging = dragging;

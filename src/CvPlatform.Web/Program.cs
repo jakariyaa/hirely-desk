@@ -49,6 +49,7 @@ builder.Services.AddTransient<CvPlatform.Core.Support.ISupportTicketUploader,
     CvPlatform.Infrastructure.Support.GoogleDriveSupportTicketUploader>();
 builder.Services.AddTransient<CvPlatform.Infrastructure.Support.SupportTicketProcessor>();
 builder.Services.AddSingleton<CvPlatform.Infrastructure.Support.DriveWatchRegistration>();
+builder.Services.AddHostedService<CvPlatform.Web.SupportTicketSweepService>();
 builder.Services.AddAntiforgery(options => options.HeaderName = "X-XSRF-TOKEN");
 builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = context =>
 {
