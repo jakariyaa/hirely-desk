@@ -394,7 +394,7 @@ else
         PeriodEnd = value.PeriodEnd,
         Boolean = value.BooleanValue,
         Dropdown = value.DropdownOption,
-        ImageValueId = value.ValueId,
+        ImageValueId = string.IsNullOrWhiteSpace(value.ImageObjectKey) ? null : value.ValueId,
         ImageObjectKey = value.ImageObjectKey,
         Version = value.Version,
     };

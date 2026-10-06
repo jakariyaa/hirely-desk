@@ -210,7 +210,7 @@ else if (_detail is not null)
         PeriodEnd = row.PeriodEnd,
         Boolean = row.BooleanValue,
         Dropdown = row.DropdownOption,
-        ImageValueId = row.ValueId,
+        ImageValueId = string.IsNullOrWhiteSpace(row.ImageObjectKey) ? null : row.ValueId,
         ImageObjectKey = row.ImageObjectKey,
         Version = row.ValueVersion,
     };
@@ -262,7 +262,7 @@ else if (_detail is not null)
                         PeriodEnd = updated.PeriodEnd,
                         Boolean = updated.BooleanValue,
                         Dropdown = updated.DropdownOption,
-                         ImageValueId = updated.ValueId,
+                         ImageValueId = string.IsNullOrWhiteSpace(updated.ImageObjectKey) ? null : updated.ValueId,
                          ImageObjectKey = updated.ImageObjectKey,
                         Version = updated.Version,
                     };

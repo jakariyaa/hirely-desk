@@ -131,7 +131,8 @@
 
     private bool StorageReady => Images.IsConfigured;
 
-    private bool HasImage => _pendingPreviewUrl is not null || Value.ImageValueId is not null;
+    private bool HasImage => _pendingPreviewUrl is not null ||
+        (Value.ImageValueId is not null && !string.IsNullOrWhiteSpace(Value.ImageObjectKey));
 
     private string PreviewUrl => _pendingPreviewUrl ?? ImageContentUrl(Value.ImageValueId!.Value);
 

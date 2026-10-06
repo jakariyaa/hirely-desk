@@ -58,7 +58,7 @@ public class ImageUploadFieldTests : BunitContext, IAsyncLifetime
         var valueId = Guid.NewGuid();
 
         var cut = Render<ImageUploadField>(parameters => parameters
-            .Add(p => p.Value, new AttributeValueDraft { ImageValueId = valueId }));
+            .Add(p => p.Value, new AttributeValueDraft { ImageValueId = valueId, ImageObjectKey = "users/00000000-0000-0000-0000-000000000000/profile/abc.jpg" }));
 
         cut.Find(".cv-image-preview").Should().NotBeNull();
         cut.Find("img").GetAttribute("src").Should().Be($"/api/profile-images/{valueId:D}/content");

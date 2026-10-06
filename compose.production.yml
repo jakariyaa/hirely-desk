@@ -47,6 +47,14 @@ services:
       Salesforce__ClientId: ${SALESFORCE_CLIENT_ID:-}
       Salesforce__ClientSecret: ${SALESFORCE_CLIENT_SECRET:-}
       Salesforce__ApiVersion: ${SALESFORCE_API_VERSION:-v61.0}
+      Google__ClientId: ${SUPPORT_GOOGLE_CLIENT_ID:-}
+      Google__ClientSecret: ${SUPPORT_GOOGLE_CLIENT_SECRET:-}
+      Google__RefreshToken: ${SUPPORT_GOOGLE_REFRESH_TOKEN:-}
+      Google__DriveFolderId: ${SUPPORT_GOOGLE_DRIVE_FOLDER_ID:-}
+      Google__DriveProcessedFolderId: ${SUPPORT_GOOGLE_DRIVE_PROCESSED_FOLDER_ID:-}
+      Google__WebhookUrl: ${SUPPORT_GOOGLE_WEBHOOK_URL:-}
+      Google__WebhookToken: ${SUPPORT_GOOGLE_WEBHOOK_TOKEN:-}
+      Support__AdminEmails: ${SUPPORT_ADMIN_EMAILS:-}
     ports:
       - "127.0.0.1:5192:8080"
     depends_on:

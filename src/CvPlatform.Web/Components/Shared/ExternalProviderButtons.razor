@@ -8,6 +8,7 @@
         @foreach (var provider in Providers)
         {
             <MudButton Href="@BuildUrl(provider)" Variant="@Variant" Color="@Color" Class="cv-oauth-btn"
+                       data-enhance-nav="false"
                        StartIcon="@ExternalProviderBranding.IconFor(provider.Name)"
                        aria-label="@Label(provider)">
                 @Label(provider)

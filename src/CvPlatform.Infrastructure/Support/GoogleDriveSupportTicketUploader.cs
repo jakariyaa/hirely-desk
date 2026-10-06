@@ -19,7 +19,7 @@ public sealed class GoogleDriveSupportTicketUploader(
     {
         if (!IsConfigured)
         {
-            logger.LogInformation("Google Drive is not configured; support ticket not uploaded");
+            logger.LogDebug("Google Drive is not configured; support ticket not uploaded");
             return false;
         }
 
