@@ -26,7 +26,4 @@ public static class ErrorCodes
         ServiceUnavailable,
         Unexpected
     ];
-
-    public static bool IsKnown(string? code) =>
-        code is not null && All.Contains(code, StringComparer.Ordinal);
 }

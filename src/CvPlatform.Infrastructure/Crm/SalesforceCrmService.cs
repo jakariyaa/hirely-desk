@@ -118,16 +118,3 @@ public sealed class SalesforceCrmService(
         }
     }
 }
-
-public sealed class NoOpCrmService(ILogger<NoOpCrmService> logger) : ICrmService
-{
-    public bool IsConfigured => false;
-
-    public Task<CrmSyncRecord?> CreateAccountWithContactAsync(
-        CrmAccountRequest request,
-        CancellationToken cancellationToken = default)
-    {
-        logger.LogInformation("Salesforce is not configured; skipping CRM sync.");
-        return Task.FromResult<CrmSyncRecord?>(null);
-    }
-}

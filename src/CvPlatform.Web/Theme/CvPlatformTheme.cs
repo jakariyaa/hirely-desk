@@ -13,7 +13,6 @@ public static class CvPlatformTheme
     public const string PrimaryHex = "#1565C0";   // Blue 800
     public const string PrimaryDarkHex = "#0D47A1"; // Blue 900
     public const string SecondaryHex = "#00838F"; // Cyan 800
-    public const string AccentHex = "#F9A825";    // Yellow 800
 
     public static MudTheme Instance { get; } = Create();
 

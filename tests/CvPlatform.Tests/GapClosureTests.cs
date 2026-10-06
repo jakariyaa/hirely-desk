@@ -56,13 +56,13 @@ public class GapClosureTests
         var cvId = await CreatePublishedCvAsync(factory, candidateId, positionId);
 
         var cvs = new CvService(factory, new PositionAccessService(factory, new AccessRuleEngine()));
-        var candidateBoard = await cvs.ListByPositionAsync(new ActorContext(candidateId, false), positionId);
+        var candidateBoard = await cvs.ListByPositionPagedAsync(new ActorContext(candidateId, false), positionId, null);
         candidateBoard.Succeeded.Should().BeFalse();
         candidateBoard.Error.Code.Should().Be(ErrorCodes.Forbidden);
 
-        var ownerBoard = await cvs.ListByPositionAsync(new ActorContext(ownerId, false, true), positionId);
+        var ownerBoard = await cvs.ListByPositionPagedAsync(new ActorContext(ownerId, false, true), positionId, null);
         ownerBoard.Succeeded.Should().BeTrue();
-        ownerBoard.Value!.Select(c => c.Id).Should().Contain(cvId);
+        ownerBoard.Value!.Items.Select(c => c.Id).Should().Contain(cvId);
     }
 
     [Fact]

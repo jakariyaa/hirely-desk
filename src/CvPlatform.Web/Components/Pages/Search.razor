@@ -158,6 +158,6 @@
     private async Task<ActorContext> GetActorAsync()
     {
         var authState = await AuthProvider.GetAuthenticationStateAsync();
-        return new ActorContext(Guid.Parse(authState.User.FindFirstValue(ClaimTypes.NameIdentifier)!), authState.User.IsInRole(Roles.Admin), authState.User.IsInRole(Roles.Recruiter) || authState.User.IsInRole(Roles.Admin));
+        return ActorContexts.FromUser(authState.User);
     }
 }

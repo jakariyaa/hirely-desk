@@ -2,7 +2,6 @@ using System.Text;
 using System.Text.Json;
 using CvPlatform.Core.Support;
 using Google.Apis.Drive.v3;
-using Google.Apis.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -26,11 +25,7 @@ public sealed class GoogleDriveSupportTicketUploader(
 
         var json = JsonSerializer.Serialize(ticket, new JsonSerializerOptions { WriteIndented = true });
 
-        var service = new DriveService(new BaseClientService.Initializer
-        {
-            HttpClientInitializer = credentials.Create(),
-            ApplicationName = _options.ApplicationName,
-        });
+        var service = credentials.CreateDriveService();
         var metadata = new Google.Apis.Drive.v3.Data.File
         {
             Name = $"ticket-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}.json",

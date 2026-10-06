@@ -30,5 +30,4 @@ public interface IAppDbContext : IDisposable, IAsyncDisposable
     DbSet<CvLike> CvLikes { get; }
 
     Task<int> SaveChangesAsync(CancellationToken ct = default);
-    Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken ct = default);
 }

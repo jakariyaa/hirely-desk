@@ -446,14 +446,12 @@ else
         if (_savingRule || _detail is null)
             return;
 
-        var parameters = new DialogParameters<ConfirmDialog>
-        {
-            { dialog => dialog.ContentText, L["RemoveRuleConfirm"].Value },
-            { dialog => dialog.YesText, L["Remove"].Value },
-            { dialog => dialog.NoText, L["Cancel"].Value },
-        };
-        var dialog = await DialogService.ShowAsync<ConfirmDialog>(title: L["RemoveRule"], parameters: parameters);
-        if (await dialog.Result is { Canceled: true } or { Data: not true })
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            L["RemoveRule"].Value,
+            L["RemoveRuleConfirm"].Value,
+            yesText: L["Remove"].Value,
+            cancelText: L["Cancel"].Value);
+        if (confirmed != true)
             return;
 
         _savingRule = true;
@@ -522,7 +520,7 @@ else
     private async Task<ActorContext> GetActorAsync()
     {
         var authState = await AuthProvider.GetAuthenticationStateAsync();
-        return new ActorContext(Guid.Parse(authState.User.FindFirstValue(ClaimTypes.NameIdentifier)!), authState.User.IsInRole(Roles.Admin), authState.User.IsInRole(Roles.Recruiter) || authState.User.IsInRole(Roles.Admin));
+        return ActorContexts.FromUser(authState.User);
     }
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
@@ -619,14 +617,12 @@ else
         var confirmText = ruleCount > 0
             ? $"{string.Format(L["AttributeUsedByRules"].Value, ruleCount)} {L["RemoveAttributeConfirm"].Value}"
             : L["RemoveAttributeConfirm"].Value;
-        var parameters = new DialogParameters<ConfirmDialog>
-        {
-            { dialog => dialog.ContentText, confirmText },
-            { dialog => dialog.YesText, L["Remove"].Value },
-            { dialog => dialog.NoText, L["Cancel"].Value },
-        };
-        var dialog = await DialogService.ShowAsync<ConfirmDialog>(title: L["RemoveAttribute"], parameters: parameters);
-        if (await dialog.Result is { Canceled: true } or { Data: not true })
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            L["RemoveAttribute"].Value,
+            confirmText,
+            yesText: L["Remove"].Value,
+            cancelText: L["Cancel"].Value);
+        if (confirmed != true)
             return;
 
         _savingAttr = true;

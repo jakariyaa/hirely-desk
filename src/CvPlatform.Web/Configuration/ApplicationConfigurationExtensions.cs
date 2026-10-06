@@ -20,26 +20,6 @@ public static class ApplicationConfigurationExtensions
             throw new InvalidOperationException(
                 $"Invalid application configuration:{Environment.NewLine}- {string.Join(Environment.NewLine + "- ", failures)}");
 
-        services.AddValidatedOptions<ConnectionStringsOptions>(
-            configuration,
-            ConnectionStringsOptions.SectionName,
-            new ConnectionStringsOptionsValidator());
-        services.AddValidatedOptions<DatabaseOptions>(
-            configuration,
-            DatabaseOptions.SectionName,
-            new DatabaseOptionsValidator());
-        services.AddValidatedOptions<GoogleAuthenticationOptions>(
-            configuration,
-            GoogleAuthenticationOptions.SectionName,
-            new GoogleAuthenticationOptionsValidator());
-        services.AddValidatedOptions<FacebookAuthenticationOptions>(
-            configuration,
-            FacebookAuthenticationOptions.SectionName,
-            new FacebookAuthenticationOptionsValidator());
-        services.AddValidatedOptions<SeedOptions>(
-            configuration,
-            SeedOptions.SectionName,
-            new SeedOptionsValidator());
         services.AddValidatedOptions<B2Options>(
             configuration,
             B2Options.SectionName,

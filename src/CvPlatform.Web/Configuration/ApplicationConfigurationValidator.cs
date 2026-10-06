@@ -218,36 +218,6 @@ internal static class ApplicationConfigurationValidator
     }
 }
 
-internal sealed class ConnectionStringsOptionsValidator : IValidateOptions<ConnectionStringsOptions>
-{
-    public ValidateOptionsResult Validate(string? name, ConnectionStringsOptions options) =>
-        ValidateOptionsResultFactory.Create(ApplicationConfigurationValidator.ValidateConnectionStrings(options));
-}
-
-internal sealed class DatabaseOptionsValidator : IValidateOptions<DatabaseOptions>
-{
-    public ValidateOptionsResult Validate(string? name, DatabaseOptions options) =>
-        ValidateOptionsResultFactory.Create(ApplicationConfigurationValidator.ValidateDatabase(options));
-}
-
-internal sealed class GoogleAuthenticationOptionsValidator : IValidateOptions<GoogleAuthenticationOptions>
-{
-    public ValidateOptionsResult Validate(string? name, GoogleAuthenticationOptions options) =>
-        ValidateOptionsResultFactory.Create(ApplicationConfigurationValidator.ValidateGoogle(options));
-}
-
-internal sealed class FacebookAuthenticationOptionsValidator : IValidateOptions<FacebookAuthenticationOptions>
-{
-    public ValidateOptionsResult Validate(string? name, FacebookAuthenticationOptions options) =>
-        ValidateOptionsResultFactory.Create(ApplicationConfigurationValidator.ValidateFacebook(options));
-}
-
-internal sealed class SeedOptionsValidator : IValidateOptions<SeedOptions>
-{
-    public ValidateOptionsResult Validate(string? name, SeedOptions options) =>
-        ValidateOptionsResultFactory.Create(ApplicationConfigurationValidator.ValidateSeed(options));
-}
-
 internal sealed class B2OptionsValidator : IValidateOptions<B2Options>
 {
     public ValidateOptionsResult Validate(string? name, B2Options options) =>

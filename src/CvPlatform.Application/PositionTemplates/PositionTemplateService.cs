@@ -188,10 +188,6 @@ public sealed class PositionTemplateService(IAppDbContextFactory factory) : IPos
         return Result<PositionTemplateDto>.Success(ToDto(template));
     }
 
-    public async Task<Result> DeleteAsync(
-        ActorContext actor, Guid templateId, long expectedVersion, CancellationToken ct = default)
-        => await DeleteManyAsync(actor, [new PositionTemplateDeleteInput(templateId, expectedVersion)], ct);
-
     public async Task<Result> DeleteManyAsync(
         ActorContext actor, IReadOnlyList<PositionTemplateDeleteInput> templates, CancellationToken ct = default)
     {

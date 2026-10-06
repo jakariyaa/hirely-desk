@@ -307,21 +307,9 @@ public sealed class AttributeDefinitionService(
         return oldChoices.Where(c => !newChoices.Contains(c, StringComparer.Ordinal)).ToList();
     }
 
-    private static IReadOnlyList<string> ParseChoices(Core.Enums.AttributeDataType dataType, string? optionsJson)
-    {
-        if (dataType != Core.Enums.AttributeDataType.Dropdown || string.IsNullOrWhiteSpace(optionsJson))
-            return [];
-        try
-        {
-            var shape = System.Text.Json.JsonSerializer.Deserialize<DropdownShape>(
-                optionsJson, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-            return shape?.Choices?.Select(c => c.Trim()).Where(c => c.Length > 0).Distinct(StringComparer.Ordinal).ToList() ?? [];
-        }
-        catch (System.Text.Json.JsonException)
-        {
-            return [];
-        }
-    }
-
-    private sealed record DropdownShape(string[]? Choices);
+    private static IReadOnlyList<string> ParseChoices(Core.Enums.AttributeDataType dataType, string? optionsJson) =>
+        dataType == Core.Enums.AttributeDataType.Dropdown
+            ? AttributeValueRules.Choices(optionsJson)
+                .Select(c => c.Trim()).Where(c => c.Length > 0).Distinct(StringComparer.Ordinal).ToList()
+            : [];
 }

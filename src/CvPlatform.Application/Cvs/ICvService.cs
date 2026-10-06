@@ -18,10 +18,6 @@ public interface ICvService
         ActorContext actor, PageRequest page, CancellationToken ct = default);
 
     /// <summary>All CVs submitted to a position (recruiter/admin browse, access-filtered).</summary>
-    Task<Result<IReadOnlyList<CvDto>>> ListByPositionAsync(
-        ActorContext actor, Guid positionId, CancellationToken ct = default);
-
-    /// <summary>Paged variant used by server-side grids; filters then pages in memory over the position scope.</summary>
     Task<Result<PagedResult<CvDto>>> ListByPositionPagedAsync(
         ActorContext actor, Guid positionId, PageRequest? page, CancellationToken ct = default);
 

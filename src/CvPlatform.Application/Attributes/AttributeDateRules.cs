@@ -18,8 +18,6 @@ public static class AttributeDateRules
     public sealed record DateRange(DateOnly? Min, DateOnly? Max)
     {
         public static DateRange Unbounded { get; } = new(null, null);
-
-        public bool HasBounds => Min is not null || Max is not null;
     }
 
     /// <summary>The current calendar day for the supplied clock, defaulting to the system clock.</summary>

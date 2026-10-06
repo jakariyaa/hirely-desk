@@ -1,3 +1,4 @@
+using System.Buffers.Text;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -14,14 +15,11 @@ public static class PositionApiTokenSecret
     private const int SecretBytes = 32;
 
     public static string Create() =>
-        Prefix + Base64Url(RandomNumberGenerator.GetBytes(SecretBytes));
+        Prefix + Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(SecretBytes));
 
     public static bool HasTokenPrefix(string token) =>
         token.StartsWith(Prefix, StringComparison.Ordinal);
 
     public static string Hash(string token) =>
         Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
-
-    private static string Base64Url(byte[] bytes) =>
-        Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
 }

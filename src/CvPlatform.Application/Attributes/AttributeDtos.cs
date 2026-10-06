@@ -85,14 +85,6 @@ public sealed record AttributeDeleteImpactDto(
     int Cvs,
     int RestrictedPositionsLosingGating)
 {
-    public static AttributeDeleteImpactDto operator +(AttributeDeleteImpactDto left, AttributeDeleteImpactDto right) =>
-        new(
-            left.ProfileValues + right.ProfileValues,
-            left.Positions + right.Positions,
-            left.AccessRules + right.AccessRules,
-            left.Cvs + right.Cvs,
-            left.RestrictedPositionsLosingGating + right.RestrictedPositionsLosingGating);
-
     public static AttributeDeleteImpactDto Zero { get; } =
         new(0, 0, 0, 0, 0);
 }

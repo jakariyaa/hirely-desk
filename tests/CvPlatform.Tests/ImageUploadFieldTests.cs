@@ -287,9 +287,9 @@ public class ImageUploadFieldTests : BunitContext, IAsyncLifetime
         public bool IsOwnedObjectKey(string objectKey, Guid userId) => false;
     }
 
-    private sealed class UploadLocalizer : IStringLocalizer<SharedResource>
+    private sealed class UploadLocalizer : StubStringLocalizer
     {
-        private static readonly IReadOnlyDictionary<string, string> Values =
+        protected override IReadOnlyDictionary<string, string> Catalog { get; } =
             new Dictionary<string, string>
             {
                 ["ImageAlt"] = "Profile image",
@@ -307,14 +307,5 @@ public class ImageUploadFieldTests : BunitContext, IAsyncLifetime
                     "The connection was lost. Check your network and try again.",
                 ["Cancel"] = "Cancel",
             };
-
-        public LocalizedString this[string name] =>
-            new(name, Values.TryGetValue(name, out var value) ? value : name);
-
-        public LocalizedString this[string name, params object[] arguments] =>
-            new(name, string.Format(CultureInfo.InvariantCulture, this[name].Value, arguments));
-
-        public IEnumerable<LocalizedString> GetAllStrings(bool includeParentCultures) =>
-            Values.Select(pair => new LocalizedString(pair.Key, pair.Value));
     }
 }

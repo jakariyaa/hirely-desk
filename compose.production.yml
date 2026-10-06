@@ -22,13 +22,11 @@ services:
     restart: unless-stopped
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      ASPNETCORE_HTTP_PORTS: 8080
       ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
       AllowedHosts: ${ALLOWED_HOST:?ALLOWED_HOST must be set}
       ConnectionStrings__Default: "Host=db;Port=5432;Database=hirelydesk;Username=hirelydesk;Password=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}"
       Seed__AdminPassword: ${ADMIN_PASSWORD:?ADMIN_PASSWORD must be set}
       Seed__DemoPassword: ${DEMO_PASSWORD:?DEMO_PASSWORD must be set}
-      Database__SkipMigrate: "false"
       Authentication__Google__ClientId: ${GOOGLE_CLIENT_ID:-}
       Authentication__Google__ClientSecret: ${GOOGLE_CLIENT_SECRET:-}
       Authentication__Facebook__AppId: ${FACEBOOK_APP_ID:-}

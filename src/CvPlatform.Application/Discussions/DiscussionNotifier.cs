@@ -7,7 +7,13 @@ public sealed class DiscussionNotifier(ILogger<DiscussionNotifier>? logger = nul
 {
     public event Action<Guid, DiscussionPostDto>? PostAdded;
 
-    public void Notify(Guid positionId, DiscussionPostDto post)
+    public Task NotifyAsync(Guid positionId, DiscussionPostDto post, CancellationToken ct = default)
+    {
+        Notify(positionId, post);
+        return Task.CompletedTask;
+    }
+
+    private void Notify(Guid positionId, DiscussionPostDto post)
     {
         var handlers = PostAdded?.GetInvocationList();
         if (handlers is null)
@@ -23,11 +29,5 @@ public sealed class DiscussionNotifier(ILogger<DiscussionNotifier>? logger = nul
                 logger?.LogWarning(ex, "Discussion subscriber failed for {PositionId}", positionId);
             }
         }
-    }
-
-    public Task NotifyAsync(Guid positionId, DiscussionPostDto post, CancellationToken ct = default)
-    {
-        Notify(positionId, post);
-        return Task.CompletedTask;
     }
 }

@@ -2,6 +2,7 @@ using Google.Apis.Auth.OAuth2;
 using Google.Apis.Auth.OAuth2.Flows;
 using Google.Apis.Drive.v3;
 using Google.Apis.Gmail.v1;
+using Google.Apis.Services;
 using Google.Apis.Util.Store;
 using Microsoft.Extensions.Options;
 
@@ -9,6 +10,8 @@ namespace CvPlatform.Infrastructure.Support;
 
 public sealed class GoogleCredentialFactory(IOptions<GoogleOptions> options)
 {
+    private const string ApplicationName = "HirelyDesk";
+
     private static readonly string[] Scopes =
     [
         DriveService.Scope.Drive,
@@ -17,7 +20,19 @@ public sealed class GoogleCredentialFactory(IOptions<GoogleOptions> options)
 
     private readonly GoogleOptions _options = options.Value;
 
-    public UserCredential Create()
+    public DriveService CreateDriveService() => new(new BaseClientService.Initializer
+    {
+        HttpClientInitializer = Create(),
+        ApplicationName = ApplicationName,
+    });
+
+    public GmailService CreateGmailService() => new(new BaseClientService.Initializer
+    {
+        HttpClientInitializer = Create(),
+        ApplicationName = ApplicationName,
+    });
+
+    private UserCredential Create()
     {
         var flow = new GoogleAuthorizationCodeFlow(new GoogleAuthorizationCodeFlow.Initializer
         {

@@ -148,7 +148,7 @@
                     : user.UserName;
                 _email = user.Email;
                 _profileImageValueId = summary.Succeeded ? summary.Value?.ImageValueId : null;
-                _initials = BuildInitials(_displayName, user.Email);
+                _initials = Initials.From(_displayName, user.Email);
             }
             ApplyTheme(user?.PreferredTheme);
         }
@@ -169,18 +169,6 @@
 
     private static string ImageContentUrl(Guid valueId) =>
         $"/api/profile-images/{valueId:D}/content";
-
-    private static string BuildInitials(string? name, string? email)
-    {
-        var source = string.IsNullOrWhiteSpace(name) ? email : name;
-        if (string.IsNullOrWhiteSpace(source))
-            return "?";
-
-        var parts = source.Split(new[] { ' ', '.', '_', '-', '@' }, StringSplitOptions.RemoveEmptyEntries);
-        if (parts.Length >= 2)
-            return string.Concat(parts[0][0].ToString().ToUpperInvariant(), parts[1][0].ToString().ToUpperInvariant());
-        return source.Substring(0, 1).ToUpperInvariant();
-    }
 
     private void ApplyTheme(string? theme)
     {

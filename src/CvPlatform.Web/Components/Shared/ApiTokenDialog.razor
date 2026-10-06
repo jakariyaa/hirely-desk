@@ -142,14 +142,12 @@
         if (_busy)
             return;
 
-        var parameters = new DialogParameters<ConfirmDialog>
-        {
-            { dialog => dialog.ContentText, L["ApiTokenRevokeConfirm"].Value },
-            { dialog => dialog.YesText, L["ApiTokenRevoke"].Value },
-            { dialog => dialog.NoText, L["Cancel"].Value },
-        };
-        var dialog = await DialogService.ShowAsync<ConfirmDialog>(L["ApiTokenRevoke"].Value, parameters);
-        if (await dialog.Result is { Canceled: true } or { Data: not true })
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            L["ApiTokenRevoke"].Value,
+            L["ApiTokenRevokeConfirm"].Value,
+            yesText: L["ApiTokenRevoke"].Value,
+            cancelText: L["Cancel"].Value);
+        if (confirmed != true)
             return;
 
         _busy = true;

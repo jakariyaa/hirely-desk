@@ -17,7 +17,7 @@
                  Class="cv-global-search" />
 
 @code {
-    public sealed record SearchItem(string Kind, Guid Id, string Title, string Url);
+    public sealed record SearchItem(Guid Id, string Title, string Url);
 
     private string? _lastQuery;
 
@@ -32,10 +32,10 @@
             return [];
         var items = new List<SearchItem>();
         items.AddRange(result.Value.Positions.Items.Select(p =>
-            new SearchItem("position", p.Id, p.Title, $"/positions/{p.Id}/apply")));
+            new SearchItem(p.Id, p.Title, $"/positions/{p.Id}/apply")));
         items.AddRange(result.Value.Cvs.Items.Select(c =>
-            new SearchItem("cv", c.CvId, $"{c.PositionTitle} — {c.CandidateName}", $"/cvs/{c.CvId}")));
-        items.Add(new SearchItem("viewall", Guid.Empty, L["ViewAllResults"], $"/search?Term={Uri.EscapeDataString(value.Trim())}"));
+            new SearchItem(c.CvId, $"{c.PositionTitle} — {c.CandidateName}", $"/cvs/{c.CvId}")));
+        items.Add(new SearchItem(Guid.Empty, L["ViewAllResults"], $"/search?Term={Uri.EscapeDataString(value.Trim())}"));
         return items;
     }
 
@@ -56,6 +56,6 @@
     private async Task<ActorContext> GetActorAsync()
     {
         var authState = await AuthProvider.GetAuthenticationStateAsync();
-        return new ActorContext(Guid.Parse(authState.User.FindFirstValue(ClaimTypes.NameIdentifier)!), authState.User.IsInRole(Roles.Admin), authState.User.IsInRole(Roles.Recruiter) || authState.User.IsInRole(Roles.Admin));
+        return ActorContexts.FromUser(authState.User);
     }
 }

@@ -7,7 +7,6 @@ using CvPlatform.Core.Data;
 using CvPlatform.Core.Entities;
 using CvPlatform.Core.Enums;
 using Microsoft.EntityFrameworkCore;
-using System.Text.Json;
 
 namespace CvPlatform.Application.Cvs;
 
@@ -100,15 +99,6 @@ public sealed class CvService(
                 c.Status, c.PublishedAt, c.Version, c.Position.MaxProjects))
             .ToListAsync(ct);
         return Result<PagedResult<CvDto>>.Success(new PagedResult<CvDto>(items, total, page.Page, page.PageSize));
-    }
-
-    public async Task<Result<IReadOnlyList<CvDto>>> ListByPositionAsync(
-        ActorContext actor, Guid positionId, CancellationToken ct = default)
-    {
-        var paged = await ListByPositionPagedAsync(actor, positionId, null, ct);
-        if (!paged.Succeeded)
-            return Result<IReadOnlyList<CvDto>>.Failure(paged.Error.Code, paged.Error.Message);
-        return Result<IReadOnlyList<CvDto>>.Success(paged.Value.Items);
     }
 
     public async Task<Result<PagedResult<CvDto>>> ListByPositionPagedAsync(
@@ -462,21 +452,6 @@ public sealed class CvService(
         return new DateRangeDto(range.Min, AttributeDateRules.UpperBound(range, today));
     }
 
-    private static IReadOnlyList<string> ParseChoices(AttributeDataType dataType, string? optionsJson)
-    {
-        if (dataType != AttributeDataType.Dropdown || string.IsNullOrWhiteSpace(optionsJson))
-            return [];
-        try
-        {
-            var shape = JsonSerializer.Deserialize<DropdownOptionsShape>(
-                optionsJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-            return shape?.Choices?.ToList() ?? [];
-        }
-        catch (JsonException)
-        {
-            return [];
-        }
-    }
-
-    private sealed record DropdownOptionsShape(string[]? Choices);
+    private static IReadOnlyList<string> ParseChoices(AttributeDataType dataType, string? optionsJson) =>
+        dataType == AttributeDataType.Dropdown ? AttributeValueRules.Choices(optionsJson) : [];
 }

@@ -1,5 +1,4 @@
 using Google.Apis.Drive.v3;
-using Google.Apis.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -22,11 +21,7 @@ public sealed class DriveWatchRegistration(
 
         try
         {
-            var drive = new DriveService(new BaseClientService.Initializer
-            {
-                HttpClientInitializer = credentials.Create(),
-                ApplicationName = _options.ApplicationName,
-            });
+            var drive = credentials.CreateDriveService();
             var startToken = await drive.Changes.GetStartPageToken().ExecuteAsync(ct);
             var channel = await drive.Changes.Watch(
                 new Google.Apis.Drive.v3.Data.Channel

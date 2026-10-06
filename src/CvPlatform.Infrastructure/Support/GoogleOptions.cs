@@ -11,7 +11,6 @@ public sealed class GoogleOptions
     public string DriveProcessedFolderId { get; set; } = "";
     public string WebhookUrl { get; set; } = "";
     public string WebhookToken { get; set; } = "";
-    public string ApplicationName { get; set; } = "HirelyDesk";
 
     public bool IsConfigured =>
         !string.IsNullOrWhiteSpace(ClientId) &&

@@ -208,17 +208,15 @@
             return;
         }
 
-        var parameters = new DialogParameters<ConfirmDialog>
-        {
-            { dialog => dialog.ContentText, L["AttributeDeleteImpact", _selected.Count,
-                impact.Value.ProfileValues, impact.Value.Positions, impact.Value.AccessRules,
-                impact.Value.Cvs, impact.Value.RestrictedPositionsLosingGating].Value },
-            { dialog => dialog.YesText, L["Delete"].Value },
-            { dialog => dialog.NoText, L["Cancel"].Value }
-        };
         var title = _selected.Count == 1 ? L["DeleteAttribute"].Value : L["DeleteAttributes"].Value;
-        var confirm = await DialogService.ShowAsync<ConfirmDialog>(title, parameters);
-        if ((await confirm.Result) is not { Canceled: false, Data: true })
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            title,
+            L["AttributeDeleteImpact", _selected.Count,
+                impact.Value.ProfileValues, impact.Value.Positions, impact.Value.AccessRules,
+                impact.Value.Cvs, impact.Value.RestrictedPositionsLosingGating].Value,
+            yesText: L["Delete"].Value,
+            cancelText: L["Cancel"].Value);
+        if (confirmed != true)
             return;
 
         _deleting = true;
@@ -250,9 +248,6 @@
     private async Task<ActorContext> GetActorAsync()
     {
         var state = await AuthProvider.GetAuthenticationStateAsync();
-        return new ActorContext(
-            Guid.Parse(state.User.FindFirstValue(ClaimTypes.NameIdentifier)!),
-            state.User.IsInRole(Roles.Admin),
-            state.User.IsInRole(Roles.Recruiter) || state.User.IsInRole(Roles.Admin));
+        return ActorContexts.FromUser(state.User);
     }
 }

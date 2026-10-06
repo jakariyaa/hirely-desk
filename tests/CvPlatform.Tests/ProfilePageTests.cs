@@ -413,9 +413,9 @@ public class ProfilePageTests : BunitContext, IAsyncLifetime
         public bool IsOwnedObjectKey(string objectKey, Guid userId) => false;
     }
 
-    private sealed class ProfileLocalizer : IStringLocalizer<SharedResource>
+    private sealed class ProfileLocalizer : StubStringLocalizer
     {
-        private static readonly IReadOnlyDictionary<string, string> Values =
+        protected override IReadOnlyDictionary<string, string> Catalog { get; } =
             new Dictionary<string, string>
             {
                 ["Profile"] = "Profile",
@@ -447,14 +447,5 @@ public class ProfilePageTests : BunitContext, IAsyncLifetime
                 ["ImageStorageUnavailable"] = "Image uploads are not available right now.",
                 ["ImageRemove"] = "Remove image",
             };
-
-        public LocalizedString this[string name] =>
-            new(name, Values.TryGetValue(name, out var value) ? value : name);
-
-        public LocalizedString this[string name, params object[] arguments] =>
-            new(name, string.Format(CultureInfo.InvariantCulture, this[name].Value, arguments));
-
-        public IEnumerable<LocalizedString> GetAllStrings(bool includeParentCultures) =>
-            Values.Select(pair => new LocalizedString(pair.Key, pair.Value));
     }
 }

@@ -338,20 +338,20 @@ public class CvServiceTests : IDisposable
         var actor = new ActorContext(candidateId, false);
 
         // Third parties cannot browse at all; the owner just sees no CVs yet.
-        var stranger = await Service(_factory).ListByPositionAsync(new ActorContext(Guid.NewGuid(), false), positionId);
+        var stranger = await Service(_factory).ListByPositionPagedAsync(new ActorContext(Guid.NewGuid(), false), positionId, null);
         stranger.Error.Code.Should().Be(ErrorCodes.Forbidden);
-        var empty = await Service(_factory).ListByPositionAsync(new ActorContext(recruiterId, false, true), positionId);
+        var empty = await Service(_factory).ListByPositionPagedAsync(new ActorContext(recruiterId, false, true), positionId, null);
         empty.Succeeded.Should().BeTrue();
-        empty.Value!.Should().BeEmpty();
+        empty.Value!.Items.Should().BeEmpty();
 
         // Publish the CV.
         var version = await GetVersionAsync(cvId);
         (await Service(_factory).PublishAsync(actor, cvId, new CvStatusInput(version))).Succeeded.Should().BeTrue();
 
         // Recruiter (position owner) now sees it.
-        var visible = await Service(_factory).ListByPositionAsync(new ActorContext(recruiterId, false, true), positionId);
+        var visible = await Service(_factory).ListByPositionPagedAsync(new ActorContext(recruiterId, false, true), positionId, null);
         visible.Succeeded.Should().BeTrue();
-        visible.Value!.Select(c => c.Id).Should().Contain(cvId);
+        visible.Value!.Items.Select(c => c.Id).Should().Contain(cvId);
 
         // Candidate loses access (City changed); shared recruiters still manage the position CV.
         await using (var db = _factory.CreateDbContext())
@@ -362,13 +362,13 @@ public class CvServiceTests : IDisposable
             await db.SaveChangesAsync();
         }
 
-        var hidden = await Service(_factory).ListByPositionAsync(new ActorContext(recruiterId, false, true), positionId);
+        var hidden = await Service(_factory).ListByPositionPagedAsync(new ActorContext(recruiterId, false, true), positionId, null);
         hidden.Succeeded.Should().BeTrue();
-        hidden.Value!.Select(c => c.Id).Should().Contain(cvId);
+        hidden.Value!.Items.Select(c => c.Id).Should().Contain(cvId);
 
         // Admin still sees everything.
-        var admin = await Service(_factory).ListByPositionAsync(new ActorContext(adminId, true), positionId);
-        admin.Value!.Select(c => c.Id).Should().Contain(cvId);
+        var admin = await Service(_factory).ListByPositionPagedAsync(new ActorContext(adminId, true), positionId, null);
+        admin.Value!.Items.Select(c => c.Id).Should().Contain(cvId);
     }
 
     [Fact]

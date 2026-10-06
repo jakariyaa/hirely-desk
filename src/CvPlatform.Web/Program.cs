@@ -43,8 +43,6 @@ builder.Services.AddSingleton<IMarkdownRenderer, MarkdownRenderer>();
 builder.Services.AddTransient<IExportService, ExportService>();
 builder.Services.AddTransient<CvPlatform.Infrastructure.Exports.IProfileImageFetcher,
     CvPlatform.Infrastructure.Exports.ProfileImageFetcher>();
-builder.Services.AddTransient<CvPlatform.Application.Users.IUserAdministrationService,
-    CvPlatform.Web.Users.UserAdministrationService>();
 builder.Services.AddSingleton<IImageStorage, CvPlatform.Infrastructure.Storage.B2ImageStorage>();
 builder.Services.AddSingleton<CvPlatform.Infrastructure.Support.GoogleCredentialFactory>();
 builder.Services.AddTransient<CvPlatform.Core.Support.ISupportTicketUploader,
@@ -63,23 +61,12 @@ builder.Services.AddScoped<ErrorMessageLocalizer>();
 builder.Services.AddScoped<IUiErrorReporter, UiErrorReporter>();
 
 var gmail = applicationConfiguration.Gmail;
-if (gmail.IsConfigured)
-    builder.Services.AddTransient<CvPlatform.Core.Email.IAppEmailSender,
-        CvPlatform.Infrastructure.Email.GmailEmailSender>();
-else
-    builder.Services.AddTransient<CvPlatform.Core.Email.IAppEmailSender,
-        CvPlatform.Infrastructure.Email.NoOpEmailSender>();
+builder.Services.AddTransient<CvPlatform.Core.Email.IAppEmailSender,
+    CvPlatform.Infrastructure.Email.GmailEmailSender>();
 
-var salesforce = applicationConfiguration.Salesforce;
-if (salesforce.IsConfigured)
-{
-    builder.Services.AddSingleton<CvPlatform.Infrastructure.Crm.SalesforceTokenProvider>();
-    builder.Services.AddHttpClient<CvPlatform.Core.Crm.ICrmService,
-            CvPlatform.Infrastructure.Crm.SalesforceCrmService>();
-}
-else
-    builder.Services.AddTransient<CvPlatform.Core.Crm.ICrmService,
-        CvPlatform.Infrastructure.Crm.NoOpCrmService>();
+builder.Services.AddSingleton<CvPlatform.Infrastructure.Crm.SalesforceTokenProvider>();
+builder.Services.AddHttpClient<CvPlatform.Core.Crm.ICrmService,
+        CvPlatform.Infrastructure.Crm.SalesforceCrmService>();
 
 builder.Services.AddIdentity<ApplicationUser, IdentityRole<Guid>>(options =>
     {
@@ -202,7 +189,6 @@ app.UseExceptionHandler("/Error", createScopeForErrors: true);
 if (!app.Environment.IsDevelopment())
     app.UseHttpsRedirection();
 
-app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseSerilogRequestLogging();
 app.UseRequestLocalization(app.Services.GetRequiredService<IOptions<RequestLocalizationOptions>>().Value);
 app.UseStatusCodePages(StatusCodePageWriter.WriteAsync);

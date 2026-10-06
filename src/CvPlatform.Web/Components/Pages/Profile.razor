@@ -339,19 +339,7 @@ else
         ? _displayName
         : _email ?? L["Profile"].Value;
 
-    private string HeaderInitials => BuildInitials(_displayName, _email);
-
-    private static string BuildInitials(string? name, string? email)
-    {
-        var source = string.IsNullOrWhiteSpace(name) ? email : name;
-        if (string.IsNullOrWhiteSpace(source))
-            return "?";
-
-        var parts = source.Split(new[] { ' ', '.', '_', '-', '@' }, StringSplitOptions.RemoveEmptyEntries);
-        if (parts.Length >= 2)
-            return string.Concat(parts[0][0].ToString().ToUpperInvariant(), parts[1][0].ToString().ToUpperInvariant());
-        return source.Substring(0, 1).ToUpperInvariant();
-    }
+    private string HeaderInitials => Initials.From(_displayName, _email);
 
     private int CompletionPercent
     {
@@ -521,15 +509,12 @@ else
             return;
         }
 
-        var dialog = await DialogService.ShowAsync<ConfirmDialog>(
+        var retry = await DialogService.ShowMessageBoxAsync(
             L["ConcurrencyConflictTitle"].Value,
-            new DialogParameters<ConfirmDialog>
-            {
-                { dialog => dialog.ContentText, L["ProfileUnsavedChangesBody"].Value },
-                { dialog => dialog.YesText, L["Retry"].Value },
-                { dialog => dialog.NoText, L["Cancel"].Value }
-            });
-        if ((await dialog.Result) is { Canceled: false, Data: true })
+            L["ProfileUnsavedChangesBody"].Value,
+            yesText: L["Retry"].Value,
+            cancelText: L["Cancel"].Value);
+        if (retry == true)
             await LoadAsync();
     }
 
@@ -539,16 +524,13 @@ else
         if (!HasUnsavedChanges || _saveState == SaveState.Saving)
             return;
 
-        var dialog = await DialogService.ShowAsync<ConfirmDialog>(
+        var discard = await DialogService.ShowMessageBoxAsync(
             L["ProfileUnsavedChangesTitle"].Value,
-            new DialogParameters<ConfirmDialog>
-            {
-                { dialog => dialog.ContentText, L["ProfileUnsavedChangesBody"].Value },
-                { dialog => dialog.YesText, L["ProfileDiscardChanges"].Value },
-                { dialog => dialog.NoText, L["ProfileKeepEditing"].Value }
-            });
+            L["ProfileUnsavedChangesBody"].Value,
+            yesText: L["ProfileDiscardChanges"].Value,
+            cancelText: L["ProfileKeepEditing"].Value);
 
-        if ((await dialog.Result) is { Canceled: false, Data: true })
+        if (discard == true)
             await CancelPendingAutosavesAsync();
         else
             context.PreventNavigation();
@@ -586,14 +568,7 @@ else
             return _actor;
 
         var authState = await AuthProvider.GetAuthenticationStateAsync();
-        var identifier = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (!Guid.TryParse(identifier, out var userId))
-            throw new InvalidOperationException("The signed-in user has no usable identifier.");
-
-        return _actor = new ActorContext(
-            userId,
-            authState.User.IsInRole(Roles.Admin),
-            authState.User.IsInRole(Roles.Recruiter) || authState.User.IsInRole(Roles.Admin));
+        return _actor = ActorContexts.FromUser(authState.User);
     }
 
     public async ValueTask DisposeAsync()

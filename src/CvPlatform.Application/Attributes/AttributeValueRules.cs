@@ -227,19 +227,11 @@ public static class AttributeValueRules
     private static string? NullIfBlank(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
-    private static bool IsDropdownChoice(string? optionsJson, string value)
-    {
-        try
-        {
-            var options = string.IsNullOrWhiteSpace(optionsJson)
-                ? null
-                : JsonSerializer.Deserialize<AttributeOptions>(optionsJson, JsonOptions);
-            return options?.Choices?.Select(choice => choice.Trim()).Contains(value, StringComparer.Ordinal) == true;
-        }
-        catch (JsonException)
-        {
-            return false;
-        }
-    }
+    /// <summary>Parsed dropdown choices from an options JSON blob; empty when absent or malformed.</summary>
+    public static IReadOnlyList<string> Choices(string? optionsJson) =>
+        AttributeDateRules.Parse(optionsJson)?.Choices ?? [];
+
+    private static bool IsDropdownChoice(string? optionsJson, string value) =>
+        Choices(optionsJson).Select(choice => choice.Trim()).Contains(value, StringComparer.Ordinal);
 
 }

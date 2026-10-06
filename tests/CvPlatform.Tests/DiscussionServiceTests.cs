@@ -48,14 +48,11 @@ public class DiscussionServiceTests : IDisposable
     {
         public readonly List<(Guid PositionId, DiscussionPostDto Post)> Calls = [];
         public event Action<Guid, DiscussionPostDto>? PostAdded;
-        public void Notify(Guid positionId, DiscussionPostDto post)
+
+        public Task NotifyAsync(Guid positionId, DiscussionPostDto post, CancellationToken ct = default)
         {
             Calls.Add((positionId, post));
             PostAdded?.Invoke(positionId, post);
-        }
-        public Task NotifyAsync(Guid positionId, DiscussionPostDto post, CancellationToken ct = default)
-        {
-            Notify(positionId, post);
             return Task.CompletedTask;
         }
     }

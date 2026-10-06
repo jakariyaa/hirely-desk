@@ -328,9 +328,9 @@ public class ComponentTests : BunitContext, IAsyncLifetime
             new(Guid.Empty, Guid.Empty, "", "", null, AttributeDataType.String, false, null, 0);
     }
 
-    private sealed class TestLocalizer : IStringLocalizer<SharedResource>
+    private sealed class TestLocalizer : StubStringLocalizer
     {
-        private static readonly IReadOnlyDictionary<string, string> Values = new Dictionary<string, string>
+        protected override IReadOnlyDictionary<string, string> Catalog { get; } = new Dictionary<string, string>
         {
             ["AddChoice"] = "Add choice",
             ["Choice"] = "Choice",
@@ -350,14 +350,6 @@ public class ComponentTests : BunitContext, IAsyncLifetime
             ["Cancel"] = "Cancel",
             ["Save"] = "Save",
         };
-
-        public LocalizedString this[string name] => new(name, Values.TryGetValue(name, out var value) ? value : name);
-
-        public LocalizedString this[string name, params object[] arguments] =>
-            new(name, string.Format(CultureInfo.InvariantCulture, this[name].Value, arguments));
-
-        public IEnumerable<LocalizedString> GetAllStrings(bool includeParentCultures) =>
-            Values.Select(pair => new LocalizedString(pair.Key, pair.Value));
 
         public IStringLocalizer WithCulture(CultureInfo culture) => this;
     }

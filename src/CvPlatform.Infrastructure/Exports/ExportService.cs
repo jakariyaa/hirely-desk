@@ -8,6 +8,7 @@ using CvPlatform.Application.Exports;
 using CvPlatform.Application.Positions;
 using CvPlatform.Application.Profiles;
 using ClosedXML.Excel;
+using Markdig;
 using QRCoder;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
@@ -214,7 +215,7 @@ public sealed class ExportService(
                                     projectsColumn.Item().EnsureSpace(35).Column(projectColumn =>
                                     {
                                         projectColumn.Item().Text(project.Name).Bold().FontSize(10.5f);
-                                        var period = FormatPeriod(project.PeriodStart, project.PeriodEnd);
+                                        var period = PeriodFormat.Format(project.PeriodStart, project.PeriodEnd);
                                         if (period != "—")
                                             projectColumn.Item().Text(period).FontSize(9)
                                                 .FontColor(Colors.Grey.Darken1);
@@ -343,9 +344,9 @@ public sealed class ExportService(
         { TextValue: { } t } => StripMarkdown(t),
         { NumericValue: { } n } => n.ToString("0.##", CultureInfo.InvariantCulture),
         { DateValue: { } d } => d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-        { PeriodStart: { } start, PeriodEnd: { } end } => FormatPeriod(start, end),
-        { PeriodStart: { } start } => $"{start:yyyy/MM} – …",
-        { PeriodEnd: { } end } => $"… – {end:yyyy/MM}",
+        { PeriodStart: { } start, PeriodEnd: { } end } => PeriodFormat.Format(start, end),
+        { PeriodStart: { } start } => PeriodFormat.Format(start, null),
+        { PeriodEnd: { } end } => PeriodFormat.Format(null, end),
         { BooleanValue: { } b } => b ? "Yes" : "No",
         { DropdownOption: { } dd } => dd,
         { ImageObjectKey: not null } => "Image",
@@ -355,7 +356,7 @@ public sealed class ExportService(
     private static string FormatProject(CvProjectOptionDto project)
     {
         var parts = new List<string> { project.Name };
-        var period = FormatPeriod(project.PeriodStart, project.PeriodEnd);
+        var period = PeriodFormat.Format(project.PeriodStart, project.PeriodEnd);
         if (period != "—")
             parts.Add(period);
         if (project.Tags is { Count: > 0 })
@@ -365,23 +366,12 @@ public sealed class ExportService(
         return string.Join(" — ", parts);
     }
 
-    private static string FormatPeriod(DateOnly? start, DateOnly? end) => (start, end) switch
-    {
-        ({ } s, { } e) => $"{s:yyyy/MM} – {e:yyyy/MM}",
-        ({ } s, null) => $"{s:yyyy/MM} – …",
-        (null, { } e) => $"… – {e:yyyy/MM}",
-        _ => "—",
-    };
-
     private static string StripMarkdown(string markdown)
     {
         if (string.IsNullOrWhiteSpace(markdown))
             return markdown;
-        var text = markdown.Replace("\r", " ").Replace("\n", " ").Trim();
-        foreach (var token in new[] { "**", "__", "##", "#", "`", ">", "-", "*", "_" })
-            text = text.Replace(token, "");
-        while (text.Contains("  "))
-            text = text.Replace("  ", " ");
+        var text = string.Join(' ', Markdig.Markdown.ToPlainText(markdown)
+            .Split((char[])[' ', '\r', '\n', '\t'], StringSplitOptions.RemoveEmptyEntries));
         return text.Length > 2000 ? text[..2000] : text;
     }
 

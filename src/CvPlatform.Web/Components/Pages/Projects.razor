@@ -142,15 +142,12 @@ else
 
     private async Task ConfirmDeleteAsync(ProjectDto project)
     {
-        var parameters = new DialogParameters<ConfirmDialog>
-        {
-            { dialog => dialog.ContentText, L["DeleteProjectConfirm"].Value },
-            { dialog => dialog.YesText, L["Delete"].Value },
-            { dialog => dialog.NoText, L["Cancel"].Value },
-        };
-        var dialog = await DialogService.ShowAsync<ConfirmDialog>(title: L["DeleteProject"], parameters: parameters);
-        var result = await dialog.Result;
-        if (result is { Canceled: true } || result?.Data is not true)
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            L["DeleteProject"].Value,
+            L["DeleteProjectConfirm"].Value,
+            yesText: L["Delete"].Value,
+            cancelText: L["Cancel"].Value);
+        if (confirmed != true)
             return;
 
         var actor = await GetActorAsync();
@@ -175,17 +172,12 @@ else
         _selected.Clear();
     }
 
-    private static string FormatPeriod(ProjectDto project) => project switch
-    {
-        { PeriodStart: { } start, PeriodEnd: { } end } => $"{start:yyyy/MM} – {end:yyyy/MM}",
-        { PeriodStart: { } start } => $"{start:yyyy/MM} – …",
-        { PeriodEnd: { } end } => $"… – {end:yyyy/MM}",
-        _ => "—",
-    };
+    private static string FormatPeriod(ProjectDto project) =>
+        PeriodFormat.Format(project.PeriodStart, project.PeriodEnd);
 
     private async Task<ActorContext> GetActorAsync()
     {
         var authState = await AuthProvider.GetAuthenticationStateAsync();
-        return new ActorContext(Guid.Parse(authState.User.FindFirstValue(ClaimTypes.NameIdentifier)!), authState.User.IsInRole(Roles.Admin), authState.User.IsInRole(Roles.Recruiter) || authState.User.IsInRole(Roles.Admin));
+        return ActorContexts.FromUser(authState.User);
     }
 }

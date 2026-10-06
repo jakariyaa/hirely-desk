@@ -14,8 +14,6 @@ public interface IPositionTemplateService
         ActorContext actor, PositionTemplateInput input, CancellationToken ct = default);
     Task<Result<PositionTemplateDto>> UpdateAsync(
         ActorContext actor, Guid templateId, PositionTemplateInput input, CancellationToken ct = default);
-    Task<Result> DeleteAsync(
-        ActorContext actor, Guid templateId, long expectedVersion, CancellationToken ct = default);
     Task<Result> DeleteManyAsync(
         ActorContext actor, IReadOnlyList<PositionTemplateDeleteInput> templates, CancellationToken ct = default);
     Task<Result<PositionTemplateDto>> SaveFromPositionAsync(

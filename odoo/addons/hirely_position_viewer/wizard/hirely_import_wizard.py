@@ -9,7 +9,6 @@ _logger = logging.getLogger(__name__)
 
 API_PATH = "/api/v1/positions/summary"
 CONFIG_PARAMETER = "hirely_position_viewer.api_url"
-DEFAULT_API_URL = "http://host.docker.internal:5191"
 REQUEST_TIMEOUT_SECONDS = 15
 
 
@@ -31,10 +30,7 @@ class HirelyImportWizard(models.TransientModel):
 
     @api.model
     def _default_api_url(self):
-        return (
-            self.env["ir.config_parameter"].sudo().get_param(CONFIG_PARAMETER)
-            or DEFAULT_API_URL
-        ).rstrip("/")
+        return self.env["ir.config_parameter"].sudo().get_param(CONFIG_PARAMETER, "").rstrip("/")
 
     def action_import(self):
         self.ensure_one()

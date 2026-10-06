@@ -104,15 +104,11 @@ public sealed class HomeStatsService(
         await using var db = factory.CreateDbContext();
 
         var latest = await LoadLatestAsync(db, actor, ct);
-        if (!latest.Succeeded)
-            return Result<HomeStatsDto>.Failure(latest.Error.Code, latest.Error.Message);
         var popular = await LoadPopularAsync(db, actor, ct);
-        if (!popular.Succeeded)
-            return Result<HomeStatsDto>.Failure(popular.Error.Code, popular.Error.Message);
         var tags = await LoadTagCloudAsync(db, ct);
 
         return Result<HomeStatsDto>.Success(new HomeStatsDto(
-            latest.Value!, popular.Value!, tags, popular.Value!.Count, latest.Value!.Count));
+            latest, popular, tags, popular.Count, latest.Count));
     }
 
     private static async Task<List<TagCountDto>> LoadTagCloudAsync(IAppDbContext db, CancellationToken ct)
@@ -139,7 +135,7 @@ public sealed class HomeStatsService(
             .ToList();
     }
 
-    private async Task<Result<List<LatestCvDto>>> LoadLatestAsync(
+    private async Task<List<LatestCvDto>> LoadLatestAsync(
         IAppDbContext db, ActorContext actor, CancellationToken ct)
     {
         IQueryable<Core.Entities.Cv> query = db.Cvs.AsNoTracking();
@@ -150,7 +146,7 @@ public sealed class HomeStatsService(
         else
             query = positionAccess.ApplyCvFilter(query, db, actor);
 
-        var result = await query.OrderByDescending(c => c.PublishedAt).ThenBy(c => c.Id)
+        return await query.OrderByDescending(c => c.PublishedAt).ThenBy(c => c.Id)
             .Take(5)
             .Select(c => new LatestCvDto(
                 c.Id,
@@ -159,16 +155,15 @@ public sealed class HomeStatsService(
                 c.Profile.User.UserName ?? string.Empty,
                 c.PublishedAt))
             .ToListAsync(ct);
-        return Result<List<LatestCvDto>>.Success(result);
     }
 
-    private async Task<Result<List<PopularPositionDto>>> LoadPopularAsync(
+    private async Task<List<PopularPositionDto>> LoadPopularAsync(
         IAppDbContext db, ActorContext actor, CancellationToken ct)
     {
         var accessible = positionAccess.ApplyPositionFilter(
             db.Positions.AsNoTracking(), db, actor);
 
-        var rows = await accessible
+        return await accessible
             .Select(p => new
             {
                 p.Id,
@@ -184,7 +179,5 @@ public sealed class HomeStatsService(
             .Take(5)
             .Select(v => new PopularPositionDto(v.Id, v.Title, v.Company, v.CvCount, v.LikeCount))
             .ToListAsync(ct);
-
-        return Result<List<PopularPositionDto>>.Success(rows);
     }
 }

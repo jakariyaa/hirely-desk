@@ -380,14 +380,12 @@ else if (_detail is not null)
     {
         if (_detail is null) return;
 
-        var parameters = new DialogParameters<ConfirmDialog>
-        {
-            { dialog => dialog.ContentText, L["DeleteCvConfirm"].Value },
-            { dialog => dialog.YesText, L["Delete"].Value },
-            { dialog => dialog.NoText, L["Cancel"].Value },
-        };
-        var dialog = await DialogService.ShowAsync<ConfirmDialog>(title: L["DeleteCv"], parameters: parameters);
-        if (await dialog.Result is { Canceled: true } or { Data: not true })
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            L["DeleteCv"].Value,
+            L["DeleteCvConfirm"].Value,
+            yesText: L["Delete"].Value,
+            cancelText: L["Cancel"].Value);
+        if (confirmed != true)
             return;
 
         _busy = true;
@@ -448,9 +446,9 @@ else if (_detail is not null)
         { TextValue: { } t } => t,
         { NumericValue: { } n } => n.ToString("0.##"),
         { DateValue: { } d } => d.ToString("yyyy-MM-dd"),
-        { PeriodStart: { } start, PeriodEnd: { } end } => $"{start:yyyy/MM} – {end:yyyy/MM}",
-        { PeriodStart: { } start } => $"{start:yyyy/MM} – …",
-        { PeriodEnd: { } end } => $"… – {end:yyyy/MM}",
+        { PeriodStart: { } start, PeriodEnd: { } end } => PeriodFormat.Format(start, end),
+        { PeriodStart: { } start } => PeriodFormat.Format(start, null),
+        { PeriodEnd: { } end } => PeriodFormat.Format(null, end),
         { BooleanValue: { } b } => b ? "✓" : "✗",
         { DropdownOption: { } dd } => dd,
         { ImageObjectKey: not null } => "Image",
@@ -463,6 +461,6 @@ else if (_detail is not null)
     private async Task<ActorContext> GetActorAsync()
     {
         var authState = await AuthProvider.GetAuthenticationStateAsync();
-        return new ActorContext(Guid.Parse(authState.User.FindFirstValue(ClaimTypes.NameIdentifier)!), authState.User.IsInRole(Roles.Admin), authState.User.IsInRole(Roles.Recruiter) || authState.User.IsInRole(Roles.Admin));
+        return ActorContexts.FromUser(authState.User);
     }
 }

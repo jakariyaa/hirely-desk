@@ -1,4 +1,3 @@
-using System.Text.Json;
 using CvPlatform.Application.Common;
 using CvPlatform.Core.Data;
 using CvPlatform.Core.Enums;
@@ -9,11 +8,6 @@ namespace CvPlatform.Application.Attributes;
 public sealed class AttributeCatalogService(
     IAppDbContextFactory factory, TimeProvider? timeProvider = null) : IAttributeCatalog
 {
-    private static readonly JsonSerializerOptions OptionsJsonOptions = new()
-    {
-        PropertyNameCaseInsensitive = true,
-    };
-
     public async Task<Result<IReadOnlyList<AttributeCategoryDto>>> GetCatalogAsync(CancellationToken ct = default)
     {
         await using var db = factory.CreateDbContext();
@@ -63,25 +57,9 @@ public sealed class AttributeCatalogService(
             new PagedResult<AttributeDefinitionDto>(items, total, page.Page, page.PageSize));
     }
 
-    public async Task<Result<IReadOnlyList<DropdownChoice>>> GetChoicesAsync(
-        Guid attributeDefinitionId, CancellationToken ct = default)
-    {
-        await using var db = factory.CreateDbContext();
-        var definition = await db.AttributeDefinitions
-            .AsNoTracking()
-            .SingleOrDefaultAsync(d => d.Id == attributeDefinitionId, ct);
-
-        if (definition is null)
-            return Result<IReadOnlyList<DropdownChoice>>.Failure(
-                ErrorCodes.NotFound, $"Attribute definition {attributeDefinitionId} was not found.");
-
-        return Result<IReadOnlyList<DropdownChoice>>.Success(
-            ParseChoices(definition.DataType, definition.OptionsJson));
-    }
-
     private static List<DropdownChoice> ParseChoices(AttributeDataType dataType, string? optionsJson) =>
-        dataType == AttributeDataType.Dropdown && !string.IsNullOrWhiteSpace(optionsJson)
-            ? TryParse(optionsJson)
+        dataType == AttributeDataType.Dropdown
+            ? AttributeValueRules.Choices(optionsJson).Select(c => new DropdownChoice(c)).ToList()
             : [];
 
     private static DateRangeDto? ParseDateRange(
@@ -93,19 +71,4 @@ public sealed class AttributeCatalogService(
         var range = AttributeDateRules.Resolve(dataType, optionsJson, today);
         return new DateRangeDto(range.Min, AttributeDateRules.UpperBound(range, today));
     }
-
-    private static List<DropdownChoice> TryParse(string optionsJson)
-    {
-        try
-        {
-            return JsonSerializer.Deserialize<DropdownOptionsShape>(optionsJson, OptionsJsonOptions)?
-                .Choices?.Select(c => new DropdownChoice(c)).ToList() ?? [];
-        }
-        catch (JsonException)
-        {
-            return [];
-        }
-    }
-
-    private sealed record DropdownOptionsShape(string[]? Choices);
 }

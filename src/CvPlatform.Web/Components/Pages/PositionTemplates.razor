@@ -89,16 +89,12 @@
         if (_selected.Count == 0)
             return;
 
-        var parameters = new DialogParameters<ConfirmDialog>
-        {
-            { dialog => dialog.ContentText, L["DeleteTemplatesConfirm", _selected.Count].Value },
-            { dialog => dialog.YesText, L["Delete"].Value },
-            { dialog => dialog.NoText, L["Cancel"].Value },
-        };
-        var dialog = await DialogService.ShowAsync<ConfirmDialog>(
-            _selected.Count == 1 ? L["DeleteTemplate"].Value : L["DeleteTemplates"].Value, parameters);
-        var result = await dialog.Result;
-        if (result is { Canceled: true } || result?.Data is not true)
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            _selected.Count == 1 ? L["DeleteTemplate"].Value : L["DeleteTemplates"].Value,
+            L["DeleteTemplatesConfirm", _selected.Count].Value,
+            yesText: L["Delete"].Value,
+            cancelText: L["Cancel"].Value);
+        if (confirmed != true)
             return;
 
         _deleting = true;

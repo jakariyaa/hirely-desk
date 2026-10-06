@@ -1,11 +1,14 @@
-@inherits LoggingErrorBoundary
+@using System.Diagnostics
 @using CvPlatform.Web.ErrorHandling
 @using CvPlatform.Web.Resources
+@using Microsoft.AspNetCore.Components.Web
 @using Microsoft.Extensions.Hosting
 @using Microsoft.Extensions.Localization
+@inherits ErrorBoundary
 
 @inject IStringLocalizer<SharedResource> L
 @inject IHostEnvironment HostEnvironment
+@inject ILogger<AppErrorBoundary> Logger
 
 @if (CurrentException is null)
 {
@@ -32,6 +35,20 @@ else
 }
 
 @code {
+    /// <summary>Trace id of the failed operation, shown to the user so support can find the log.</summary>
+    public string ReferenceId { get; private set; } = string.Empty;
+
+    protected override Task OnErrorAsync(Exception exception)
+    {
+        ReferenceId = Activity.Current?.TraceId.ToString()
+            ?? ActivityTraceId.CreateRandom().ToString();
+        Logger.LogError(
+            exception,
+            "Unhandled exception caught by the global error boundary. {ReferenceId}",
+            ReferenceId);
+        return Task.CompletedTask;
+    }
+
     private bool ShowReferenceId =>
         !HostEnvironment.IsDevelopment() && !string.IsNullOrEmpty(ReferenceId);
 }

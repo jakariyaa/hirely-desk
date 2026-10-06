@@ -1,6 +1,5 @@
 using AwesomeAssertions;
 using CvPlatform.Infrastructure.Email;
-using Microsoft.Extensions.Logging.Abstractions;
 
 namespace CvPlatform.Tests;
 
@@ -16,13 +15,5 @@ public class EmailSenderTests
     {
         new GmailOptions { Address = address, AppPassword = appPassword }
             .IsConfigured.Should().Be(expected);
-    }
-
-    [Fact]
-    public async Task NoOp_sender_completes_without_sending()
-    {
-        var sender = new NoOpEmailSender(NullLogger<NoOpEmailSender>.Instance);
-        await sender.Invoking(s => s.SendConfirmationLinkAsync("a@example.test", "http://localhost/confirm"))
-            .Should().NotThrowAsync();
     }
 }

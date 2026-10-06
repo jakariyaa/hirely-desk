@@ -1,3 +1,4 @@
+using System.Buffers.Text;
 using System.Net;
 using System.Text;
 using System.Text.Json;
@@ -5,7 +6,6 @@ using CvPlatform.Core.Support;
 using Google.Apis.Drive.v3;
 using Google.Apis.Gmail.v1;
 using Google.Apis.Gmail.v1.Data;
-using Google.Apis.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MimeKit;
@@ -25,17 +25,8 @@ public sealed class SupportTicketProcessor(
         if (!_options.IsConfigured || string.IsNullOrWhiteSpace(_options.DriveProcessedFolderId))
             return;
 
-        var credential = credentials.Create();
-        var drive = new DriveService(new BaseClientService.Initializer
-        {
-            HttpClientInitializer = credential,
-            ApplicationName = _options.ApplicationName,
-        });
-        var gmail = new GmailService(new BaseClientService.Initializer
-        {
-            HttpClientInitializer = credential,
-            ApplicationName = _options.ApplicationName,
-        });
+        var drive = credentials.CreateDriveService();
+        var gmail = credentials.CreateGmailService();
 
         var listRequest = drive.Files.List();
         listRequest.Q = $"'{_options.DriveFolderId}' in parents and trashed = false and mimeType = 'application/json'";
@@ -99,8 +90,7 @@ public sealed class SupportTicketProcessor(
         logger.LogInformation("Support notification sent to {Count} admin(s)", admins.Count);
     }
 
-    private static string Base64UrlEncode(byte[] bytes) =>
-        Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+    private static string Base64UrlEncode(byte[] bytes) => Base64Url.EncodeToString(bytes);
 
     private static string Truncate(string value, int max) =>
         value.Length <= max ? value : value[..max] + "…";

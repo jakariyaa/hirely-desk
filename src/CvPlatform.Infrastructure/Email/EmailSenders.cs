@@ -32,12 +32,3 @@ public sealed class GmailEmailSender(
         logger.LogInformation("Confirmation email sent to {Email}", email);
     }
 }
-
-public sealed class NoOpEmailSender(ILogger<NoOpEmailSender> logger) : IAppEmailSender
-{
-    public Task SendConfirmationLinkAsync(string email, string confirmationLink, CancellationToken ct = default)
-    {
-        logger.LogInformation("Gmail is not configured; skipping confirmation email to {Email}", email);
-        return Task.CompletedTask;
-    }
-}

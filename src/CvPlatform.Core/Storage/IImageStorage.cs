@@ -19,10 +19,6 @@ public sealed record ImageUploadLimits(
     long MaxBytes,
     IReadOnlyCollection<string> AllowedContentTypes)
 {
-    public bool Allows(string contentType) =>
-        contentType is not null &&
-        AllowedContentTypes.Contains(contentType, StringComparer.OrdinalIgnoreCase);
-
     public string AcceptAttribute => string.Join(',', AllowedContentTypes);
 }
 

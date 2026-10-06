@@ -31,15 +31,7 @@
                     <MudSelectItem Value="type">@type</MudSelectItem>
                 }
             </MudSelect>
-            @if (_dataType == AttributeDataType.Dropdown)
-            {
-                <AttributeOptionsEditor DataType="_dataType" @bind-OptionsJson="_optionsJson" />
-            }
-            else if (_dataType is AttributeDataType.Numeric or AttributeDataType.String or AttributeDataType.Text
-                or AttributeDataType.Date)
-            {
-                <AttributeOptionsEditor DataType="_dataType" @bind-OptionsJson="_optionsJson" />
-            }
+            <AttributeOptionsEditor DataType="_dataType" @bind-OptionsJson="_optionsJson" />
         </DialogContent>
         <DialogActions>
             <MudButton OnClick="MudDialog.Cancel">@L["Cancel"]</MudButton>
@@ -106,7 +98,7 @@
         try
         {
             var auth = await AuthProvider.GetAuthenticationStateAsync();
-            var actor = new ActorContext(Guid.Parse(auth.User.FindFirstValue(ClaimTypes.NameIdentifier)!), auth.User.IsInRole(Roles.Admin), auth.User.IsInRole(Roles.Recruiter) || auth.User.IsInRole(Roles.Admin));
+            var actor = ActorContexts.FromUser(auth.User);
             var input = new AttributeDefinitionInput(
                 _categoryId, _name, _description, _dataType,
                 _optionsJson,
@@ -124,14 +116,12 @@
                 var impact = await Definitions.GetOptionChangeImpactAsync(actor, Editing.Id, input);
                 if (impact.Succeeded && impact.Value is not null)
                 {
-                    var parameters = new DialogParameters<ConfirmDialog>
-                    {
-                            { dialog => dialog.ContentText, L["RemoveOptionsConfirm"].Value },
-                            { dialog => dialog.YesText, L["Remove"].Value },
-                            { dialog => dialog.NoText, L["Cancel"].Value },
-                        };
-                    var confirm = await DialogService.ShowAsync<ConfirmDialog>(L["RemoveOptions"].Value, parameters);
-                    if ((await confirm.Result) is { Canceled: false, Data: true })
+                    var confirmed = await DialogService.ShowMessageBoxAsync(
+                        L["RemoveOptions"].Value,
+                        L["RemoveOptionsConfirm"].Value,
+                        yesText: L["Remove"].Value,
+                        cancelText: L["Cancel"].Value);
+                    if (confirmed == true)
                     {
                         var forced = await Definitions.UpdateAsync(actor, Editing.Id, input with { ForceOptionRemoval = true });
                         if (forced.Succeeded)
