@@ -254,13 +254,10 @@ public class ErrorMessageLocalizerTests
 
     [Theory]
     [InlineData("invalid_type", "ImageUploadTypeInvalid")]
-    [InlineData("too_large_to_downscale", "ImageUploadTooLargeToDownscale")]
-    [InlineData("downscale_failed", "ImageUploadDownscaleFailed")]
+    [InlineData("too_large", "ImageUploadTooLarge")]
     [InlineData("ticket_failed", "ImageUploadTicketFailed")]
-    [InlineData("storage_blocked", "ImageUploadStorageBlocked")]
     [InlineData("storage_rejected", "ImageUploadRejected")]
     [InlineData("verify_failed", "ImageUploadVerifyFailed")]
-    [InlineData("network", "ErrorNetworkUnavailable")]
     [InlineData("something_new", "ImageUploadFailed")]
     public void Upload_failure_codes_map_to_their_own_message(string code, string expectedKey)
     {
@@ -271,14 +268,11 @@ public class ErrorMessageLocalizerTests
 
     [Theory]
     [InlineData("ImageUploadTypeInvalid")]
-    [InlineData("ImageUploadTooLargeToDownscale")]
-    [InlineData("ImageUploadDownscaleFailed")]
+    [InlineData("ImageUploadTooLarge")]
     [InlineData("ImageUploadTicketFailed")]
-    [InlineData("ImageUploadStorageBlocked")]
     [InlineData("ImageUploadRejected")]
     [InlineData("ImageUploadVerifyFailed")]
     [InlineData("ImageUploadFailed")]
-    [InlineData("ErrorNetworkUnavailable")]
     public void Every_image_upload_message_is_localized_in_english_and_polish(string key)
     {
         Resource("en", key).Found.Should().BeTrue(

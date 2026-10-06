@@ -44,6 +44,7 @@ builder.Services.AddTransient<IExportService, ExportService>();
 builder.Services.AddTransient<CvPlatform.Infrastructure.Exports.IProfileImageFetcher,
     CvPlatform.Infrastructure.Exports.ProfileImageFetcher>();
 builder.Services.AddSingleton<IImageStorage, CvPlatform.Infrastructure.Storage.B2ImageStorage>();
+builder.Services.AddHttpClient<CvPlatform.Web.Storage.IImageUploadClient, CvPlatform.Web.Storage.ImageUploadClient>();
 builder.Services.AddSingleton<CvPlatform.Infrastructure.Support.GoogleCredentialFactory>();
 builder.Services.AddTransient<CvPlatform.Core.Support.ISupportTicketUploader,
     CvPlatform.Infrastructure.Support.GoogleDriveSupportTicketUploader>();
@@ -133,15 +134,6 @@ builder.Services.AddRateLimiter(o =>
             QueueLimit = 0,
             AutoReplenishment = true
         }));
-    o.AddPolicy("uploads", context => RateLimitPartition.GetFixedWindowLimiter(
-        $"upload:{context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? context.Connection.RemoteIpAddress?.ToString() ?? "anonymous"}",
-        _ => new FixedWindowRateLimiterOptions
-        {
-            PermitLimit = 5,
-            Window = TimeSpan.FromMinutes(1),
-            QueueLimit = 0,
-            AutoReplenishment = true
-        }));
     o.AddPolicy("image-downloads", context => RateLimitPartition.GetFixedWindowLimiter(
         $"image-download:{context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? context.Connection.RemoteIpAddress?.ToString() ?? "anonymous"}",
         _ => new FixedWindowRateLimiterOptions
@@ -200,7 +192,6 @@ app.UseAntiforgery();
 
 app.MapStaticAssets();
 app.MapAuthEndpoints();
-app.MapB2ImageUploadEndpoints();
 app.MapProfileImageEndpoints();
 app.MapExportEndpoints();
 app.MapPositionSummaryEndpoints();

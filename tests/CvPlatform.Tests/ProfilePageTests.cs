@@ -442,7 +442,7 @@ public class ProfilePageTests : BunitContext, IAsyncLifetime
                 ["Attr.Me.Photo"] = "Photo",
                 ["Attr.Me.Email"] = "Email",
                 ["ImageAlt"] = "Profile image",
-                ["ImageDropHere"] = "Drop an image here or click to choose a file",
+                ["ImageChooseHere"] = "Click to choose an image file",
                 ["ImageFormatHint"] = "{0}. Up to {1}.",
                 ["ImageStorageUnavailable"] = "Image uploads are not available right now.",
                 ["ImageRemove"] = "Remove image",

@@ -732,19 +732,17 @@
   <data name="ErrorServiceUnavailable" xml:space="preserve"><value>Usługa jest chwilowo niedostępna. Spróbuj ponownie za chwilę.</value></data>
   <data name="ImageUploadTypeInvalid" xml:space="preserve"><value>Obsługiwane są tylko obrazy JPEG, PNG i WebP o maksymalnym rozmiarze 5 MB.</value></data>
   <data name="ImageUploadTicketFailed" xml:space="preserve"><value>Nie udało się rozpocząć przesyłania.</value></data>
-  <data name="ImageUploadStorageBlocked" xml:space="preserve"><value>Przesyłanie zostało zablokowane przez usługę magazynu. Sprawdź politykę CORS bucketu.</value></data>
   <data name="ImageUploadRejected" xml:space="preserve"><value>Usługa magazynu odrzuciła przesyłanie.</value></data>
   <data name="ImageUploadVerifyFailed" xml:space="preserve"><value>Nie udało się zweryfikować przesyłania.</value></data>
   <data name="ImageAlt" xml:space="preserve"><value>Zdjecie profilu</value></data>
-  <data name="ImageDropHere" xml:space="preserve"><value>Przeciagnij obraz lub kliknij, aby wybrac plik</value></data>
+  <data name="ImageChooseHere" xml:space="preserve"><value>Kliknij, aby wybrac plik obrazu</value></data>
   <data name="ImageChange" xml:space="preserve"><value>Zmień zdjęcie</value></data>
   <data name="ImageUploading" xml:space="preserve"><value>Wysyłanie obrazu...</value></data>
   <data name="ImageProgress" xml:space="preserve"><value>Wysyłanie: {0}%</value></data>
   <data name="ImageRemove" xml:space="preserve"><value>Usuń obraz</value></data>
-  <data name="ImageFormatHint" xml:space="preserve"><value>{0}. Maksymalnie {1}; większe zdjęcia są automatycznie zmniejszane.</value></data>
+  <data name="ImageFormatHint" xml:space="preserve"><value>{0}. Maksymalnie {1}.</value></data>
   <data name="ImageStorageUnavailable" xml:space="preserve"><value>Przesyłanie obrazów jest obecnie niedostępne.</value></data>
-  <data name="ImageUploadTooLargeToDownscale" xml:space="preserve"><value>Ten obraz jest za duży nawet po zmniejszeniu. Wybierz mniejszy plik.</value></data>
-  <data name="ImageUploadDownscaleFailed" xml:space="preserve"><value>Nie udało się przetworzyć tego obrazu. Wybierz inny plik.</value></data>
+  <data name="ImageUploadTooLarge" xml:space="preserve"><value>Ten obraz jest za duży. Wybierz mniejszy plik.</value></data>
   <data name="ErrorNetworkUnavailable" xml:space="preserve"><value>Połączenie zostało przerwane. Sprawdź sieć i spróbuj ponownie.</value></data>
   <data name="ProfilePhoto" xml:space="preserve"><value>Zdjecie</value></data>
   <data name="ProfilePhotoHint" xml:space="preserve"><value>Używane jako awatar w całej platformie.</value></data>

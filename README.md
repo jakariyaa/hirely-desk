@@ -9,7 +9,7 @@ Hirely Desk is a CV management and recruitment platform. Candidates maintain reu
 - Public and access-controlled positions
 - Candidate profiles, projects, CV publishing, search, discussions, and likes
 - PDF, XLSX, and CSV exports
-- Backblaze B2 direct image uploads
+- Backblaze B2 image uploads
 - Token-protected aggregated-results API with an Odoo 18 read-only viewer
 - English and Polish localization
 
@@ -256,25 +256,9 @@ Optional integrations are enabled only when fully configured:
 
 Use user secrets locally and an approved production secret-management solution in deployment. Seed passwords are not reset when the configuration changes.
 
-B2 is optional for local development, but the production Compose file requires it. The bucket is private and its CORS rule must allow the exact application origin, the `PUT` method, and the `content-type` request header. `content-type` is not a CORS-safelisted value for `image/png`, so the browser always issues an `OPTIONS` preflight; a missing or incorrect rule makes the upload fail with an opaque browser network error. A suitable policy is:
+B2 is optional for local development, but the production Compose file requires it. The bucket is private and no CORS rule is needed: the server performs the upload `PUT` itself, so the browser never talks to B2. The bucket-scoped B2 application key needs both `writeFiles` for the upload `PUT` and `readFiles` for the server-side `HeadObject` verification on upload completion and for export/download reads. `B2:Region` produces an HTTPS S3 endpoint in the form `https://s3.<region>.backblazeb2.com`.
 
-```json
-{
-  "CORSRules": [
-    {
-      "AllowedOrigins": ["https://hirelydesk.jakariya.eu.org"],
-      "AllowedMethods": ["PUT", "GET", "HEAD"],
-      "AllowedHeaders": ["*"],
-      "ExposeHeaders": ["ETag"],
-      "MaxAgeSeconds": 3000
-    }
-  ]
-}
-```
-
-Match `AllowedOrigins` to the real deployed origin for each environment. The bucket-scoped B2 application key needs both `writeFiles` for the browser PUT and `readFiles` for the server-side `HeadObject` verification on upload completion and export/download reads. The authenticated upload endpoints are rate limited to 5 requests per minute, and each upload attempt consumes two requests (presign + complete). `B2:Region` produces an HTTPS S3 endpoint in the form `https://s3.<region>.backblazeb2.com`.
-
-Profile images support JPEG, PNG, and WebP files up to 5 MiB by default. Authenticated users request a short-lived upload URL, upload directly from the browser, and complete the upload so the server can verify its object key, content type, and size. The application stores only B2 object keys, serves images through authorization-protected endpoints, signs short-lived GET URLs after authorization, and reads export images through the server-side S3 client. Presigned URLs are bearer tokens and must not be persisted or logged. `B2:PresignedUrlLifetimeSeconds` and `B2:DownloadUrlLifetimeSeconds` must each be between 1 second and 7 days; `B2:MaxUploadBytes` must be between 1 byte and 25 MiB.
+Profile images support JPEG, PNG, and WebP files up to 5 MiB by default. `InputFile` hands the file to the Blazor circuit, the server signs a short-lived upload URL with `IImageStorage`, streams the bytes to B2 through `IImageUploadClient` (with a progress bar), and verifies the object key, content type, and size before the value is saved. Files larger than `B2:MaxUploadBytes` are rejected with a message instead of being scaled down. The application stores only B2 object keys, serves images through authorization-protected endpoints, signs short-lived GET URLs after authorization, and reads export images through the server-side S3 client. Presigned URLs are bearer tokens and must not be persisted or logged. `B2:PresignedUrlLifetimeSeconds` and `B2:DownloadUrlLifetimeSeconds` must each be between 1 second and 7 days; `B2:MaxUploadBytes` must be between 1 byte and 25 MiB.
 
 The `ImageObjectKeys` migration only renames the existing `image_url` column to `image_object_key`; it does not copy objects or transform legacy Cloudinary URLs. Before applying it in an environment with existing images, copy each legacy object into the private B2 bucket, verify the copy, and replace each stored legacy URL with its canonical object key in the expected user profile path. Apply the schema migration only after that backfill is complete.
 

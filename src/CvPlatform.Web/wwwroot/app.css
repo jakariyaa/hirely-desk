@@ -678,17 +678,10 @@ html, body {
     outline-offset: 2px;
 }
 
-.cv-image-dropzone-dragging {
-    border-color: var(--cv-primary);
-    border-style: solid;
-    background-color: rgba(21, 101, 192, 0.08);
-}
-
 /*
- * The native input stays in the DOM because it is the only way to obtain a File without streaming
- * it through the Blazor circuit, which would defeat the direct-to-storage upload. It is visually
- * hidden but kept focusable and label-associated, so pointer, keyboard and assistive technology
- * all reach the real file picker.
+ * The native input stays in the DOM because InputFile is what turns it into an IBrowserFile. It is
+ * visually hidden but kept focusable and label-associated, so pointer, keyboard and assistive
+ * technology all reach the real file picker.
  */
 .cv-image-sr-only {
     position: absolute;

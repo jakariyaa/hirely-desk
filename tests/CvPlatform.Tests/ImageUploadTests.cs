@@ -1,5 +1,6 @@
 using AwesomeAssertions;
 using CvPlatform.Infrastructure.Storage;
+using CvPlatform.Web.Storage;
 using Microsoft.Extensions.Options;
 
 namespace CvPlatform.Tests;
@@ -84,5 +85,28 @@ public class ImageUploadTests
         }));
 
         storage.CreateUploadTicket(Guid.NewGuid(), contentType, 100).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Progressing_content_streams_the_body_and_reports_the_bytes_written()
+    {
+        var payload = new byte[ProgressStreamContent.BufferSize + 100];
+        Random.Shared.NextBytes(payload);
+        var reports = new List<int>();
+
+        using var content = new ProgressStreamContent(
+            new MemoryStream(payload), payload.Length, new CollectingProgress(reports));
+
+        using var target = new MemoryStream();
+        await content.CopyToAsync(target);
+
+        target.ToArray().Should().Equal(payload);
+        content.Headers.ContentLength.Should().Be(payload.Length);
+        reports.Should().ContainInOrder(99, 100);
+    }
+
+    private sealed class CollectingProgress(List<int> reports) : IProgress<int>
+    {
+        public void Report(int value) => reports.Add(value);
     }
 }

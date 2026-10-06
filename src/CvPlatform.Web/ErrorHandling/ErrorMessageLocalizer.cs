@@ -31,13 +31,10 @@ public sealed class ErrorMessageLocalizer(
     public string DescribeUploadFailure(string? code) => code switch
     {
         "invalid_type" => Text("ImageUploadTypeInvalid"),
-        "too_large_to_downscale" => Text("ImageUploadTooLargeToDownscale"),
-        "downscale_failed" => Text("ImageUploadDownscaleFailed"),
+        "too_large" => Text("ImageUploadTooLarge"),
         "ticket_failed" => Text("ImageUploadTicketFailed"),
-        "storage_blocked" => Text("ImageUploadStorageBlocked"),
         "storage_rejected" => Text("ImageUploadRejected"),
         "verify_failed" => Text("ImageUploadVerifyFailed"),
-        "network" => Text("ErrorNetworkUnavailable"),
         _ => Text("ImageUploadFailed")
     };
 
