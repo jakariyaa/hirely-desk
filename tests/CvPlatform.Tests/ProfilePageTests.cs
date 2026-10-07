@@ -3,6 +3,7 @@ using Bunit;
 using CvPlatform.Application.Attributes;
 using CvPlatform.Application.Authorization;
 using CvPlatform.Application.Common;
+using CvPlatform.Application.Crm;
 using CvPlatform.Application.Profiles;
 using CvPlatform.Core.Enums;
 using CvPlatform.Core.Entities;
@@ -10,6 +11,7 @@ using CvPlatform.Core.Storage;
 using CvPlatform.Web.Components.Pages;
 using CvPlatform.Web.Components.Shared;
 using CvPlatform.Web.Resources;
+using CvPlatform.Web.Storage;
 using CvPlatform.Web.State;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Components;
@@ -50,6 +52,8 @@ public class ProfilePageTests : BunitContext, IAsyncLifetime
         Services.AddSingleton<IProfileService>(_profiles);
         Services.AddSingleton<AuthenticationStateProvider>(new StubAuthenticationStateProvider(UserId));
         Services.AddSingleton<SignInManager<ApplicationUser>>(new StubSignInManager());
+        Services.AddSingleton<ICrmSyncService, StubCrmSyncService>();
+        Services.AddSingleton<IImageUploadClient, StubImageUploadClient>();
         JSInterop.Mode = JSRuntimeMode.Loose;
     }
 
@@ -108,14 +112,11 @@ public class ProfilePageTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
-    public void A_save_status_region_is_always_present_so_the_outcome_is_never_silent()
+    public void There_is_no_persistent_save_status_pill_because_a_saved_toast_is_enough()
     {
         var cut = RenderPage();
 
-        var status = cut.Find(".cv-save-status");
-        status.GetAttribute("role").Should().Be("status");
-        status.GetAttribute("aria-live").Should().Be("polite");
-        status.TextContent.Should().Contain("All changes saved");
+        cut.FindAll(".cv-save-status").Should().BeEmpty();
     }
 
     [Fact]
@@ -145,16 +146,17 @@ public class ProfilePageTests : BunitContext, IAsyncLifetime
 
         // The debounce is real, so wait for the service rather than for a specific label.
         _profiles.Saved.Wait(TimeSpan.FromSeconds(10)).Should().BeTrue();
-        cut.WaitForState(() => cut.Find(".cv-save-status").TextContent.Contains("All changes saved"));
 
         _profiles.SavedInputs.Should().ContainSingle();
         _profiles.SavedInputs[0].AttributeDefinitionId.Should().Be(NameId);
         _profiles.SavedInputs[0].StringValue.Should().Be("Ada");
-        cut.FindComponent<NavigationLock>().Instance.ConfirmExternalNavigation.Should().BeFalse();
+        // The component clears its dirty flag after the service returns, so poll for the lock opening.
+        cut.WaitForAssertion(() =>
+            cut.FindComponent<NavigationLock>().Instance.ConfirmExternalNavigation.Should().BeFalse());
     }
 
     [Fact]
-    public async Task A_failed_save_surfaces_in_the_status_region_and_keeps_the_lock_closed()
+    public async Task A_failed_save_warns_the_user_and_keeps_the_lock_closed()
     {
         _profiles.SaveError = new AppError(ErrorCodes.Unexpected, "boom");
         var cut = RenderPage();
@@ -163,7 +165,8 @@ public class ProfilePageTests : BunitContext, IAsyncLifetime
         cut.FindAll("input[type=text]")[0].Change("Ada");
 
         _profiles.Saved.Wait(TimeSpan.FromSeconds(10)).Should().BeTrue();
-        cut.WaitForState(() => cut.Find(".cv-save-status").TextContent.Contains("could not be saved"));
+        cut.WaitForAssertion(() =>
+            cut.FindComponent<NavigationLock>().Instance.ConfirmExternalNavigation.Should().BeTrue());
     }
 
     [Fact]
@@ -322,6 +325,25 @@ public class ProfilePageTests : BunitContext, IAsyncLifetime
     {
         public override Task<IEnumerable<AuthenticationScheme>> GetExternalAuthenticationSchemesAsync() =>
             Task.FromResult<IEnumerable<AuthenticationScheme>>([new("Google", "Google", typeof(StubExternalHandler))]);
+    }
+
+    private sealed class StubImageUploadClient : IImageUploadClient
+    {
+        public Task<bool> PutAsync(
+            ImageUploadTicket ticket, Stream content, long size, IProgress<int>? progress,
+            CancellationToken cancellationToken) => Task.FromResult(true);
+    }
+
+    private sealed class StubCrmSyncService : ICrmSyncService
+    {
+        public bool IsConfigured => false;
+
+        public Task<bool> IsSyncedAsync(ActorContext actor, Guid userId, CancellationToken ct = default) =>
+            Task.FromResult(false);
+
+        public Task<Result<CrmSyncOutcome>> SyncAsync(
+            ActorContext actor, Guid userId, CrmSyncInput input, CancellationToken ct = default) =>
+            throw new NotSupportedException();
     }
 
     private sealed class StubUserConfirmation : IUserConfirmation<ApplicationUser>

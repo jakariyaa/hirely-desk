@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using System.Threading.RateLimiting;
 using CvPlatform.Core.Support;
 using Google.Apis.Drive.v3;
 using Microsoft.Extensions.Logging;
@@ -10,6 +11,7 @@ namespace CvPlatform.Infrastructure.Support;
 public sealed class GoogleDriveSupportTicketUploader(
     IOptions<GoogleOptions> options,
     GoogleCredentialFactory credentials,
+    RateLimiter ticketRateLimiter,
     ILogger<GoogleDriveSupportTicketUploader> logger) : ISupportTicketUploader
 {
     public bool IsConfigured => _options.IsConfigured;
@@ -20,6 +22,13 @@ public sealed class GoogleDriveSupportTicketUploader(
         if (!IsConfigured)
         {
             logger.LogDebug("Google Drive is not configured; support ticket not uploaded");
+            return false;
+        }
+
+        using var lease = await ticketRateLimiter.AcquireAsync(1, ct);
+        if (!lease.IsAcquired)
+        {
+            logger.LogWarning("Support ticket rate limit reached; ticket not uploaded");
             return false;
         }
 

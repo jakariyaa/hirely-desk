@@ -32,6 +32,8 @@ services:
         condition: service_healthy
     ports:
       - "127.0.0.1:8069:8069"
+    # Postgres credentials only; the entrypoint forwards these as db_host/db_user/db_password.
+    # They are NOT web login credentials - log in to Odoo as admin/admin.
     environment:
       HOST: odoo-db
       USER: odoo

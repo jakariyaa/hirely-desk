@@ -5,8 +5,6 @@ namespace CvPlatform.Web.Integration;
 
 public static class DriveWebhookEndpoints
 {
-    private static readonly SemaphoreSlim Gate = new(1, 1);
-
     public static void MapDriveWebhookEndpoints(this WebApplication app)
     {
         app.MapPost("/api/v1/integrations/drive/webhook", async (
@@ -22,15 +20,7 @@ public static class DriveWebhookEndpoints
             var state = ctx.Request.Headers["X-Goog-Resource-State"].ToString();
             if (!string.Equals(state, "sync", StringComparison.OrdinalIgnoreCase))
             {
-                await Gate.WaitAsync(ct);
-                try
-                {
-                    await processor.ProcessPendingAsync(ct);
-                }
-                finally
-                {
-                    Gate.Release();
-                }
+                await processor.ProcessPendingAsync(ct);
             }
             return Results.Ok();
         }).AllowAnonymous();

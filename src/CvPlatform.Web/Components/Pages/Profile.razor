@@ -21,6 +21,7 @@
 @inject ICrmSyncService CrmSyncService
 @inject AuthenticationStateProvider AuthProvider
 @inject IUiErrorReporter Errors
+@inject ISnackbar Snackbar
 @inject IDialogService DialogService
 @inject IStringLocalizer<SharedResource> L
 @inject ProfileHeaderState ProfileHeader
@@ -32,24 +33,6 @@
 
 <NavigationLock ConfirmExternalNavigation="@HasUnsavedChanges"
                 OnBeforeInternalNavigation="ConfirmLeaveAsync" />
-
-<div class="cv-save-status" role="status" aria-live="polite">
-    @switch (_saveState)
-    {
-        case SaveState.Saving:
-            <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Primary" />
-            <MudText Typo="Typo.body2">@L["ProfileSaving"]</MudText>
-            break;
-        case SaveState.Failed:
-            <MudIcon Icon="@Icons.Material.Filled.ErrorOutline" Size="Size.Small" Color="Color.Error" />
-            <MudText Typo="Typo.body2" Color="Color.Error">@L["ProfileSaveFailed"]</MudText>
-            break;
-        default:
-            <MudIcon Icon="@Icons.Material.Filled.CloudDone" Size="Size.Small" Color="Color.Success" />
-            <MudText Typo="Typo.body2">@L["ProfileSaved"]</MudText>
-            break;
-    }
-</div>
 
 @if (_loading)
 {
@@ -217,13 +200,6 @@ else
 }
 
 @code {
-    private enum SaveState
-    {
-        Idle,
-        Saving,
-        Failed
-    }
-
     private const string AccountAnchor = "profile-section-account";
     private const int AutosaveDelayMilliseconds = 700;
 
@@ -235,7 +211,6 @@ else
     private ActorContext? _actor;
     private IReadOnlyList<AuthenticationScheme> _externalSchemes = [];
     private bool _loading;
-    private SaveState _saveState = SaveState.Idle;
     private string _activeAnchor = string.Empty;
     private string? _error;
     private string? _displayName;
@@ -270,7 +245,6 @@ else
         await CancelPendingAutosavesAsync();
         _saving.Clear();
         _dirty.Clear();
-        _saveState = SaveState.Idle;
         _loading = true;
         _error = null;
         try
@@ -422,7 +396,6 @@ else
     private async Task DraftChangedAsync(Guid definitionId)
     {
         _dirty.Add(definitionId);
-        _saveState = SaveState.Idle;
         StateHasChanged();
 
         if (_autosave.Remove(definitionId, out var previous))
@@ -455,7 +428,6 @@ else
         if (!_saving.Add(definition.Id))
             return;
 
-        _saveState = SaveState.Saving;
         try
         {
             if (!_drafts.TryGetValue(definition.Id, out var draft))
@@ -476,7 +448,7 @@ else
                 }
 
                 _dirty.Remove(definition.Id);
-                _saveState = SaveState.Idle;
+                Snackbar.Add(L["ProfileSaved"], Severity.Success);
                 await ProfileHeader.NotifyChangedAsync();
                 var refreshed = await ProfileService.GetSummaryForUserAsync(actor, actor.UserId);
                 if (refreshed.Succeeded)
@@ -487,12 +459,10 @@ else
                 return;
             }
 
-            _saveState = SaveState.Failed;
             await HandleSaveFailureAsync(result.Error);
         }
         catch (Exception ex)
         {
-            _saveState = SaveState.Failed;
             Errors.Notify(ex);
         }
         finally
@@ -521,7 +491,7 @@ else
     private async Task ConfirmLeaveAsync(LocationChangingContext context)
     {
         // A pending autosave lands on its own, so only a field that is still waiting needs a prompt.
-        if (!HasUnsavedChanges || _saveState == SaveState.Saving)
+        if (!HasUnsavedChanges || _saving.Count > 0)
             return;
 
         var discard = await DialogService.ShowMessageBoxAsync(

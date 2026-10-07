@@ -1,6 +1,5 @@
 using System.Buffers.Text;
 using System.Net;
-using System.Text;
 using System.Text.Json;
 using CvPlatform.Core.Support;
 using Google.Apis.Drive.v3;
@@ -14,47 +13,74 @@ namespace CvPlatform.Infrastructure.Support;
 
 public sealed class SupportTicketProcessor(
     IOptions<GoogleOptions> options,
+    IOptions<SupportOptions> supportOptions,
     GoogleCredentialFactory credentials,
     ILogger<SupportTicketProcessor> logger)
 {
+    // ponytail: one sweep processes at most this many files so a backlog cannot flood the
+    // admin inbox in a single pass; the 1-minute sweep drains the remainder. Raise only if
+    // a real backlog is observed.
+    private const int MaxFilesPerSweep = 500;
+    private const int PageSize = 100;
+
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
+    private static readonly SemaphoreSlim Gate = new(1, 1);
+
     private readonly GoogleOptions _options = options.Value;
+    private readonly SupportOptions _support = supportOptions.Value;
 
     public async Task ProcessPendingAsync(CancellationToken ct = default)
     {
         if (!_options.IsConfigured || string.IsNullOrWhiteSpace(_options.DriveProcessedFolderId))
             return;
 
+        // Without a recipient the sweep would move tickets to Processed having emailed
+        // nobody, silently dropping them. Leave them pending until config is fixed.
+        if (_support.AdminEmailList.Count == 0)
+        {
+            logger.LogWarning("Support has no admin recipients configured; leaving tickets pending");
+            return;
+        }
+
+        await Gate.WaitAsync(ct);
+        try
+        {
+            await ProcessCoreAsync(ct);
+        }
+        finally
+        {
+            Gate.Release();
+        }
+    }
+
+    private async Task ProcessCoreAsync(CancellationToken ct)
+    {
         var drive = credentials.CreateDriveService();
         var gmail = credentials.CreateGmailService();
 
-        var listRequest = drive.Files.List();
-        listRequest.Q = $"'{_options.DriveFolderId}' in parents and trashed = false and mimeType = 'application/json'";
-        listRequest.Fields = "files(id, name)";
-        listRequest.OrderBy = "createdTime";
-        var pending = (await listRequest.ExecuteAsync(ct)).Files;
-        if (pending is null || pending.Count == 0)
+        var files = await ListPendingAsync(drive, ct);
+        if (files.Count == 0)
             return;
 
-        foreach (var file in pending)
+        foreach (var file in files)
         {
             try
             {
                 var get = drive.Files.Get(file.Id);
                 using var buffer = new MemoryStream();
                 await get.DownloadAsync(buffer, ct);
-                var ticket = JsonSerializer.Deserialize<SupportTicket>(buffer.ToArray(), JsonOptions);
-                if (ticket is null)
-                    continue;
 
-                var subject = $"[Support] [{ticket.Priority}] {Truncate(ticket.Summary, 60)}";
-                await SendAsync(gmail, subject, BuildHtml(ticket), ct, ticket);
+                if (!TryRead(buffer.ToArray(), out var ticket, out var reason))
+                {
+                    logger.LogError("Discarding malformed support ticket file {Id}: {Reason}", file.Id, reason);
+                }
+                else
+                {
+                    var subject = $"[Support] [{ticket.Priority}] {Truncate(ticket.Summary!, 60)}";
+                    await SendAsync(gmail, subject, BuildHtml(ticket), ct);
+                }
 
-                var update = drive.Files.Update(new Google.Apis.Drive.v3.Data.File(), file.Id);
-                update.AddParents = _options.DriveProcessedFolderId;
-                update.RemoveParents = _options.DriveFolderId;
-                update.Fields = "id, parents";
-                await update.ExecuteAsync(ct);
+                await MoveToProcessedAsync(drive, file.Id, ct);
                 logger.LogInformation("Processed support ticket {File}", file.Name);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
@@ -64,18 +90,80 @@ public sealed class SupportTicketProcessor(
         }
     }
 
-    private async Task SendAsync(GmailService gmail, string subject, string html,
-        CancellationToken ct, SupportTicket ticket)
+    private async Task<List<Google.Apis.Drive.v3.Data.File>> ListPendingAsync(
+        DriveService drive, CancellationToken ct)
     {
-        var admins = ticket.AdminEmails
-            .Where(e => !string.IsNullOrWhiteSpace(e))
-            .ToList();
-        if (admins.Count == 0)
+        var files = new List<Google.Apis.Drive.v3.Data.File>();
+        string? pageToken = null;
+        do
         {
-            logger.LogWarning("Support ticket has no admin recipients; skipping email");
-            return;
+            var listRequest = drive.Files.List();
+            listRequest.Q = $"'{_options.DriveFolderId}' in parents and trashed = false and mimeType = 'application/json'";
+            listRequest.Fields = "files(id, name)";
+            listRequest.OrderBy = "createdTime";
+            listRequest.PageSize = PageSize;
+            listRequest.PageToken = pageToken;
+            var page = await listRequest.ExecuteAsync(ct);
+            if (page.Files is not null)
+                files.AddRange(page.Files);
+            pageToken = page.NextPageToken;
+        } while (pageToken is not null && files.Count < MaxFilesPerSweep);
+
+        return files.Take(MaxFilesPerSweep).ToList();
+    }
+
+    private async Task MoveToProcessedAsync(DriveService drive, string fileId, CancellationToken ct)
+    {
+        var update = drive.Files.Update(new Google.Apis.Drive.v3.Data.File(), fileId);
+        update.AddParents = _options.DriveProcessedFolderId;
+        update.RemoveParents = _options.DriveFolderId;
+        update.Fields = "id, parents";
+        await update.ExecuteAsync(ct);
+    }
+
+    public static bool TryRead(byte[] payload, out SupportTicket? ticket, out string reason)
+    {
+        try
+        {
+            ticket = JsonSerializer.Deserialize<SupportTicket>(payload, JsonOptions);
+        }
+        catch (JsonException)
+        {
+            ticket = null;
+            reason = "payload is not valid JSON";
+            return false;
         }
 
+        return TryValidate(ticket, out reason);
+    }
+
+    public static bool TryValidate(SupportTicket? ticket, out string reason)
+    {
+        if (ticket is null)
+        {
+            reason = "payload is not a support ticket";
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(ticket.Summary))
+        {
+            reason = "summary is missing";
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(ticket.Priority))
+        {
+            reason = "priority is missing";
+            return false;
+        }
+
+        reason = "";
+        return true;
+    }
+
+    private async Task SendAsync(GmailService gmail, string subject, string html, CancellationToken ct)
+    {
+        var admins = _support.AdminEmailList;
         var message = new MimeMessage();
         foreach (var admin in admins)
             message.To.Add(MailboxAddress.Parse(admin));
@@ -104,7 +192,6 @@ public sealed class SupportTicketProcessor(
             ("Link", ticket.Link),
             ("Priority", ticket.Priority),
             ("Summary", ticket.Summary),
-            ("Admins", string.Join(", ", ticket.AdminEmails)),
         }.Select(row =>
             $"<tr><td style=\"padding:6px 12px;font-weight:bold;vertical-align:top\">{WebUtility.HtmlEncode(row.Label)}</td><td style=\"padding:6px 12px\">{WebUtility.HtmlEncode(row.Value ?? "")}</td></tr>"));
         return $"""

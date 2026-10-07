@@ -4,6 +4,7 @@
 @using CvPlatform.Web.Resources
 @using Microsoft.Extensions.Localization
 @inject ICrmSyncService CrmSync
+@inject IUiErrorReporter Errors
 @inject IStringLocalizer<SharedResource> L
 @inject ISnackbar Snackbar
 
@@ -77,7 +78,7 @@
             }
             else
             {
-                _error = result.Error.Message;
+                _error = Errors.Report(result.Error);
             }
         }
         finally

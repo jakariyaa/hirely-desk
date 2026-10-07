@@ -46,6 +46,17 @@ builder.Services.AddTransient<CvPlatform.Infrastructure.Exports.IProfileImageFet
 builder.Services.AddSingleton<IImageStorage, CvPlatform.Infrastructure.Storage.B2ImageStorage>();
 builder.Services.AddHttpClient<CvPlatform.Web.Storage.IImageUploadClient, CvPlatform.Web.Storage.ImageUploadClient>();
 builder.Services.AddSingleton<CvPlatform.Infrastructure.Support.GoogleCredentialFactory>();
+// Global, not per-user: the cost of a support ticket lands on every admin inbox, so one
+// tight global cap bounds that blast radius better than per-user partitions would.
+// Endpoint rate limiting cannot cover this — the upload runs inside a Blazor circuit.
+builder.Services.AddSingleton<RateLimiter>(new FixedWindowRateLimiter(
+    new FixedWindowRateLimiterOptions
+    {
+        PermitLimit = 10,
+        Window = TimeSpan.FromMinutes(1),
+        QueueLimit = 0,
+        AutoReplenishment = true
+    }));
 builder.Services.AddTransient<CvPlatform.Core.Support.ISupportTicketUploader,
     CvPlatform.Infrastructure.Support.GoogleDriveSupportTicketUploader>();
 builder.Services.AddTransient<CvPlatform.Infrastructure.Support.SupportTicketProcessor>();

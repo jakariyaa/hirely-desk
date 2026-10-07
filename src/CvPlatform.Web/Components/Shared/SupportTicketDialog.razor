@@ -3,7 +3,7 @@
 @inject NavigationManager Navigation
 @inject IPositionService PositionService
 @inject CvPlatform.Core.Support.ISupportTicketUploader TicketUploader
-@inject IOptions<CvPlatform.Infrastructure.Support.SupportOptions> SupportOptions
+@inject IUiErrorReporter Errors
 @inject ISnackbar Snackbar
 @inject IStringLocalizer<SharedResource> L
 @using CvPlatform.Application.Authorization
@@ -13,7 +13,6 @@
 @using CvPlatform.Web.Resources
 @using Microsoft.AspNetCore.Identity
 @using Microsoft.Extensions.Localization
-@using Microsoft.Extensions.Options
 
 <MudForm @ref="_form">
     <MudDialog>
@@ -79,9 +78,8 @@
                 : authState.User.IsInRole(Roles.Recruiter) ? Roles.Recruiter
                 : authState.User.IsInRole(Roles.Candidate) ? Roles.Candidate : "User";
             var reportedBy = $"{user?.Email ?? authState.User.Identity?.Name} ({role})";
-            var admins = SupportOptions.Value.AdminEmailList;
             var ticket = new CvPlatform.Core.Support.SupportTicket(
-                reportedBy, _position, Navigation.Uri, _priority, _summary, admins);
+                reportedBy, _position, Navigation.Uri, _priority, _summary);
 
             if (await TicketUploader.UploadAsync(ticket))
             {
@@ -92,6 +90,10 @@
             {
                 Snackbar.Add(L["TicketUploadFailed"], Severity.Error);
             }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(Errors.Report(ex), Severity.Error);
         }
         finally
         {
@@ -119,8 +121,9 @@
                 }
             }
         }
-        catch
+        catch (Exception ex)
         {
+            Errors.Report(ex);
         }
         return null;
     }

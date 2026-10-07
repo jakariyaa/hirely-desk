@@ -146,6 +146,8 @@ docker compose -f compose.odoo.yml ps
 
 Open <http://localhost:8069> and create the first database (any name). The master password is only needed to manage databases.
 
+Log in with login `admin` and password `admin`. The `odoo` / `odoo` values in `compose.odoo.yml` are the PostgreSQL credentials, not the Odoo web login.
+
 ### Install the Odoo application
 
 1. Open **Apps**, remove the default `Apps` filter, and search for **Hirely Desk Position Viewer**.
