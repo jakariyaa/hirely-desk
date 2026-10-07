@@ -62,140 +62,119 @@ else
         <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-4">@_error</MudAlert>
     }
 
-    <div class="cv-profile-layout">
-        <nav class="cv-profile-nav" aria-label="@L["ProfileJumpToSection"]">
-            <MudText Typo="Typo.overline" Class="cv-text-caption">@L["ProfileJumpToSection"]</MudText>
-            <MudList T="string" Dense="true" Class="pa-0">
-                @foreach (var category in _catalog)
+    <div class="cv-profile-form">
+        <MudPaper Class="cv-panel pa-4 mb-4 cv-profile-header">
+            <div class="cv-profile-header-main">
+                @if (_headerImageValueId is not null)
                 {
-                    <MudListItem T="string"
-                                 Text="@category.Name"
-                                 Href="@("#" + AnchorFor(category))"
-                                 Class="@NavItemClass(category.Id)"
-                                 @onclick="@(() => SelectAnchor(AnchorFor(category)))" />
-                }
-                <MudListItem T="string"
-                             Text="@L["ProfileAccount"]"
-                             Href="@("#" + AccountAnchor)"
-                             Class="@NavItemClass(default, AccountAnchor)"
-                             @onclick="@(() => SelectAnchor(AccountAnchor))" />
-            </MudList>
-        </nav>
-
-        <div class="cv-profile-form">
-            <MudPaper Class="cv-panel pa-4 mb-4 cv-profile-header">
-                <div class="cv-profile-header-main">
-                    @if (_headerImageValueId is not null)
-                    {
-                        <MudImage Src="@ImageContentUrl(_headerImageValueId.Value)" Alt="@HeaderName" Class="cv-profile-header-avatar" />
-                    }
-                    else
-                    {
-                        <span class="cv-profile-header-avatar cv-profile-header-initials" aria-hidden="true">@HeaderInitials</span>
-                    }
-                    <div class="cv-profile-header-text">
-                        <MudText Typo="Typo.h5">@HeaderName</MudText>
-                        <MudText Typo="Typo.body2" Class="cv-text-caption">@_email</MudText>
-                    </div>
-                </div>
-                <div class="cv-profile-completion">
-                    <div class="cv-profile-completion-label">
-                        <MudText Typo="Typo.caption">@L["ProfileCompletion"]</MudText>
-                        <MudText Typo="Typo.caption">@CompletionPercent%</MudText>
-                    </div>
-                    <MudProgressLinear Color="Color.Primary" Size="Size.Small" Value="@CompletionPercent" />
-                </div>
-            </MudPaper>
-
-            @if (PhotoDefinition is not null)
-            {
-                <MudPaper Class="cv-panel pa-4 mb-4 cv-profile-section" id="@AnchorFor(PhotoDefinition.Id)">
-                    <div class="cv-profile-section-head">
-                        <div>
-                            <MudText Typo="Typo.h6">@L["ProfilePhoto"]</MudText>
-                            <MudText Typo="Typo.body2" Class="cv-text-caption">@L["ProfilePhotoHint"]</MudText>
-                        </div>
-                    </div>
-                    <AttributeValueEditor Definition="PhotoDefinition"
-                                           Value="@Draft(PhotoDefinition.Id)"
-                                           Disabled="@IsSaving(PhotoDefinition.Id)"
-                                           OnChanged="@(() => DraftChangedAsync(PhotoDefinition.Id))" />
-                </MudPaper>
-            }
-
-            @foreach (var category in _catalog)
-            {
-                var definitions = DefinitionsOf(category);
-                if (definitions.Count == 0)
-                {
-                    continue;
-                }
-
-                <MudPaper Class="cv-panel pa-4 mb-4 cv-profile-section" id="@AnchorFor(category.Id)">
-                    <MudText Typo="Typo.h6" Class="mb-3">@category.Name</MudText>
-                    @foreach (var definition in definitions)
-                    {
-                        <div class="cv-attribute-row">
-                            <MudText Typo="Typo.body2" Class="cv-attribute-label">
-                                @AttributeLabels.Localize(L, definition.Name)
-                            </MudText>
-                            <AttributeValueEditor Definition="definition"
-                                                   Value="@Draft(definition.Id)"
-                                                   Disabled="@IsSaving(definition.Id)"
-                                                   OnChanged="@(() => DraftChangedAsync(definition.Id))" />
-                            <div class="cv-attribute-status">
-                                @if (IsSaving(definition.Id))
-                                {
-                                    <MudProgressCircular Size="Size.Small" Indeterminate="true" />
-                                }
-                                else if (_dirty.Contains(definition.Id))
-                                {
-                                    <MudIcon Icon="@Icons.Material.Filled.Schedule"
-                                             Size="Size.Small"
-                                             Color="Color.Warning"
-                                             title="@L["ProfilePendingSave"]" />
-                                }
-                            </div>
-                        </div>
-                    }
-                </MudPaper>
-            }
-
-            <MudPaper Class="cv-panel pa-4 mb-4 cv-profile-section" id="@AccountAnchor">
-                <MudText Typo="Typo.h6" Class="mb-1">@L["ProfileAccount"]</MudText>
-                <MudText Typo="Typo.body2" Class="cv-text-caption mb-3">@L["ProfileExternalLoginsHint"]</MudText>
-                @if (_externalSchemes.Count == 0)
-                {
-                    <MudText Typo="Typo.body2">@L["ExternalLoginUnavailable"]</MudText>
+                    <MudImage Src="@ImageContentUrl(_headerImageValueId.Value)" Alt="@HeaderName" Class="cv-profile-header-avatar" />
                 }
                 else
                 {
-                    <ExternalProviderButtons Providers="_externalSchemes"
-                                             ReturnUrl="/profile"
-                                             LinkMode="true"
-                                             Color="Color.Primary"
-                                             CssClass="d-flex flex-wrap gap-2"
-                                             LabelFor="@(provider => L["LinkExternalProvider", provider.DisplayName ?? provider.Name])" />
+                    <span class="cv-profile-header-avatar cv-profile-header-initials" aria-hidden="true">@HeaderInitials</span>
                 }
-            </MudPaper>
+                <div class="cv-profile-header-text">
+                    <MudText Typo="Typo.h5">@HeaderName</MudText>
+                    <MudText Typo="Typo.body2" Class="cv-text-caption">@_email</MudText>
+                </div>
+            </div>
+            <div class="cv-profile-completion">
+                <div class="cv-profile-completion-label">
+                    <MudText Typo="Typo.caption">@L["ProfileCompletion"]</MudText>
+                    <MudText Typo="Typo.caption">@CompletionPercent%</MudText>
+                </div>
+                <MudProgressLinear Color="Color.Primary" Size="Size.Small" Value="@CompletionPercent" />
+            </div>
+        </MudPaper>
 
-            <MudPaper Class="cv-panel pa-4 mb-4 cv-profile-section">
-                <MudText Typo="Typo.h6" Class="mb-1">@L["CrmSectionTitle"]</MudText>
-                <MudText Typo="Typo.body2" Class="cv-text-caption mb-3">@L["CrmSectionHint"]</MudText>
-                @if (_crmSynced)
+        @if (PhotoDefinition is not null)
+        {
+            <MudPaper Class="cv-panel pa-4 mb-4 cv-profile-section" id="@AnchorFor(PhotoDefinition.Id)">
+                <div class="cv-profile-section-head">
+                    <div>
+                        <MudText Typo="Typo.h6">@L["ProfilePhoto"]</MudText>
+                        <MudText Typo="Typo.body2" Class="cv-text-caption">@L["ProfilePhotoHint"]</MudText>
+                    </div>
+                </div>
+                <AttributeValueEditor Definition="PhotoDefinition"
+                                       Value="@Draft(PhotoDefinition.Id)"
+                                       Disabled="@IsSaving(PhotoDefinition.Id)"
+                                       OnChanged="@(() => DraftChangedAsync(PhotoDefinition.Id))" />
+            </MudPaper>
+        }
+
+        @foreach (var category in _catalog)
+        {
+            var definitions = DefinitionsOf(category);
+            if (definitions.Count == 0)
+            {
+                continue;
+            }
+
+            <MudPaper Class="cv-panel pa-4 mb-4 cv-profile-section" id="@AnchorFor(category.Id)">
+                <MudText Typo="Typo.h6" Class="mb-3">@category.Name</MudText>
+                @foreach (var definition in definitions)
                 {
-                    <MudAlert Severity="Severity.Success" Dense="true">@L["CrmAlreadySynced"]</MudAlert>
-                }
-                else if (!CrmSyncService.IsConfigured)
-                {
-                    <MudAlert Severity="Severity.Info" Dense="true">@L["CrmNotConfigured"]</MudAlert>
-                }
-                else
-                {
-                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenCrmSyncAsync">@L["CrmSyncButton"]</MudButton>
+                    <div class="cv-attribute-row">
+                        <MudText Typo="Typo.body2" Class="cv-attribute-label">
+                            @AttributeLabels.Localize(L, definition.Name)
+                        </MudText>
+                        <AttributeValueEditor Definition="definition"
+                                               Value="@Draft(definition.Id)"
+                                               Disabled="@IsSaving(definition.Id)"
+                                               OnChanged="@(() => DraftChangedAsync(definition.Id))" />
+                        <div class="cv-attribute-status">
+                            @if (IsSaving(definition.Id))
+                            {
+                                <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                            }
+                            else if (_dirty.Contains(definition.Id))
+                            {
+                                <MudIcon Icon="@Icons.Material.Filled.Schedule"
+                                         Size="Size.Small"
+                                         Color="Color.Warning"
+                                         title="@L["ProfilePendingSave"]" />
+                            }
+                        </div>
+                    </div>
                 }
             </MudPaper>
-        </div>
+        }
+
+        <MudPaper Class="cv-panel pa-4 mb-4 cv-profile-section" id="@AccountAnchor">
+            <MudText Typo="Typo.h6" Class="mb-1">@L["ProfileAccount"]</MudText>
+            <MudText Typo="Typo.body2" Class="cv-text-caption mb-3">@L["ProfileExternalLoginsHint"]</MudText>
+            @if (_externalSchemes.Count == 0)
+            {
+                <MudText Typo="Typo.body2">@L["ExternalLoginUnavailable"]</MudText>
+            }
+            else
+            {
+                <ExternalProviderButtons Providers="_externalSchemes"
+                                         ReturnUrl="/profile"
+                                         LinkMode="true"
+                                         Color="Color.Primary"
+                                         CssClass="d-flex flex-wrap gap-2"
+                                         LabelFor="@(provider => L["LinkExternalProvider", provider.DisplayName ?? provider.Name])" />
+            }
+        </MudPaper>
+
+        <MudPaper Class="cv-panel pa-4 mb-4 cv-profile-section">
+            <MudText Typo="Typo.h6" Class="mb-1">@L["CrmSectionTitle"]</MudText>
+            <MudText Typo="Typo.body2" Class="cv-text-caption mb-3">@L["CrmSectionHint"]</MudText>
+            @if (_crmSynced)
+            {
+                <MudAlert Severity="Severity.Success" Dense="true">@L["CrmAlreadySynced"]</MudAlert>
+            }
+            else if (!CrmSyncService.IsConfigured)
+            {
+                <MudAlert Severity="Severity.Info" Dense="true">@L["CrmNotConfigured"]</MudAlert>
+            }
+            else
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenCrmSyncAsync">@L["CrmSyncButton"]</MudButton>
+            }
+        </MudPaper>
     </div>
 }
 
@@ -211,7 +190,6 @@ else
     private ActorContext? _actor;
     private IReadOnlyList<AuthenticationScheme> _externalSchemes = [];
     private bool _loading;
-    private string _activeAnchor = string.Empty;
     private string? _error;
     private string? _displayName;
     private string? _email;
@@ -258,8 +236,6 @@ else
             }
 
             _catalog = catalogResult.Value;
-            if (_catalog.Count > 0)
-                _activeAnchor = AnchorFor(_catalog[0].Id);
 
             var actor = await GetActorAsync();
             var summary = await ProfileService.GetSummaryForUserAsync(actor, actor.UserId);
@@ -343,20 +319,6 @@ else
         || draft.PeriodEnd is not null
         || draft.Boolean is not null
         || !string.IsNullOrWhiteSpace(draft.Dropdown);
-
-    private static string AnchorFor(AttributeCategoryDto category) => AnchorFor(category.Id);
-
-    private void SelectAnchor(string anchor)
-    {
-        _activeAnchor = anchor;
-        StateHasChanged();
-    }
-
-    private string NavItemClass(Guid id, string? anchor = null)
-    {
-        var target = anchor ?? AnchorFor(id);
-        return target == _activeAnchor ? "cv-profile-nav-link cv-profile-nav-link-active" : "cv-profile-nav-link";
-    }
 
     private static AttributeValueDraft ToDraft(AttributeValueDto value) => new()
     {

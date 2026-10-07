@@ -170,17 +170,54 @@ public class GapClosureTests
     [Fact]
     public void Resx_contains_builtin_attr_keys_and_concurrency_hint()
     {
-        var baseDir = AppContext.BaseDirectory;
-        var resx = System.IO.Path.GetFullPath(System.IO.Path.Combine(baseDir, "..", "..", "..", "..", "..", "src", "CvPlatform.Web", "Resources", "SharedResource.en.resx"));
-        if (!System.IO.File.Exists(resx))
-        {
-            var alt = "/home/jack/itransition/cv-management-platform/src/CvPlatform.Web/Resources/SharedResource.en.resx";
-            resx = alt;
-        }
-        var xml = System.IO.File.ReadAllText(resx);
+        var xml = System.IO.File.ReadAllText(ResxPath("SharedResource.en.resx"));
         xml.Should().Contain("Attr.Me.City");
         xml.Should().Contain("Attr.Me.BirthDate");
         xml.Should().Contain("ConcurrencyReloadHint");
+    }
+
+    [Theory]
+    [InlineData("SharedResource.en.resx")]
+    [InlineData("SharedResource.resx")]
+    public void English_resources_contain_no_polish_text(string fileName)
+    {
+        var values = ResxValues(ResxPath(fileName));
+
+        var polish = values
+            .Where(pair => PolishDiacritics.IsMatch(pair.Value))
+            .Select(pair => pair.Key)
+            .Order()
+            .ToList();
+
+        polish.Should().BeEmpty("'{0}' is the English resource file; Polish text belongs in SharedResource.pl.resx", fileName);
+    }
+
+    [Fact]
+    public void Every_shared_resource_key_exists_in_polish()
+    {
+        var english = ResxValues(ResxPath("SharedResource.resx"));
+        var polish = ResxValues(ResxPath("SharedResource.pl.resx"));
+
+        polish.Keys.Should().Contain(english.Keys, "SharedResource.pl.resx is the only translated file and must cover every key");
+    }
+
+    private static readonly System.Text.RegularExpressions.Regex PolishDiacritics = new(
+        "[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    private static string ResxPath(string fileName)
+    {
+        var baseDir = AppContext.BaseDirectory;
+        var resx = System.IO.Path.GetFullPath(System.IO.Path.Combine(baseDir, "..", "..", "..", "..", "..", "src", "CvPlatform.Web", "Resources", fileName));
+        return System.IO.File.Exists(resx) ? resx : "/home/jack/itransition/cv-management-platform/src/CvPlatform.Web/Resources/" + fileName;
+    }
+
+    private static Dictionary<string, string> ResxValues(string path)
+    {
+        var document = System.Xml.Linq.XDocument.Load(path);
+        return document.Root!.Elements("data")
+            .ToDictionary(
+                element => (string)element.Attribute("name")!,
+                element => ((string?)element.Element("value") ?? string.Empty).Trim());
     }
 
     [Fact]

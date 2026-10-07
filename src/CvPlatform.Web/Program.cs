@@ -182,6 +182,11 @@ builder.Services.Configure<RequestLocalizationOptions>(o =>
     o.DefaultRequestCulture = new Microsoft.AspNetCore.Localization.RequestCulture("en");
     o.SupportedCultures = cultures;
     o.SupportedUICultures = cultures;
+    // DefaultRequestCulture is only a fallback: Accept-Language outranks it, so a Polish-locale
+    // browser would render everything in Polish. The in-app switcher writes the culture cookie.
+    o.RequestCultureProviders = o.RequestCultureProviders
+        .Where(p => p is not Microsoft.AspNetCore.Localization.AcceptLanguageHeaderRequestCultureProvider)
+        .ToList();
 });
 
 var app = builder.Build();

@@ -702,20 +702,20 @@
   <data name="DeleteTemplatesConfirm" xml:space="preserve"><value>Delete {0} selected position template(s)?</value></data>
   <data name="TemplatesDeleted" xml:space="preserve"><value>{0} position template(s) deleted.</value></data>
   <data name="TemplateDeleted" xml:space="preserve"><value>Template deleted</value></data>
-  <data name="CategoryHelper" xml:space="preserve"><value>Wspólne atrybuty profilu należą do kategorii.</value></data>
-  <data name="NoAttributeCategories" xml:space="preserve"><value>Brak dostępnych kategorii atrybutów.</value></data>
-  <data name="RemoveOptions" xml:space="preserve"><value>Usuń opcje</value></data>
-  <data name="RemoveOptionsConfirm" xml:space="preserve"><value>Usunięcie tych opcji usunie także wartości profili i reguły dostępu, które ich używają. Kontynuować?</value></data>
-  <data name="EditAttribute" xml:space="preserve"><value>Edytuj atrybut</value></data>
-  <data name="AllCategories" xml:space="preserve"><value>Wszystkie kategorie</value></data>
-  <data name="AttributeCount" xml:space="preserve"><value>Atrybutów: {0}</value></data>
-  <data name="Source" xml:space="preserve"><value>Źródło</value></data>
-  <data name="BuiltIn" xml:space="preserve"><value>Wbudowany</value></data>
-  <data name="NoAttributesHint" xml:space="preserve"><value>Zmień wyszukiwanie lub utwórz nowy atrybut.</value></data>
-  <data name="AttributeDeleteImpact" xml:space="preserve"><value>Usunąć {0} atrybut(ów)? Profile: {1}; stanowiska: {2}; reguły: {3}; CV: {4}; stanowiska ograniczone tracące całe bramkowanie: {5}.</value></data>
-  <data name="DeleteAttribute" xml:space="preserve"><value>Usuń atrybut</value></data>
-  <data name="DeleteAttributes" xml:space="preserve"><value>Usuń atrybuty</value></data>
-  <data name="AttributesDeleted" xml:space="preserve"><value>Usunięto atrybutów: {0}.</value></data>
+  <data name="CategoryHelper" xml:space="preserve"><value>Shared profile attributes belong to a category.</value></data>
+  <data name="NoAttributeCategories" xml:space="preserve"><value>No attribute categories available.</value></data>
+  <data name="RemoveOptions" xml:space="preserve"><value>Remove options</value></data>
+  <data name="RemoveOptionsConfirm" xml:space="preserve"><value>Removing these options will also remove the profile values and access rules that use them. Continue?</value></data>
+  <data name="EditAttribute" xml:space="preserve"><value>Edit attribute</value></data>
+  <data name="AllCategories" xml:space="preserve"><value>All categories</value></data>
+  <data name="AttributeCount" xml:space="preserve"><value>Attributes: {0}</value></data>
+  <data name="Source" xml:space="preserve"><value>Source</value></data>
+  <data name="BuiltIn" xml:space="preserve"><value>Built-in</value></data>
+  <data name="NoAttributesHint" xml:space="preserve"><value>Change your search or create a new attribute.</value></data>
+  <data name="AttributeDeleteImpact" xml:space="preserve"><value>Delete {0} attribute(s)? Profiles: {1}; positions: {2}; rules: {3}; CVs: {4}; restricted positions losing full gating: {5}.</value></data>
+  <data name="DeleteAttribute" xml:space="preserve"><value>Delete attribute</value></data>
+  <data name="DeleteAttributes" xml:space="preserve"><value>Delete attributes</value></data>
+  <data name="AttributesDeleted" xml:space="preserve"><value>Deleted {0} attribute(s).</value></data>
   <data name="ErrorPageTitle" xml:space="preserve"><value>Error</value></data>
   <data name="ErrorPageBody" xml:space="preserve"><value>An error occurred while processing your request.</value></data>
   <data name="ErrorBoundaryTitle" xml:space="preserve"><value>Something went wrong</value></data>
@@ -759,7 +759,6 @@
   <data name="ProfileUnsavedChangesBody" xml:space="preserve"><value>Your most recent edits have not been saved yet. Leaving now discards them.</value></data>
   <data name="ProfileDiscardChanges" xml:space="preserve"><value>Discard changes</value></data>
   <data name="ProfileKeepEditing" xml:space="preserve"><value>Keep editing</value></data>
-  <data name="ProfileJumpToSection" xml:space="preserve"><value>Sections</value></data>
   <data name="ConcurrencyConflictTitle" xml:space="preserve"><value>Someone else changed this profile</value></data>
   <data name="ProfilePendingSave" xml:space="preserve"><value>Waiting to save</value></data>
   <data name="CrmSectionTitle" xml:space="preserve"><value>CRM (Salesforce)</value></data>

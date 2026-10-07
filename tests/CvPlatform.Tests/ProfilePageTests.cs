@@ -73,33 +73,14 @@ public class ProfilePageTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
-    public void Every_section_is_reachable_from_the_sticky_navigation()
+    public void Sections_keep_their_fragment_targets_and_the_side_navigation_is_gone()
     {
         var cut = RenderPage();
 
-        var targets = cut.FindAll("nav.cv-profile-nav a")
-            .Select(anchor => anchor.GetAttribute("href")).ToList();
-
-        targets.Should().Equal(
-            $"#profile-section-{PersonalId:D}",
-            $"#profile-section-{ContactId:D}",
-            "#profile-section-account");
+        cut.FindAll("nav.cv-profile-nav").Should().BeEmpty();
         cut.Find($"#profile-section-{PersonalId:D}").Should().NotBeNull();
+        cut.Find($"#profile-section-{ContactId:D}").Should().NotBeNull();
         cut.Find("#profile-section-account").Should().NotBeNull();
-    }
-
-    [Fact]
-    public void The_first_section_is_marked_active_and_selection_moves_on_click()
-    {
-        var cut = RenderPage();
-
-        cut.Find("nav.cv-profile-nav a.cv-profile-nav-link-active")
-            .GetAttribute("href").Should().Be($"#profile-section-{PersonalId:D}");
-
-        cut.FindAll("nav.cv-profile-nav a")[1].Click();
-
-        cut.Find("nav.cv-profile-nav a.cv-profile-nav-link-active")
-            .GetAttribute("href").Should().Be($"#profile-section-{ContactId:D}");
     }
 
     [Fact]
@@ -447,7 +428,6 @@ public class ProfilePageTests : BunitContext, IAsyncLifetime
                 ["ProfileAboutYou"] = "About you",
                 ["ProfileAccount"] = "Account",
                 ["ProfileExternalLoginsHint"] = "Sign in faster by linking an external account.",
-                ["ProfileJumpToSection"] = "Sections",
                 ["ProfileSaving"] = "Saving your changes...",
                 ["ProfileSaved"] = "All changes saved",
                 ["ProfileSaveFailed"] = "Some changes could not be saved",

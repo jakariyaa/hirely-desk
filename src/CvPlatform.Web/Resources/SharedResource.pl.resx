@@ -759,7 +759,6 @@
   <data name="ProfileUnsavedChangesBody" xml:space="preserve"><value>Ostatnie zmiany nie zostały jeszcze zapisane. Wyjście, a zostaną utracone.</value></data>
   <data name="ProfileDiscardChanges" xml:space="preserve"><value>Odrzuć zmiany</value></data>
   <data name="ProfileKeepEditing" xml:space="preserve"><value>Kontynuuj edycję</value></data>
-  <data name="ProfileJumpToSection" xml:space="preserve"><value>Sekcje</value></data>
   <data name="ConcurrencyConflictTitle" xml:space="preserve"><value>Ktoś inny zmienił ten profil</value></data>
   <data name="ProfilePendingSave" xml:space="preserve"><value>Oczekuje na zapis</value></data>
   <data name="CrmSectionTitle" xml:space="preserve"><value>CRM (Salesforce)</value></data>
