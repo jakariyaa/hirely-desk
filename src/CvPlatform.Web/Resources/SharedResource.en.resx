@@ -479,6 +479,9 @@
   <data name="NoResults" xml:space="preserve">
     <value>No results found.</value>
   </data>
+  <data name="ViewAllResults" xml:space="preserve">
+    <value>View all results</value>
+  </data>
   <data name="LatestCvs" xml:space="preserve">
     <value>Latest CVs</value>
   </data>

@@ -9,25 +9,27 @@
 @inject NavigationManager Navigation
 @inject IStringLocalizer<SharedResource> L
 
-<MudAutocomplete T="SearchItem" SearchFunc="SearchAsync" ToStringFunc="@(i => i?.Title ?? "")"
+<MudAutocomplete @ref="_box" T="SearchItem" SearchFunc="SearchAsync" ToStringFunc="@(i => i?.Title ?? "")"
+                 @bind-Text="_text"
                  ValueChanged="OnSelectedAsync" Placeholder="@L["SearchPlaceholder"]"
                  AdornmentIcon="@Icons.Material.Filled.Search" Adornment="Adornment.Start"
-                 OnAdornmentClick="@(() => GoToSearchAsync())"
+                 OnAdornmentClick="@GoToSearchAsync"
                  DebounceInterval="300" MinCharacters="2" Clearable="true" Dense="true"
+                 AfterItemsTemplate="@Footer" NoItemsTemplate="@Empty"
                  Class="cv-global-search" />
 
 @code {
     public sealed record SearchItem(Guid Id, string Title, string Url);
 
-    private string? _lastQuery;
+    private MudAutocomplete<SearchItem>? _box;
+    private string? _text;
 
     private async Task<IEnumerable<SearchItem>> SearchAsync(string value, CancellationToken ct)
     {
-        _lastQuery = value;
         if (string.IsNullOrWhiteSpace(value) || value.Trim().Length < 2)
             return [];
         var actor = await GetActorAsync();
-        var result = await SearchService.SearchAsync(actor, value.Trim(), new PageRequest(1, 10), ct);
+        var result = await SearchService.SearchAsync(actor, value.Trim(), new PageRequest(1, 5), ct);
         if (!result.Succeeded || result.Value is null)
             return [];
         var items = new List<SearchItem>();
@@ -35,7 +37,6 @@
             new SearchItem(p.Id, p.Title, $"/positions/{p.Id}/apply")));
         items.AddRange(result.Value.Cvs.Items.Select(c =>
             new SearchItem(c.CvId, $"{c.PositionTitle} — {c.CandidateName}", $"/cvs/{c.CvId}")));
-        items.Add(new SearchItem(Guid.Empty, L["ViewAllResults"], $"/search?Term={Uri.EscapeDataString(value.Trim())}"));
         return items;
     }
 
@@ -46,12 +47,24 @@
         return Task.CompletedTask;
     }
 
-    private Task GoToSearchAsync()
+    private async Task GoToSearchAsync()
     {
-        if (!string.IsNullOrWhiteSpace(_lastQuery))
-            Navigation.NavigateTo($"/search?Term={Uri.EscapeDataString(_lastQuery.Trim())}");
-        return Task.CompletedTask;
+        var term = _text?.Trim();
+        if (string.IsNullOrEmpty(term))
+            return;
+        Navigation.NavigateTo($"/search?Term={Uri.EscapeDataString(term)}");
+        await _box!.ClearAsync();
     }
+
+    private RenderFragment Footer => @<MudButton Class="ma-2" FullWidth="true" Variant="Variant.Text"
+        Color="Color.Primary" StartIcon="@Icons.Material.Filled.List" OnClick="@GoToSearchAsync">
+        @L["ViewAllResults"]
+    </MudButton>;
+
+    private RenderFragment Empty => @<div class="pa-2 d-flex align-center justify-space-between">
+        <MudText Typo="Typo.body2">@L["NoResults"]</MudText>
+        <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="@GoToSearchAsync">@L["ViewAllResults"]</MudButton>
+    </div>;
 
     private async Task<ActorContext> GetActorAsync()
     {
